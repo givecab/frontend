@@ -1,45 +1,41 @@
-"use client"
-
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider, useAuth } from "@/contexts/auth-context"
-import { ProtectedRoute } from "@/components/protected-route"
-import Login from "@/components/login"
-import Home from "@/components/home"
-
-// Component to handle initial route logic
-function AppRoutes() {
-  const { user, isLoading } = useAuth()
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Cargando...</div>
-      </div>
-    )
-  }
-
-  return (
-    <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
-    </Routes>
-  )
-}
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
+import { AuthProvider } from "./contexts/auth-context"
+import Login from "./components/login"
+import Home from "./components/home"
+import { Layout } from "./components/layout"
+import { ProtectedRoute } from "./components/protected-route"
+import ManagementPage from "./components/admin/management-page"
+import { Toaster } from "sonner"
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <AppRoutes />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Home />} />
+          </Route>
+          <Route
+            path="/management"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ManagementPage />} />
+          </Route>
+        </Routes>
       </Router>
+      <Toaster position="bottom-right" richColors />
     </AuthProvider>
   )
 }

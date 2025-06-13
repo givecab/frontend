@@ -2,7 +2,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { User, Shield, Clock, TestTube, Users, TrendingUp, Calendar, CheckCircle } from "lucide-react"
 
-export default function Home() {
+const HomePage = () => {
   const { user } = useAuth()
 
   const getActivePermissions = () => {
@@ -143,3 +143,5 @@ export default function Home() {
     </div>
   )
 }
+
+export default HomePage

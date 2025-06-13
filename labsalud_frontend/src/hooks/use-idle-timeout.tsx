@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 
 interface UseIdleTimeoutProps {
   onIdle: () => void
@@ -17,6 +18,7 @@ export const useIdleTimeout = ({ onIdle, idleTime = 5 * 60 * 1000, warningTime =
   const isActiveRef = useRef(true)
   const lastActivityRef = useRef(Date.now())
   const showWarningRef = useRef(false)
+  const toastIdRef = useRef<string | number | null>(null)
 
   // Sincronizar el ref con el estado
   useEffect(() => {
@@ -36,25 +38,11 @@ export const useIdleTimeout = ({ onIdle, idleTime = 5 * 60 * 1000, warningTime =
       clearInterval(countdownTimerRef.current)
       countdownTimerRef.current = null
     }
+    if (toastIdRef.current) {
+      toast.dismiss(toastIdRef.current)
+      toastIdRef.current = null
+    }
   }, [])
-
-  const startCountdown = useCallback(() => {
-    let seconds = Math.floor(warningTime / 1000)
-    setTimeLeft(seconds)
-
-    countdownTimerRef.current = setInterval(() => {
-      seconds -= 1
-      setTimeLeft(seconds)
-
-      if (seconds <= 0) {
-        clearInterval(countdownTimerRef.current!)
-        countdownTimerRef.current = null
-        setShowWarning(false)
-        isActiveRef.current = false
-        onIdle()
-      }
-    }, 1000)
-  }, [warningTime, onIdle])
 
   const resetTimer = useCallback(() => {
     if (!isActiveRef.current) return
@@ -78,12 +66,40 @@ export const useIdleTimeout = ({ onIdle, idleTime = 5 * 60 * 1000, warningTime =
         onIdle()
       }
     }, idleTime)
-  }, [idleTime, warningTime, onIdle, startCountdown, clearAllTimers])
+  }, [idleTime, warningTime, onIdle, clearAllTimers])
 
   const extendSession = useCallback(() => {
     setShowWarning(false)
     resetTimer()
   }, [resetTimer])
+
+  const startCountdown = useCallback(() => {
+    let seconds = Math.floor(warningTime / 1000)
+    setTimeLeft(seconds)
+
+    // Eliminar el toast de advertencia - Ya no mostraremos el toast
+    // toastIdRef.current = toast.warning("Sesión por expirar", {
+    //   description: "Tu sesión expirará pronto por inactividad.",
+    //   action: {
+    //     label: "Continuar sesión",
+    //     onClick: extendSession,
+    //   },
+    //   duration: warningTime, // Duración igual al tiempo de advertencia
+    // })
+
+    countdownTimerRef.current = setInterval(() => {
+      seconds -= 1
+      setTimeLeft(seconds)
+
+      if (seconds <= 0) {
+        clearInterval(countdownTimerRef.current!)
+        countdownTimerRef.current = null
+        setShowWarning(false)
+        isActiveRef.current = false
+        onIdle()
+      }
+    }, 1000)
+  }, [warningTime, onIdle])
 
   // Función para manejar eventos de actividad del usuario
   const handleActivity = useCallback(

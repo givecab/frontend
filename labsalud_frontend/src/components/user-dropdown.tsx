@@ -2,8 +2,9 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { User, LogOut, Settings, UserCircle } from "lucide-react"
+import { User, LogOut, Settings, UserCircle, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { Link } from "react-router-dom"
 
 interface UserDropdownProps {
   isMobile?: boolean
@@ -14,7 +15,22 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const { user, logout } = useAuth()
+  const { user, logout, hasPermission } = useAuth()
+
+  // Verificar si el usuario tiene al menos uno de los permisos de gestión
+  // Excluimos el permiso 24 (consultar usuario) si es el único que tiene
+  const hasOnlyViewPermission =
+    hasPermission("24") && ![30, 31, 32, 33, 34, 35, 36].some((permId) => hasPermission(permId.toString()))
+
+  const canAccessManagement =
+    !hasOnlyViewPermission &&
+    (hasPermission("30") || // crear usuario
+      hasPermission("31") || // modificar usuario
+      hasPermission("32") || // eliminar usuario
+      hasPermission("33") || // crear rol
+      hasPermission("34") || // asignar rol
+      hasPermission("35") || // quitar rol
+      hasPermission("36")) // gestionar permisos temporales
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -76,7 +92,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
         ref={menuRef}
         className={`
           absolute z-50 bg-white shadow-lg overflow-hidden transition-all duration-200 ease-in-out
-          ${isMobile ? "left-0 w-full fixed top-[4.5rem] rounded-b-lg" : "right-0 mt-0 w-48 rounded-b-lg"}
+          ${isMobile ? "left-0 w-full fixed top-[3.5rem] rounded-b-lg" : "right-0 mt-0 w-48 rounded-b-lg"}
           ${isOpen ? "opacity-100 max-h-96" : "opacity-0 max-h-0 pointer-events-none"}
         `}
         style={
@@ -116,15 +132,34 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
 
         {/* Menu Items */}
         <div className={isMobile ? "p-4" : ""}>
-          <button className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 transition-colors duration-150">
+          <Link
+            to="/profile"
+            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 transition-colors duration-150"
+            onClick={() => setIsOpen(false)}
+          >
             <UserCircle className="w-5 h-5" />
             <span>Mi Perfil</span>
-          </button>
+          </Link>
 
-          <button className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 transition-colors duration-150">
+          {canAccessManagement && (
+            <Link
+              to="/management"
+              className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 transition-colors duration-150"
+              onClick={() => setIsOpen(false)}
+            >
+              <Shield className="w-5 h-5" />
+              <span>Gestión de Usuarios</span>
+            </Link>
+          )}
+
+          <Link
+            to="/settings"
+            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 transition-colors duration-150"
+            onClick={() => setIsOpen(false)}
+          >
             <Settings className="w-5 h-5" />
             <span>Configuración</span>
-          </button>
+          </Link>
 
           <hr className="my-2" />
 

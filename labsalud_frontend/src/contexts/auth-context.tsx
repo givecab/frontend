@@ -5,6 +5,13 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 import { useIdleTimeout } from "@/hooks/use-idle-timeout"
 import { IdleWarningModal } from "@/components/idle-warning-modal"
 
+interface PermissionObject {
+  id: number
+  nombre: string
+  es_temporal: boolean
+  fecha_expiracion: string | null
+}
+
 interface TempPermission {
   permission: string
   name: string
@@ -25,6 +32,7 @@ interface User {
     name: string
   }
   temp_permissions?: TempPermission[]
+  permissions?: PermissionObject[] // Array de objetos de permisos
 }
 
 interface AuthContextType {
@@ -33,7 +41,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>
   logout: () => void
   isLoading: boolean
-  hasPermission: (permission: string) => boolean
+  hasPermission: (permission: string | number) => boolean
   isInGroup: (groupName: string) => boolean
   refreshToken: () => Promise<boolean>
 }
@@ -86,13 +94,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const hasPermission = useCallback(
-    (permission: string): boolean => {
-      if (!user || !user.temp_permissions) return false
-      const now = new Date()
-      return user.temp_permissions.some((tempPerm) => {
-        const expiresAt = new Date(tempPerm.expires_at)
-        return tempPerm.permission === permission && expiresAt > now
-      })
+    (permission: string | number): boolean => {
+      if (!user) return false
+
+      // Convertir el permiso a número si es string
+      const permissionId = typeof permission === "string" ? Number(permission) : permission
+
+      // Verificar si el permiso está en el array de objetos de permisos
+      if (user.permissions && Array.isArray(user.permissions)) {
+        // Buscar un objeto de permiso cuyo ID coincida con el permiso solicitado
+        const foundPermission = user.permissions.find((perm) => perm.id === permissionId)
+
+        if (foundPermission) {
+          // Si el permiso no es temporal, o si es temporal pero no ha expirado
+          if (
+            !foundPermission.es_temporal ||
+            (foundPermission.es_temporal &&
+              foundPermission.fecha_expiracion &&
+              new Date(foundPermission.fecha_expiracion) > new Date())
+          ) {
+            return true
+          }
+        }
+      }
+
+      // Mantener la verificación de permisos temporales como respaldo
+      if (user.temp_permissions) {
+        const now = new Date()
+        return user.temp_permissions.some((tempPerm) => {
+          const expiresAt = new Date(tempPerm.expires_at)
+          const tempPermId = typeof tempPerm.permission === "string" ? Number(tempPerm.permission) : tempPerm.permission
+          return tempPermId === permissionId && expiresAt > now
+        })
+      }
+
+      return false
     },
     [user],
   )
@@ -139,20 +175,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      console.log("Intentando login con:", username)
-
       const response = await fetch("http://192.168.1.8:8000/api/token/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       })
 
-      console.log("Respuesta del servidor:", response.status)
-
       if (response.ok) {
         const data = await response.json()
-        console.log("Login exitoso, guardando datos...")
-
         localStorage.setItem("access_token", data.access)
         localStorage.setItem("refresh_token", data.refresh)
         localStorage.setItem("user", JSON.stringify(data.user))
@@ -160,7 +190,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(data.user)
         return true
       } else {
-        console.log("Login falló con status:", response.status)
         return false
       }
     } catch (error) {
@@ -170,7 +199,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading, hasPermission, isInGroup, refreshToken }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        isLoading,
+        hasPermission,
+        isInGroup,
+        refreshToken,
+      }}
+    >
       {children}
 
       {/* Modal de advertencia de inactividad - solo se muestra si hay usuario logueado */}
