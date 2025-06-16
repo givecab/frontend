@@ -5,6 +5,7 @@ import Home from "./components/home"
 import { Layout } from "./components/layout"
 import { ProtectedRoute } from "./components/protected-route"
 import ManagementPage from "./components/admin/management-page"
+import PatientsPage from "./components/patients/patients-page"
 import { Toaster } from "sonner"
 
 function App() {
@@ -32,6 +33,16 @@ function App() {
             }
           >
             <Route index element={<ManagementPage />} />
+          </Route>
+          <Route
+            path="/pacientes"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<PatientsPage />} />
           </Route>
         </Routes>
       </Router>

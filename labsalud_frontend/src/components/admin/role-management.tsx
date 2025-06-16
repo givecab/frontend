@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
+import { env } from "@/config/env"
 
 interface RoleManagementProps {
   roles: Role[]
@@ -42,7 +43,7 @@ export function RoleManagement({ roles, permissions, setRoles }: RoleManagementP
   // Permisos
   const canCreateRole = hasPermission("33")
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
@@ -50,7 +51,7 @@ export function RoleManagement({ roles, permissions, setRoles }: RoleManagementP
     }))
   }
 
-  const handlePermissionChange = (permissionId: string, checked: boolean) => {
+  const handlePermissionChange = (permissionId: string, checked: boolean): void => {
     setFormData((prev) => {
       if (checked) {
         return { ...prev, permissions: [...prev.permissions, Number.parseInt(permissionId)] }
@@ -75,12 +76,15 @@ export function RoleManagement({ roles, permissions, setRoles }: RoleManagementP
     })
   }
 
-  // Modificar la función handleCreateRole para actualizar el estado inmediatamente
-  const handleCreateRole = async () => {
+  const handleCreateRole = async (): Promise<void> => {
     try {
       const loadingId = toast.loading("Creando rol...")
 
-      const response = await apiRequest("/api/roles/", {
+      if (env.DEBUG_MODE) {
+        console.log("Creando rol:", formData.name)
+      }
+
+      const response = await apiRequest(env.ROLES_ENDPOINT, {
         method: "POST",
         body: formData,
       })
@@ -92,24 +96,27 @@ export function RoleManagement({ roles, permissions, setRoles }: RoleManagementP
         setRoles((prev) => [...prev, newRole])
         toast.success("Rol creado", {
           description: `El rol ${newRole.name} ha sido creado exitosamente.`,
+          duration: env.TOAST_DURATION,
         })
         resetForm()
       } else {
         const errorData = await response.json()
         toast.error("Error al crear rol", {
           description: errorData.detail || "Ha ocurrido un error al crear el rol.",
+          duration: env.TOAST_DURATION,
         })
       }
     } catch (error) {
       console.error("Error al crear rol:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al crear el rol.",
+        duration: env.TOAST_DURATION,
       })
     }
   }
 
   // Función para obtener el nombre del permiso por ID
-  const getPermissionName = (permissionId: number) => {
+  const getPermissionName = (permissionId: number): string => {
     const permission = permissions.find((p) => p.id === permissionId)
     return permission ? permission.name : "Desconocido"
   }

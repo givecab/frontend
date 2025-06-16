@@ -8,8 +8,9 @@ import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
 import { PermissionManagement } from "./permission-management"
 import { Loader2, AlertCircle } from "lucide-react"
+import { env } from "@/config/env"
 
-// Interfaces para los datos
+// Interfaces para los datos - EXPORTADAS
 export interface User {
   id: number
   username: string
@@ -73,29 +74,45 @@ export default function ManagementPage() {
       setError(null)
 
       try {
+        if (env.DEBUG_MODE) {
+          console.log("Cargando datos de gestión...")
+        }
+
         // Cargar usuarios
-        const usersResponse = await apiRequest("/api/users/")
+        const usersResponse = await apiRequest(env.USERS_ENDPOINT)
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
           setUsers(usersData)
+
+          if (env.DEBUG_MODE) {
+            console.log(`Usuarios cargados: ${usersData.length}`)
+          }
         } else {
           console.error("Error al cargar usuarios:", usersResponse.status)
         }
 
         // Cargar roles
-        const rolesResponse = await apiRequest("/api/roles/")
+        const rolesResponse = await apiRequest(env.ROLES_ENDPOINT)
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json()
           setRoles(rolesData)
+
+          if (env.DEBUG_MODE) {
+            console.log(`Roles cargados: ${rolesData.length}`)
+          }
         } else {
           console.error("Error al cargar roles:", rolesResponse.status)
         }
 
         // Cargar permisos
-        const permissionsResponse = await apiRequest("/api/permissions/")
+        const permissionsResponse = await apiRequest(env.PERMISSIONS_ENDPOINT)
         if (permissionsResponse.ok) {
           const permissionsData = await permissionsResponse.json()
           setPermissions(permissionsData)
+
+          if (env.DEBUG_MODE) {
+            console.log(`Permisos cargados: ${permissionsData.length}`)
+          }
         } else {
           console.error("Error al cargar permisos:", permissionsResponse.status)
         }
