@@ -1,107 +1,171 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import type { User, Role } from "@/components/admin/management-page"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import type { User, Role } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
-import { env } from "@/config/env"
+import { useToast } from "@/hooks/use-toast"
+import type { ApiRequestOptions } from "@/hooks/use-api"
 
 interface RoleAssignDialogProps {
-  isOpen: boolean
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   user: User | null
   roles: Role[]
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
-  apiRequest: (url: string, options?: any) => Promise<Response>
+  apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
+  refreshData?: () => Promise<void>
 }
 
-export function RoleAssignDialog({ isOpen, onClose, user, roles, setUsers, apiRequest }: RoleAssignDialogProps) {
+export function RoleAssignDialog({
+  open,
+  onOpenChange,
+  user,
+  roles,
+  setUsers,
+  apiRequest,
+  refreshData,
+}: RoleAssignDialogProps) {
+  const { success, error: showError } = useToast()
   const [roleData, setRoleData] = useState({
     role_id: "",
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const availableRoles = useMemo(() => {
+    if (!user || !roles || !Array.isArray(roles)) {
+      return []
+    }
+    const userGroups = user.groups || user.roles || []
+    const userRoleIds = userGroups.map((group) => group.id)
+    return roles.filter((role) => !userRoleIds.includes(role.id))
+  }, [user, roles])
+
+  useEffect(() => {
+    if (open && user && availableRoles.length > 0) {
+      const savedData = localStorage.getItem(`role-assign-${user.id}`)
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData)
+          if (availableRoles.some((role) => role.id.toString() === parsed.role_id)) {
+            setRoleData(parsed)
+          } else {
+            setRoleData({ role_id: availableRoles[0].id.toString() })
+          }
+        } catch (e) {
+          console.error("Error parsing saved role assign data:", e)
+          setRoleData({ role_id: availableRoles[0].id.toString() })
+        }
+      } else {
+        setRoleData({ role_id: availableRoles[0].id.toString() })
+      }
+    } else if (!open) {
+      setRoleData({ role_id: "" })
+      setIsSubmitting(false)
+      localStorage.removeItem(`role-assign-${user?.id}`)
+    }
+  }, [open, user, availableRoles])
+
+  const saveRoleData = useCallback(
+    (data: { role_id: string }) => {
+      if (user && data.role_id) {
+        localStorage.setItem(`role-assign-${user.id}`, JSON.stringify(data))
+      }
+    },
+    [user],
+  )
+
+  useEffect(() => {
+    if (roleData.role_id) {
+      saveRoleData(roleData)
+    }
+  }, [roleData, saveRoleData])
 
   const handleAssignRole = async () => {
     if (!user || !roleData.role_id) return
 
+    setIsSubmitting(true)
+
     try {
-      const loadingId = toast.loading("Asignando rol...")
-
-      const response = await apiRequest(`${env.USERS_ENDPOINT}${user.id}/assign-role/`, {
-        method: "PUT",
-        body: {
-          role_id: Number.parseInt(roleData.role_id),
+      const response = await apiRequest(
+        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}${user.id}/assign-role/`,
+        {
+          method: "PUT",
+          body: {
+            role_id: Number.parseInt(roleData.role_id),
+          },
         },
-      })
-
-      toast.dismiss(loadingId)
+      )
 
       if (response.ok) {
         const updatedUser = await response.json()
         setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
-
-        toast.success("Rol asignado", {
-          description: "El rol ha sido asignado exitosamente.",
-          duration: env.TOAST_DURATION,
-        })
-        setRoleData({ role_id: "" })
-        onClose()
+        if (refreshData) {
+          await refreshData()
+        }
+        success("Rol asignado", { description: "El rol ha sido asignado exitosamente." })
+        onOpenChange(false)
       } else {
-        const errorData = await response.json()
-        toast.error("Error al asignar rol", {
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
+        showError("Error al asignar rol", {
           description: errorData.detail || "Ha ocurrido un error al asignar el rol.",
-          duration: env.TOAST_DURATION,
         })
       }
-    } catch (error) {
-      console.error("Error al asignar rol:", error)
-      toast.error("Error", {
-        description: "Ha ocurrido un error al asignar el rol.",
-        duration: env.TOAST_DURATION,
-      })
+    } catch (err) {
+      console.error("Error al asignar rol:", err)
+      showError("Error", { description: "Ha ocurrido un error de red o inesperado." })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const handleClose = () => {
-    setRoleData({ role_id: "" })
-    onClose()
-  }
+  if (!user) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Asignar Rol</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="role_id">Rol</Label>
-            <Select
-              value={roleData.role_id}
-              onValueChange={(value) => setRoleData((prev) => ({ ...prev, role_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.id.toString()}>
-                    {role.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="py-4">
+          {availableRoles.length > 0 ? (
+            <div className="space-y-4">
+              <p>
+                Selecciona el rol que deseas asignar a <strong>{user.username}</strong>:
+              </p>
+              <Select
+                value={roleData.role_id}
+                onValueChange={(value) => setRoleData((prev) => ({ ...prev, role_id: value }))}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.id.toString()}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p>Este usuario ya tiene todos los roles disponibles asignados.</p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancelar</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting}>
+              Cancelar
+            </Button>
           </DialogClose>
-          <Button className="bg-[#204983]" onClick={handleAssignRole}>
-            Asignar Rol
+          <Button onClick={handleAssignRole} disabled={isSubmitting || availableRoles.length === 0}>
+            {isSubmitting ? "Asignando..." : "Asignar Rol"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,81 +1,88 @@
 "use client"
 
 import type React from "react"
-import type { User } from "@/components/admin/management-page"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { toast } from "sonner"
-import { env } from "@/config/env"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
+import type { User } from "@/types"
+import type { ApiRequestOptions } from "@/hooks/use-api"
 
 interface DeleteUserDialogProps {
-  isOpen: boolean
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   user: User | null
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
-  apiRequest: (url: string, options?: any) => Promise<Response>
+  apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
+  refreshData: () => Promise<void>
 }
 
-export function DeleteUserDialog({ isOpen, onClose, user, setUsers, apiRequest }: DeleteUserDialogProps) {
+export function DeleteUserDialog({
+  open,
+  onOpenChange,
+  user,
+  setUsers,
+  apiRequest,
+  refreshData,
+}: DeleteUserDialogProps) {
+  const { success, error } = useToast()
+
   const handleDeleteUser = async () => {
     if (!user) return
 
     try {
-      const loadingId = toast.loading("Eliminando usuario...")
-
-      const response = await apiRequest(`${env.USERS_ENDPOINT}${user.id}/`, {
-        method: "DELETE",
-      })
-
-      toast.dismiss(loadingId)
+      const response = await apiRequest(
+        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}${user.id}/`,
+        {
+          method: "DELETE",
+        },
+      )
 
       if (response.ok) {
         setUsers((prev) => prev.filter((u) => u.id !== user.id))
-        toast.success("Usuario eliminado", {
+        await refreshData()
+        success("Usuario eliminado", {
           description: "El usuario ha sido eliminado exitosamente.",
-          duration: env.TOAST_DURATION,
         })
-        onClose()
+        onOpenChange(false)
       } else {
-        const errorData = await response.json()
-        toast.error("Error al eliminar usuario", {
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
+        error("Error al eliminar usuario", {
           description: errorData.detail || "Ha ocurrido un error al eliminar el usuario.",
-          duration: env.TOAST_DURATION,
         })
       }
-    } catch (error) {
-      console.error("Error al eliminar usuario:", error)
-      toast.error("Error", {
-        description: "Ha ocurrido un error al eliminar el usuario.",
-        duration: env.TOAST_DURATION,
+    } catch (err) {
+      console.error("Error al eliminar usuario:", err)
+      error("Error", {
+        description: "Ha ocurrido un error de red o inesperado.",
       })
     }
   }
 
+  if (!user) return null
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Esta acción no se puede deshacer. El usuario <strong>{user?.username}</strong> será eliminado
-            permanentemente.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteUser} className="bg-red-600 hover:bg-red-700">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Eliminar Usuario</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p>
+            ¿Estás seguro de que deseas eliminar al usuario <strong>{user.username}</strong>? Esta acción no se puede
+            deshacer.
+          </p>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancelar
+            </Button>
+          </DialogClose>
+          <Button className="bg-red-600 hover:bg-red-700" onClick={handleDeleteUser}>
             Eliminar
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

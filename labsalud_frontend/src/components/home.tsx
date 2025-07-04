@@ -1,14 +1,20 @@
 "use client"
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
 import { User, Shield, Clock, TestTube, Users, TrendingUp, Calendar, CheckCircle } from "lucide-react"
+
+interface TempPermission {
+  id: number
+  name: string
+  expires_at: string
+}
 
 export default function Home() {
   const { user } = useAuth()
 
-  const getActivePermissions = () => {
+  const getActivePermissions = (): TempPermission[] => {
     if (!user || !user.temp_permissions) return []
     const now = new Date()
-    return user.temp_permissions.filter((perm) => new Date(perm.expires_at) > now)
+    return user.temp_permissions.filter((perm: TempPermission) => new Date(perm.expires_at) > now)
   }
 
   // Datos simulados que luego vendrán de la API
@@ -53,7 +59,7 @@ export default function Home() {
             <h3 className="font-semibold text-green-800">Permisos Temporales Activos</h3>
           </div>
           <div className="space-y-2">
-            {getActivePermissions().map((perm, index) => (
+            {getActivePermissions().map((perm: TempPermission, index: number) => (
               <div key={index} className="flex items-center justify-between bg-white/95 backdrop-blur-sm rounded p-2">
                 <span className="text-sm font-medium text-green-800">{perm.name}</span>
                 <div className="flex items-center space-x-1 text-xs text-green-600">

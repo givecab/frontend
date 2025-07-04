@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { User, Lock, AlertCircle } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
 
 export default function Login() {
   const [username, setUsername] = useState("")
@@ -17,14 +17,12 @@ export default function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      console.log("Usuario autenticado, redirigiendo...")
       navigate("/", { replace: true })
     }
   }, [user, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Formulario enviado")
 
     setError("") // Limpiar errores previos
     setIsSubmitting(true)
@@ -35,15 +33,11 @@ export default function Login() {
       return
     }
 
-    console.log("Llamando a login...")
     const success = await login(username, password)
-    console.log("Resultado del login:", success)
 
     if (success) {
-      console.log("Login exitoso")
       // La redirección se manejará en el useEffect cuando user cambie
     } else {
-      console.log("Login falló, mostrando error")
       setError("Usuario o contraseña incorrectos. Por favor, verifica tus credenciales e intenta nuevamente.")
     }
 
@@ -52,7 +46,6 @@ export default function Login() {
 
   // Mostrar loading solo durante la verificación inicial
   if (isLoading) {
-    console.log("Mostrando pantalla de carga inicial")
     return (
       <div className="min-h-screen bg-[#adadad] flex items-center justify-center">
         <div className="bg-white rounded-lg p-8 shadow-lg">
@@ -67,11 +60,8 @@ export default function Login() {
 
   // Si ya hay usuario, no mostrar nada (el useEffect se encargará de redirigir)
   if (user) {
-    console.log("Usuario existe, no mostrando login")
     return null
   }
-
-  console.log("Renderizando formulario de login")
 
   return (
     <div className="min-h-screen bg-[#adadad] relative overflow-hidden">
@@ -170,9 +160,12 @@ export default function Login() {
 
             {/* Additional Options */}
             <div className="mt-6 text-center">
-              <a href="#" className="text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200"
+              >
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
           </div>
         </div>

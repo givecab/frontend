@@ -19,32 +19,7 @@ export function PatientTable({ patients, onSelectPatient, canEdit, canDelete }: 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [isViewingDetails, setIsViewingDetails] = useState(false)
 
-  // Reemplazar la función formatDateForDisplay con esta versión corregida:
-  const formatDateForDisplay = (dateString: string) => {
-    if (!dateString) return ""
-
-    if (dateString.includes("/")) {
-      const parts = dateString.split("/")
-      // Si el primer elemento tiene 4 dígitos, es yyyy/mm/dd
-      if (parts[0].length === 4) {
-        const [year, month, day] = parts
-        return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`
-      } else {
-        // Si no, ya está en dd/mm/yyyy
-        return dateString
-      }
-    }
-
-    // Si viene en formato ISO o yyyy-mm-dd, usar parsing directo para evitar problemas de zona horaria
-    if (dateString.includes("-")) {
-      const [year, month, day] = dateString.split("-")
-      return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`
-    }
-
-    return dateString
-  }
-
-  // Reemplazar la función calculateAge con esta versión corregida:
+  // Función para calcular edad corregida:
   const calculateAge = (birthDate: string) => {
     if (!birthDate) return 0
 
@@ -99,82 +74,82 @@ export function PatientTable({ patients, onSelectPatient, canEdit, canDelete }: 
 
   return (
     <>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="font-semibold">DNI</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Edad</TableHead>
-              <TableHead>Género</TableHead>
-              <TableHead>Teléfono</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Ciudad</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {patients.length > 0 ? (
-              patients.map((patient) => (
-                <TableRow key={patient.id}>
-                  <TableCell className="font-mono font-medium text-[#204983]">{formatDni(patient.dni)}</TableCell>
-                  <TableCell className="font-medium">{`${patient.first_name} ${patient.last_name}`}</TableCell>
-                  <TableCell>{calculateAge(patient.birth_date)} años</TableCell>
-                  <TableCell>
-                    <Badge variant={patient.gender === "M" || patient.gender === "Masculino" ? "default" : "secondary"}>
-                      {getGenderDisplay(patient.gender)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{patient.phone_mobile || patient.phone_landline}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{patient.email}</TableCell>
-                  <TableCell>{patient.city}</TableCell>
-                  <TableCell>
-                    <Badge variant={patient.is_active ? "default" : "outline"}>
-                      {patient.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      {/* Ver detalles */}
-                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(patient)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-
-                      {/* Editar paciente */}
-                      {canEdit && (
-                        <Button variant="outline" size="sm" onClick={() => onSelectPatient(patient, "edit")}>
-                          <Pencil className="h-4 w-4" />
+      <div className="bg-white rounded-lg shadow-sm">
+        <div className="rounded-md border bg-white">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50/50">
+                <TableHead className="font-semibold text-gray-900">DNI</TableHead>
+                <TableHead className="font-semibold text-gray-900">Nombre</TableHead>
+                <TableHead className="font-semibold text-gray-900">Edad</TableHead>
+                <TableHead className="font-semibold text-gray-900">Género</TableHead>
+                <TableHead className="font-semibold text-gray-900">Teléfono</TableHead>
+                <TableHead className="font-semibold text-gray-900">Email</TableHead>
+                <TableHead className="font-semibold text-gray-900">Ciudad</TableHead>
+                <TableHead className="text-right font-semibold text-gray-900">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="bg-white">
+              {patients.length > 0 ? (
+                patients.map((patient) => (
+                  <TableRow key={patient.id} className="bg-white hover:bg-gray-50/50 border-gray-200">
+                    <TableCell className="font-mono font-medium text-[#204983] bg-white">
+                      {formatDni(patient.dni)}
+                    </TableCell>
+                    <TableCell className="font-medium bg-white">{`${patient.first_name} ${patient.last_name}`}</TableCell>
+                    <TableCell className="bg-white">{calculateAge(patient.birth_date)} años</TableCell>
+                    <TableCell className="bg-white">
+                      <Badge
+                        variant={patient.gender === "M" || patient.gender === "Masculino" ? "default" : "secondary"}
+                      >
+                        {getGenderDisplay(patient.gender)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="bg-white">{patient.phone_mobile || patient.phone_landline}</TableCell>
+                    <TableCell className="max-w-[200px] truncate bg-white">{patient.email}</TableCell>
+                    <TableCell className="bg-white">{patient.city}</TableCell>
+                    <TableCell className="text-right bg-white">
+                      <div className="flex justify-end space-x-2">
+                        {/* Ver detalles */}
+                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(patient)}>
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
 
-                      {/* Eliminar paciente */}
-                      {canDelete && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-red-200 hover:bg-red-50"
-                          onClick={() => onSelectPatient(patient, "delete")}
-                        >
-                          <Trash className="h-4 w-4 text-red-500" />
-                        </Button>
-                      )}
+                        {/* Editar paciente */}
+                        {canEdit && (
+                          <Button variant="outline" size="sm" onClick={() => onSelectPatient(patient, "edit")}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {/* Eliminar paciente */}
+                        {canDelete && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-red-200 hover:bg-red-50"
+                            onClick={() => onSelectPatient(patient, "delete")}
+                          >
+                            <Trash className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow className="bg-white">
+                  <TableCell colSpan={8} className="text-center py-4 bg-white">
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <AlertCircle className="h-8 w-8 mb-2" />
+                      <p>No hay pacientes disponibles</p>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-4">
-                  <div className="flex flex-col items-center justify-center text-gray-500">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <p>No hay pacientes disponibles</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Diálogo de detalles */}

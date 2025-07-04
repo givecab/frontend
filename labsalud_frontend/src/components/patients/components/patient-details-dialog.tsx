@@ -110,12 +110,6 @@ export function PatientDetailsDialog({ isOpen, onClose, patient }: PatientDetail
                 <p className="text-lg font-mono font-semibold text-[#204983]">{formatDni(patient.dni)}</p>
               </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Estado</p>
-              <Badge variant={patient.is_active ? "default" : "outline"}>
-                {patient.is_active ? "Activo" : "Inactivo"}
-              </Badge>
-            </div>
           </div>
 
           {/* Información personal */}
@@ -217,7 +211,7 @@ export function PatientDetailsDialog({ isOpen, onClose, patient }: PatientDetail
             <div className="grid grid-cols-1 gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Creado por</p>
-                <p>{`${patient.created_by.first_name} ${patient.created_by.last_name} (${patient.created_by.username})`}</p>
+                <p>{patient.created_by.username}</p>
                 <p className="text-xs text-gray-400">{formatDateTime(patient.created_at)}</p>
               </div>
 
@@ -226,8 +220,8 @@ export function PatientDetailsDialog({ isOpen, onClose, patient }: PatientDetail
                   <p className="text-sm font-medium text-gray-500">Última modificación</p>
                   {patient.updated_by.slice(0, 3).map((updater, index) => (
                     <div key={index} className="text-sm">
-                      <p>{`${updater.first_name} ${updater.last_name} (${updater.username})`}</p>
-                      <p className="text-xs text-gray-400">{formatDateTime(updater.updated_at)}</p>
+                      <p>{updater.username}</p>
+                      <p className="text-xs text-gray-400">{formatDateTime(patient.updated_at)}</p>
                     </div>
                   ))}
                   {patient.updated_by.length > 3 && (

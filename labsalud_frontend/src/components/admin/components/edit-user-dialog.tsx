@@ -1,220 +1,212 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import type { User } from "@/components/admin/management-page"
+import { useState, useEffect, useCallback } from "react"
+import type { User, Role } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
-import { env } from "@/config/env"
+import { useToast } from "@/hooks/use-toast"
+import type { ApiRequestOptions } from "@/hooks/use-api"
 
 interface EditUserDialogProps {
-  isOpen: boolean
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   user: User | null
+  roles: Role[]
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
-  apiRequest: (url: string, options?: any) => Promise<Response>
+  apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
+  refreshData: () => Promise<void>
 }
 
-export function EditUserDialog({ isOpen, onClose, user, setUsers, apiRequest }: EditUserDialogProps) {
-  const [formData, setFormData] = useState({
+export function EditUserDialog({
+  open,
+  onOpenChange,
+  user,
+  roles,
+  setUsers,
+  apiRequest,
+  refreshData,
+}: EditUserDialogProps) {
+  const { success, error: showError } = useToast()
+  const [userData, setUserData] = useState({
     username: "",
     email: "",
     first_name: "",
     last_name: "",
-    password: "",
-    is_active: true,
-    photo: null as File | null,
+    groups: [] as number[],
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (user) {
-      setFormData({
+    if (open && user) {
+      const userGroups = user.groups || user.roles || []
+      setUserData({
         username: user.username,
         email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        password: "",
-        is_active: user.is_active,
-        photo: null, // Siempre null para permitir nueva selección
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        groups: userGroups.map((group) => group.id),
       })
+    } else if (!open) {
+      setUserData({
+        username: "",
+        email: "",
+        first_name: "",
+        last_name: "",
+        groups: [],
+      })
+      setIsSubmitting(false)
     }
-  }, [user])
+  }, [open, user])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    setFormData((prev) => ({
+    setUserData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }))
-  }
+  }, [])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null
-    setFormData((prev) => ({
+  const handleRoleChange = useCallback((roleId: number, checked: boolean) => {
+    setUserData((prev) => ({
       ...prev,
-      photo: file,
+      groups: checked ? [...prev.groups, roleId] : prev.groups.filter((id) => id !== roleId),
     }))
-  }
+  }, [])
 
-  const handleUpdateUser = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     if (!user) return
 
+    setIsSubmitting(true)
+
     try {
-      const loadingId = toast.loading("Actualizando usuario...")
-
-      if (env.DEBUG_MODE) {
-        console.log("Actualizando usuario:", user.username)
-        console.log("Con nueva foto:", formData.photo ? formData.photo.name : "Sin cambio de foto")
-      }
-
-      // Crear FormData para enviar archivos
-      const formDataToSend = new FormData()
-      formDataToSend.append("username", formData.username)
-      formDataToSend.append("email", formData.email)
-      formDataToSend.append("first_name", formData.first_name)
-      formDataToSend.append("last_name", formData.last_name)
-      formDataToSend.append("is_active", formData.is_active.toString())
-
-      // Solo incluir password si se proporcionó uno nuevo
-      if (formData.password && formData.password.trim() !== "") {
-        formDataToSend.append("password", formData.password)
-      }
-
-      // Agregar foto si se seleccionó una nueva
-      if (formData.photo) {
-        formDataToSend.append("photo", formData.photo)
-      }
-
-      const response = await apiRequest(`${env.USERS_ENDPOINT}${user.id}/`, {
-        method: "PATCH",
-        body: formDataToSend,
-      })
-
-      toast.dismiss(loadingId)
+      const response = await apiRequest(
+        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}${user.id}/`,
+        {
+          method: "PATCH",
+          body: userData,
+        },
+      )
 
       if (response.ok) {
         const updatedUser = await response.json()
         setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
-        toast.success("Usuario actualizado", {
-          description: `El usuario ${updatedUser.username} ha sido actualizado exitosamente.`,
-          duration: env.TOAST_DURATION,
+        await refreshData()
+        success("Usuario actualizado", {
+          description: "Los datos del usuario han sido actualizados exitosamente.",
         })
-        onClose()
+        onOpenChange(false)
       } else {
-        const errorData = await response.json()
-        console.error("Error response:", errorData)
-        toast.error("Error al actualizar usuario", {
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
+        showError("Error al actualizar usuario", {
           description: errorData.detail || "Ha ocurrido un error al actualizar el usuario.",
-          duration: env.TOAST_DURATION,
         })
       }
-    } catch (error) {
-      console.error("Error al actualizar usuario:", error)
-      toast.error("Error", {
-        description: "Ha ocurrido un error al actualizar el usuario.",
-        duration: env.TOAST_DURATION,
+    } catch (err) {
+      console.error("Error al actualizar usuario:", err)
+      showError("Error", {
+        description: "Ha ocurrido un error de red o inesperado.",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
+  if (!user) return null
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Usuario</DialogTitle>
+          <DialogTitle>Editar Usuario: {user.username}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-username">Usuario</Label>
+              <Label htmlFor="username">Nombre de usuario *</Label>
               <Input
-                id="edit-username"
+                id="username"
                 name="username"
-                value={formData.username}
-                onChange={handleInputChange}
-                placeholder="Nombre de usuario"
+                value={userData.username}
+                onChange={handleChange}
+                required
+                placeholder="usuario123"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
-                id="edit-email"
+                id="email"
                 name="email"
                 type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="correo@ejemplo.com"
+                value={userData.email}
+                onChange={handleChange}
+                required
+                placeholder="usuario@ejemplo.com"
               />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-first_name">Nombre</Label>
+              <Label htmlFor="first_name">Nombre</Label>
               <Input
-                id="edit-first_name"
+                id="first_name"
                 name="first_name"
-                value={formData.first_name}
-                onChange={handleInputChange}
-                placeholder="Nombre"
+                value={userData.first_name}
+                onChange={handleChange}
+                placeholder="Juan"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-last_name">Apellido</Label>
+              <Label htmlFor="last_name">Apellido</Label>
               <Input
-                id="edit-last_name"
+                id="last_name"
                 name="last_name"
-                value={formData.last_name}
-                onChange={handleInputChange}
-                placeholder="Apellido"
+                value={userData.last_name}
+                onChange={handleChange}
+                placeholder="Pérez"
               />
             </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="edit-password">Contraseña (dejar en blanco para no cambiar)</Label>
-            <Input
-              id="edit-password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="Nueva contraseña"
-            />
+            <Label>Roles</Label>
+            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
+              {Array.isArray(roles) && roles.length > 0 ? (
+                roles.map((role) => (
+                  <div key={role.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`role-${role.id}`}
+                      checked={userData.groups.includes(role.id)}
+                      onCheckedChange={(checked) => handleRoleChange(role.id, Boolean(checked))}
+                    />
+                    <Label htmlFor={`role-${role.id}`} className="text-sm">
+                      {role.name}
+                    </Label>
+                  </div>
+                ))
+              ) : (
+                <p className="col-span-2 text-gray-500 text-sm">No hay roles disponibles.</p>
+              )}
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-photo">Foto de perfil</Label>
-            <Input
-              id="edit-photo"
-              name="photo"
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="cursor-pointer"
-            />
-            {formData.photo && <p className="text-sm text-gray-600">Archivo seleccionado: {formData.photo.name}</p>}
-            <p className="text-xs text-gray-500">Selecciona una nueva imagen para cambiar la foto actual</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="edit-is_active"
-              name="is_active"
-              checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked === true }))}
-            />
-            <Label htmlFor="edit-is_active">Usuario activo</Label>
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancelar</Button>
-          </DialogClose>
-          <Button className="bg-[#204983]" onClick={handleUpdateUser}>
-            Guardar Cambios
-          </Button>
-        </DialogFooter>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={isSubmitting}>
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

@@ -8,23 +8,36 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { env } from "@/config/env"
+import { AlertCircle, CheckCircle } from "lucide-react"
 
 interface CreatePatientDialogProps {
   isOpen: boolean
   onClose: () => void
-  setPatients: React.Dispatch<React.SetStateAction<any[]>>
   addPatient: (newPatient: any) => void
   apiRequest: (url: string, options?: any) => Promise<Response>
 }
 
-export function CreatePatientDialog({
-  isOpen,
-  onClose,
-  setPatients,
-  addPatient,
-  apiRequest,
-}: CreatePatientDialogProps) {
+interface ValidationState {
+  dni: { isValid: boolean; message: string }
+  first_name: { isValid: boolean; message: string }
+  last_name: { isValid: boolean; message: string }
+  email: { isValid: boolean; message: string }
+  phone_mobile: { isValid: boolean; message: string }
+  phone_landline: { isValid: boolean; message: string }
+  birth_date: { isValid: boolean; message: string }
+}
+
+const initialValidation: ValidationState = {
+  dni: { isValid: false, message: "Ingresa un DNI válido (7-8 dígitos)" },
+  first_name: { isValid: false, message: "Ingresa el nombre" },
+  last_name: { isValid: false, message: "Ingresa el apellido" },
+  email: { isValid: true, message: "" },
+  phone_mobile: { isValid: true, message: "" },
+  phone_landline: { isValid: true, message: "" },
+  birth_date: { isValid: false, message: "Selecciona la fecha de nacimiento" },
+}
+
+export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }: CreatePatientDialogProps) {
   const [formData, setFormData] = useState({
     dni: "",
     first_name: "",
@@ -40,6 +53,115 @@ export function CreatePatientDialog({
     address: "",
   })
 
+  const [validation, setValidation] = useState<ValidationState>(initialValidation)
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+
+  // Funciones de validación
+  const validateDNI = (dni: string) => {
+    if (!dni.trim()) {
+      return { isValid: false, message: "El DNI es obligatorio" }
+    }
+    if (!/^\d+$/.test(dni)) {
+      return { isValid: false, message: "El DNI solo debe contener números" }
+    }
+    if (dni.length < 7 || dni.length > 8) {
+      return { isValid: false, message: "El DNI debe tener entre 7 y 8 dígitos" }
+    }
+    return { isValid: true, message: "DNI válido" }
+  }
+
+  const validateName = (name: string, field: string) => {
+    if (!name.trim()) {
+      return { isValid: false, message: `${field} es obligatorio` }
+    }
+    if (name.trim().length < 2) {
+      return { isValid: false, message: "Mínimo 2 caracteres" }
+    }
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(name.trim())) {
+      return { isValid: false, message: "Solo letras y espacios" }
+    }
+    return { isValid: true, message: `${field} válido` }
+  }
+
+  const validateEmail = (email: string) => {
+    if (!email.trim()) {
+      return { isValid: true, message: "" } // Email es opcional
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return { isValid: false, message: "Formato de email inválido (ejemplo: usuario@dominio.com)" }
+    }
+    return { isValid: true, message: "Email válido" }
+  }
+
+  const validatePhone = (phone: string, field: string) => {
+    if (!phone.trim()) {
+      return { isValid: true, message: "" } // Teléfonos son opcionales
+    }
+    if (!/^[\d\s\-+()]+$/.test(phone)) {
+      return { isValid: false, message: `${field} solo puede contener números, espacios, guiones y paréntesis` }
+    }
+    if (phone.replace(/\D/g, "").length < 8) {
+      return { isValid: false, message: `${field} debe tener al menos 8 dígitos` }
+    }
+    return { isValid: true, message: `${field} válido` }
+  }
+
+  const validateBirthDate = (date: string) => {
+    if (!date) {
+      return { isValid: false, message: "La fecha de nacimiento es obligatoria" }
+    }
+    const birthDate = new Date(date)
+    const today = new Date()
+    const age = today.getFullYear() - birthDate.getFullYear()
+
+    if (birthDate > today) {
+      return { isValid: false, message: "La fecha no puede ser futura" }
+    }
+    if (age > 120) {
+      return { isValid: false, message: "La fecha parece incorrecta (edad mayor a 120 años)" }
+    }
+    if (age < 0) {
+      return { isValid: false, message: "La fecha parece incorrecta" }
+    }
+    return { isValid: true, message: "Fecha válida" }
+  }
+
+  // Validar campo específico
+  const validateField = (name: string, value: string) => {
+    let result
+    switch (name) {
+      case "dni":
+        result = validateDNI(value)
+        break
+      case "first_name":
+        result = validateName(value, "El nombre")
+        break
+      case "last_name":
+        result = validateName(value, "El apellido")
+        break
+      case "email":
+        result = validateEmail(value)
+        break
+      case "phone_mobile":
+        result = validatePhone(value, "El teléfono móvil")
+        break
+      case "phone_landline":
+        result = validatePhone(value, "El teléfono fijo")
+        break
+      case "birth_date":
+        result = validateBirthDate(value)
+        break
+      default:
+        return
+    }
+
+    setValidation((prev) => ({
+      ...prev,
+      [name]: result,
+    }))
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
 
@@ -50,11 +172,23 @@ export function CreatePatientDialog({
         ...prev,
         [name]: numericValue,
       }))
+
+      // Marcar como tocado
+      setTouched((prev) => ({ ...prev, [name]: true }))
+
+      // Validar en tiempo real
+      validateField(name, numericValue)
     } else {
       setFormData((prev) => ({
         ...prev,
         [name]: value,
       }))
+
+      // Marcar como tocado
+      setTouched((prev) => ({ ...prev, [name]: true }))
+
+      // Validar en tiempo real
+      validateField(name, value)
     }
   }
 
@@ -80,83 +214,59 @@ export function CreatePatientDialog({
       city: "Leones",
       address: "",
     })
+    setValidation(initialValidation)
+    setTouched({})
   }
 
-  // Convertir fecha de yyyy-mm-dd a yyyy-mm-dd para el backend (ya está en el formato correcto)
-  const formatDateForAPI = (dateString: string) => {
-    return dateString // El input date ya devuelve yyyy-mm-dd
-  }
+  const isFormValid = () => {
+    const requiredFields = ["dni", "first_name", "last_name", "birth_date"]
+    const requiredFieldsValid = requiredFields.every((field) => {
+      const fieldValidation = validation[field as keyof ValidationState]
+      return fieldValidation.isValid
+    })
 
-  const validateForm = () => {
-    if (!formData.dni.trim()) {
-      toast.error("Error de validación", {
-        description: "El DNI es obligatorio.",
-        duration: env.TOAST_DURATION,
-      })
-      return false
-    }
+    const optionalFieldsValid = ["email", "phone_mobile", "phone_landline"].every((field) => {
+      const fieldValidation = validation[field as keyof ValidationState]
+      return fieldValidation.isValid
+    })
 
-    if (formData.dni.length < 7 || formData.dni.length > 8) {
-      toast.error("Error de validación", {
-        description: "El DNI debe tener entre 7 y 8 dígitos.",
-        duration: env.TOAST_DURATION,
-      })
-      return false
-    }
-
-    if (!formData.first_name.trim() || !formData.last_name.trim()) {
-      toast.error("Error de validación", {
-        description: "El nombre y apellido son obligatorios.",
-        duration: env.TOAST_DURATION,
-      })
-      return false
-    }
-
-    if (!formData.birth_date) {
-      toast.error("Error de validación", {
-        description: "La fecha de nacimiento es obligatoria.",
-        duration: env.TOAST_DURATION,
-      })
-      return false
-    }
-
-    if (!formData.gender) {
-      toast.error("Error de validación", {
-        description: "El género es obligatorio.",
-        duration: env.TOAST_DURATION,
-      })
-      return false
-    }
-
-    return true
+    return requiredFieldsValid && optionalFieldsValid && formData.gender !== ""
   }
 
   const handleCreatePatient = async () => {
-    if (!validateForm()) return
+    // Marcar todos los campos como tocados
+    const allFields = ["dni", "first_name", "last_name", "birth_date", "email", "phone_mobile", "phone_landline"]
+    const newTouched = allFields.reduce((acc, field) => ({ ...acc, [field]: true }), {})
+    setTouched(newTouched)
+
+    // Validar todos los campos
+    allFields.forEach((field) => {
+      validateField(field, formData[field as keyof typeof formData] as string)
+    })
+
+    if (!isFormValid() || !formData.gender) {
+      toast.error("Formulario inválido", {
+        description: "Por favor, corrige los errores antes de continuar.",
+        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+      })
+      return
+    }
 
     try {
       const loadingId = toast.loading("Creando paciente...")
 
-      if (env.DEBUG_MODE) {
-        console.log("Creando paciente:", `${formData.first_name} ${formData.last_name} - DNI: ${formData.dni}`)
-      }
-
-      // Preparar datos para enviar con fecha en formato yyyy/mm/dd
       const dataToSend = {
         ...formData,
-        birth_date: formatDateForAPI(formData.birth_date),
+        birth_date: formData.birth_date,
       }
 
-      if (env.DEBUG_MODE) {
-        console.log("Datos a enviar (crear):", dataToSend)
-        console.log("Fecha original (input):", formData.birth_date)
-        console.log("Fecha para backend:", dataToSend.birth_date)
-      }
-
-      const response = await apiRequest(env.PATIENTS_ENDPOINT, {
-        method: "POST",
-        body: dataToSend,
-      })
+      const response = await apiRequest(
+        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_PATIENTS_ENDPOINT}`,
+        {
+          method: "POST",
+          body: dataToSend,
+        },
+      )
 
       toast.dismiss(loadingId)
 
@@ -165,24 +275,22 @@ export function CreatePatientDialog({
         addPatient(newPatient)
         toast.success("Paciente creado", {
           description: `El paciente ${newPatient.first_name} ${newPatient.last_name} (DNI: ${newPatient.dni}) ha sido creado exitosamente.`,
-          duration: env.TOAST_DURATION,
+          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
         })
         resetForm()
         onClose()
       } else {
         const errorData = await response.json()
-        console.error("Error al crear - Datos enviados:", dataToSend)
-        console.error("Error al crear - Respuesta del servidor:", errorData)
         toast.error("Error al crear paciente", {
           description: errorData.detail || "Ha ocurrido un error al crear el paciente.",
-          duration: env.TOAST_DURATION,
+          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
         })
       }
     } catch (error) {
       console.error("Error al crear paciente:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al crear el paciente.",
-        duration: env.TOAST_DURATION,
+        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
       })
     }
   }
@@ -196,9 +304,28 @@ export function CreatePatientDialog({
     return dni.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
   }
 
+  const getFieldStyle = (fieldName: string) => {
+    if (!touched[fieldName]) return ""
+    const field = validation[fieldName as keyof ValidationState]
+    return field?.isValid ? "border-green-500 focus:ring-green-500" : "border-red-500 focus:ring-red-500"
+  }
+
+  const renderFieldMessage = (fieldName: string) => {
+    if (!touched[fieldName]) return null
+    const field = validation[fieldName as keyof ValidationState]
+    if (!field || !field.message) return null
+
+    return (
+      <div className={`flex items-center gap-1 text-xs mt-1 ${field.isValid ? "text-green-600" : "text-red-600"}`}>
+        {field.isValid ? <CheckCircle className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+        <span>{field.message}</span>
+      </div>
+    )
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Paciente</DialogTitle>
         </DialogHeader>
@@ -215,9 +342,10 @@ export function CreatePatientDialog({
               onChange={handleInputChange}
               placeholder="12345678"
               maxLength={8}
-              className="font-mono text-lg"
+              className={`font-mono text-lg ${getFieldStyle("dni")}`}
               required
             />
+            {renderFieldMessage("dni")}
             {formData.dni && <p className="text-xs text-gray-500">Vista previa: {formatDniDisplay(formData.dni)}</p>}
           </div>
 
@@ -230,9 +358,11 @@ export function CreatePatientDialog({
                 name="first_name"
                 value={formData.first_name}
                 onChange={handleInputChange}
-                placeholder="Nombre"
+                placeholder="Juan"
+                className={getFieldStyle("first_name")}
                 required
               />
+              {renderFieldMessage("first_name")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="last_name">Apellido *</Label>
@@ -241,9 +371,11 @@ export function CreatePatientDialog({
                 name="last_name"
                 value={formData.last_name}
                 onChange={handleInputChange}
-                placeholder="Apellido"
+                placeholder="Pérez"
+                className={getFieldStyle("last_name")}
                 required
               />
+              {renderFieldMessage("last_name")}
             </div>
           </div>
 
@@ -256,8 +388,10 @@ export function CreatePatientDialog({
                 type="date"
                 value={formData.birth_date}
                 onChange={handleInputChange}
+                className={getFieldStyle("birth_date")}
                 required
               />
+              {renderFieldMessage("birth_date")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="gender">Género *</Label>
@@ -283,7 +417,9 @@ export function CreatePatientDialog({
                 value={formData.phone_mobile}
                 onChange={handleInputChange}
                 placeholder="Teléfono móvil"
+                className={getFieldStyle("phone_mobile")}
               />
+              {renderFieldMessage("phone_mobile")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone_landline">Teléfono fijo</Label>
@@ -293,7 +429,9 @@ export function CreatePatientDialog({
                 value={formData.phone_landline}
                 onChange={handleInputChange}
                 placeholder="Teléfono fijo"
+                className={getFieldStyle("phone_landline")}
               />
+              {renderFieldMessage("phone_landline")}
             </div>
           </div>
 
@@ -306,7 +444,9 @@ export function CreatePatientDialog({
               value={formData.email}
               onChange={handleInputChange}
               placeholder="correo@ejemplo.com"
+              className={getFieldStyle("email")}
             />
+            {renderFieldMessage("email")}
           </div>
 
           {/* Información de ubicación */}
@@ -352,7 +492,7 @@ export function CreatePatientDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancelar</Button>
           </DialogClose>
-          <Button className="bg-[#204983]" onClick={handleCreatePatient}>
+          <Button className="bg-[#204983]" onClick={handleCreatePatient} disabled={!isFormValid()}>
             Crear Paciente
           </Button>
         </DialogFooter>

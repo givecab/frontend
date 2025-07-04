@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { Menu, X } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
 import { UserDropdown } from "./user-dropdown"
 
 interface NavLinkProps {
@@ -66,9 +66,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <nav className="w-full px-0 md:px-4 relative">
+      <nav className="w-full px-0 lg:px-4 relative">
         {/* Desktop Navbar */}
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <div
             className={`bg-white shadow-lg mx-4 px-8 py-4 transition-all duration-200 relative ${
               isUserMenuOpen
@@ -136,8 +136,8 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Navbar */}
-        <div className="md:hidden">
+        {/* Mobile/Tablet Navbar */}
+        <div className="lg:hidden">
           <div
             className={`
               bg-white shadow-lg px-4 py-3 w-full transition-all duration-200
@@ -179,7 +179,7 @@ export const Navbar: React.FC = () => {
           {/* Mobile Menu Dropdown - Ocupa todo el ancho */}
           <div
             className={`
-              fixed left-0 top-[4.5rem] w-full bg-white shadow-lg z-40 overflow-hidden rounded-b-lg
+              fixed left-0 top-[3.5rem] w-full bg-white shadow-lg z-40 overflow-hidden rounded-b-lg
               transition-all duration-200 ease-in-out
               ${isMobileMenuOpen ? "opacity-100 max-h-96" : "opacity-0 max-h-0 pointer-events-none"}
             `}

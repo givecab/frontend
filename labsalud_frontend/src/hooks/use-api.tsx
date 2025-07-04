@@ -1,30 +1,48 @@
 "use client"
 
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { useCallback } from "react"
-import { env } from "@/config/env"
 
-interface ApiRequestOptions {
+// JSDoc documentation for ApiRequestOptions and useApi hook
+/**
+ * Options for API requests, including HTTP method, request body, headers, and timeout.
+ */
+export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
-  body?: any
+  // Request body payload
+  body?: unknown
   headers?: Record<string, string>
   timeout?: number
+  /** Optional key to trigger loading indicator via useLoading */
+  loadingKey?: string
 }
 
+/**
+ * Custom hook to perform API requests with automatic token handling, refresh,
+ * error logging, and timeout support. Returns an apiRequest function.
+ */
 export const useApi = () => {
   const { token, refreshToken, logout } = useAuth()
+  const { setLoading } = useLoading()
 
   const apiRequest = useCallback(
     async (url: string, options: ApiRequestOptions = {}) => {
-      const { method = "GET", body, headers = {}, timeout = env.API_TIMEOUT } = options
+      const { loadingKey, ...apiOptions } = options
+      if (loadingKey) setLoading(loadingKey, true)
+      const {
+        method = "GET",
+        body,
+        headers = {},
+        timeout = Number(import.meta.env.VITE_API_TIMEOUT) || 30000, // Default 30 seconds
+      } = apiOptions
 
-      // Preparar headers
       const requestHeaders: Record<string, string> = {
         ...headers,
       }
 
-      // Solo agregar Content-Type si no es FormData
-      if (!(body instanceof FormData)) {
+      const isFormData = body instanceof FormData
+      if (!isFormData && body) {
         requestHeaders["Content-Type"] = "application/json"
       }
 
@@ -32,21 +50,25 @@ export const useApi = () => {
         requestHeaders.Authorization = `Bearer ${token}`
       }
 
-      // Crear AbortController para timeout
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-      try {
-        if (env.DEBUG_MODE) {
-          console.log(`API Request: ${method} ${env.API_BASE_URL}${url}`)
-          if (body instanceof FormData) {
-            console.log("Sending FormData with files")
-          }
-        }
+      let finalUrl: string
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        finalUrl = url
+      } else {
+        // Asegurar que la base URL termine con / y el endpoint no empiece con /
+        const baseUrl = import.meta.env.VITE_API_BASE_URL
+        const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`
+        const cleanUrl = url.startsWith("/") ? url.slice(1) : url
+        finalUrl = `${cleanBaseUrl}${cleanUrl}`
+      }
 
-        // Preparar el body según el tipo
+      console.log(`[useApi] Making ${method} request to: ${finalUrl}`)
+
+      try {
         let requestBody: string | FormData | undefined
-        if (body instanceof FormData) {
+        if (isFormData) {
           requestBody = body
         } else if (body) {
           requestBody = JSON.stringify(body)
@@ -54,7 +76,7 @@ export const useApi = () => {
           requestBody = undefined
         }
 
-        let response = await fetch(`${env.API_BASE_URL}${url}`, {
+        let response = await fetch(finalUrl, {
           method,
           headers: requestHeaders,
           body: requestBody,
@@ -63,50 +85,48 @@ export const useApi = () => {
 
         clearTimeout(timeoutId)
 
-        // Si el token expiró (401), intentar refrescar
+        console.log(`[useApi] Response status: ${response.status} for ${finalUrl}`)
+
         if (response.status === 401 && token) {
-          if (env.DEBUG_MODE) {
-            console.log("Token expired, attempting refresh...")
-          }
-
+          console.warn("[useApi] 401 Unauthorized. Attempting token refresh...")
           const refreshSuccess = await refreshToken()
-
           if (refreshSuccess) {
-            // Reintentar la request con el nuevo token
-            const newToken = localStorage.getItem("access_token")
+            const newToken = sessionStorage.getItem("access_token")
             if (newToken) {
               requestHeaders.Authorization = `Bearer ${newToken}`
-              response = await fetch(`${env.API_BASE_URL}${url}`, {
+              console.log("[useApi] Token refreshed. Retrying request...")
+              // Retry the original request with the new token
+              response = await fetch(finalUrl, {
                 method,
                 headers: requestHeaders,
                 body: requestBody,
+                signal: controller.signal,
               })
+            } else {
+              console.error("[useApi] Refresh successful but no new token found in session storage.")
+              logout()
+              throw new Error("Sesión expirada: No se pudo obtener un nuevo token.")
             }
           } else {
-            // Si no se pudo refrescar, hacer logout
+            console.error("[useApi] Token refresh failed. Logging out.")
             logout()
-            throw new Error("Session expired")
+            throw new Error("Sesión expirada: No se pudo refrescar el token.")
           }
         }
-
-        if (env.DEBUG_MODE) {
-          console.log(`API Response: ${response.status} ${response.statusText}`)
-        }
-
         return response
       } catch (error) {
         clearTimeout(timeoutId)
-
         if (error instanceof Error && error.name === "AbortError") {
-          console.error(`API request timeout after ${timeout}ms:`, url)
-          throw new Error(`Request timeout after ${timeout}ms`)
+          console.error(`[useApi] Request timed out for ${finalUrl} after ${timeout}ms`)
+          throw new Error(`Tiempo de espera agotado después de ${timeout}ms`)
         }
-
-        console.error("API request error:", error)
+        console.error(`[useApi] Network or unexpected error for ${finalUrl}:`, error)
         throw error
+      } finally {
+        if (loadingKey) setLoading(loadingKey, false)
       }
     },
-    [token, refreshToken, logout],
+    [token, refreshToken, logout, setLoading],
   )
 
   return { apiRequest }

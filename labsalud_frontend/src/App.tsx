@@ -6,7 +6,10 @@ import { Layout } from "./components/layout"
 import { ProtectedRoute } from "./components/protected-route"
 import ManagementPage from "./components/admin/management-page"
 import PatientsPage from "./components/patients/patients-page"
+import ProfilePage from "./components/profile/profile-page"
+import ForgotPassword from "./components/forgot-password"
 import { Toaster } from "sonner"
+import ConfigurationPage from "./components/configuration/configuration-page"
 
 function App() {
   return (
@@ -14,6 +17,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             path="/"
             element={
@@ -23,6 +27,16 @@ function App() {
             }
           >
             <Route index element={<Home />} />
+          </Route>
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ProfilePage />} />
           </Route>
           <Route
             path="/management"
@@ -43,6 +57,16 @@ function App() {
             }
           >
             <Route index element={<PatientsPage />} />
+          </Route>
+          <Route
+            path="/configuracion"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ConfigurationPage />} />
           </Route>
         </Routes>
       </Router>

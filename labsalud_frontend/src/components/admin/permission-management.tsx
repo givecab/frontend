@@ -1,6 +1,6 @@
 "use client"
 
-import type { Permission } from "./management-page"
+import type { Permission } from "@/types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -13,10 +13,14 @@ interface PermissionManagementProps {
 export function PermissionManagement({ permissions }: PermissionManagementProps) {
   const [searchTerm, setSearchTerm] = useState("")
 
-  const filteredPermissions = permissions.filter(
+  // Validar datos
+  const validPermissions = Array.isArray(permissions)
+    ? permissions.filter((permission) => permission && permission.id)
+    : []
+
+  const filteredPermissions = validPermissions.filter(
     (permission) =>
-      permission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      permission.codename.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (permission.codename || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       permission.id.toString().includes(searchTerm),
   )
 
@@ -35,8 +39,8 @@ export function PermissionManagement({ permissions }: PermissionManagementProps)
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
-              <TableHead>Nombre</TableHead>
               <TableHead>Código</TableHead>
+              <TableHead>Descripción</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -44,8 +48,10 @@ export function PermissionManagement({ permissions }: PermissionManagementProps)
               filteredPermissions.map((permission) => (
                 <TableRow key={permission.id}>
                   <TableCell>{permission.id}</TableCell>
-                  <TableCell className="font-medium">{permission.name}</TableCell>
-                  <TableCell>{permission.codename}</TableCell>
+                  <TableCell className="font-medium">{permission.codename || "Sin código"}</TableCell>
+                  <TableCell>
+                    <code className="bg-gray-100 px-2 py-1 rounded text-sm">{permission.codename || "Sin código"}</code>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
@@ -53,7 +59,7 @@ export function PermissionManagement({ permissions }: PermissionManagementProps)
                 <TableCell colSpan={3} className="text-center py-4">
                   <div className="flex flex-col items-center justify-center text-gray-500">
                     <AlertCircle className="h-8 w-8 mb-2" />
-                    <p>No hay permisos disponibles</p>
+                    <p>{searchTerm ? "No se encontraron permisos" : "No hay permisos disponibles"}</p>
                   </div>
                 </TableCell>
               </TableRow>

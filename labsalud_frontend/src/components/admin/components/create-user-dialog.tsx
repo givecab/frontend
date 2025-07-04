@@ -1,179 +1,173 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import type { User, Role } from "@/components/admin/management-page"
+import { useState, useEffect, useCallback } from "react"
+import type { User, Role } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
-import { env } from "@/config/env"
+import { useToast } from "@/hooks/use-toast"
+import type { ApiRequestOptions } from "@/hooks/use-api"
 
 interface CreateUserDialogProps {
-  isOpen: boolean
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   roles: Role[]
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
-  apiRequest: (url: string, options?: any) => Promise<Response>
+  apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
+  refreshData: () => Promise<void>
 }
 
-export function CreateUserDialog({ isOpen, onClose, roles, setUsers, apiRequest }: CreateUserDialogProps) {
-  const [formData, setFormData] = useState({
+export function CreateUserDialog({
+  open,
+  onOpenChange,
+  roles,
+  setUsers,
+  apiRequest,
+  refreshData,
+}: CreateUserDialogProps) {
+  const { success, error: showError } = useToast()
+  const [userData, setUserData] = useState({
+    id: 0,
     username: "",
     email: "",
     first_name: "",
     last_name: "",
     password: "",
-    is_active: true,
-    roles: [] as number[],
-    photo: null as File | null,
+    groups: [] as number[],
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (open) {
+      const savedData = localStorage.getItem("create-user-form")
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData)
+          setUserData({ ...userData, ...parsed, password: "" }) // Don't save password
+        } catch (e) {
+          console.error("Error parsing saved user data:", e)
+        }
+      }
+    } else {
+      setUserData({
+        id: 0,
+        username: "",
+        email: "",
+        first_name: "",
+        last_name: "",
+        password: "",
+        groups: [],
+      })
+      setIsSubmitting(false)
+      localStorage.removeItem("create-user-form")
+    }
+  }, [open])
+
+  const saveUserData = useCallback((data: typeof userData) => {
+    const { password, ...dataToSave } = data
+    localStorage.setItem("create-user-form", JSON.stringify(dataToSave))
+  }, [])
+
+  useEffect(() => {
+    if (userData.username || userData.email || userData.first_name || userData.last_name) {
+      saveUserData(userData)
+    }
+  }, [userData, saveUserData])
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    setFormData((prev) => ({
+    setUserData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }))
-  }
+  }, [])
 
-  const handleRoleChange = (roleId: string, checked: boolean) => {
-    setFormData((prev) => {
-      if (checked) {
-        return { ...prev, roles: [...prev.roles, Number.parseInt(roleId)] }
-      } else {
-        return { ...prev, roles: prev.roles.filter((id) => id !== Number.parseInt(roleId)) }
-      }
-    })
-  }
-
-  const resetForm = () => {
-    setFormData({
-      username: "",
-      email: "",
-      first_name: "",
-      last_name: "",
-      password: "",
-      is_active: true,
-      roles: [],
-      photo: null,
-    })
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null
-    setFormData((prev) => ({
+  const handleRoleChange = useCallback((roleId: number, checked: boolean) => {
+    setUserData((prev) => ({
       ...prev,
-      photo: file,
+      groups: checked ? [...prev.groups, roleId] : prev.groups.filter((id) => id !== roleId),
     }))
-  }
+  }, [])
 
-  const handleCreateUser = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
     try {
-      const loadingId = toast.loading("Creando usuario...")
-
-      if (env.DEBUG_MODE) {
-        console.log("Creando usuario:", formData.username)
-        console.log("Con foto:", formData.photo ? formData.photo.name : "Sin foto")
-      }
-
-      // Crear FormData para enviar archivos
-      const formDataToSend = new FormData()
-      formDataToSend.append("username", formData.username)
-      formDataToSend.append("email", formData.email)
-      formDataToSend.append("first_name", formData.first_name)
-      formDataToSend.append("last_name", formData.last_name)
-      formDataToSend.append("password", formData.password)
-      formDataToSend.append("is_active", formData.is_active.toString())
-
-      // Agregar roles como array
-      formData.roles.forEach((roleId) => {
-        formDataToSend.append("roles", roleId.toString())
-      })
-
-      // Agregar foto si existe
-      if (formData.photo) {
-        formDataToSend.append("photo", formData.photo)
-      }
-
-      const response = await apiRequest(env.USERS_ENDPOINT, {
+      const response = await apiRequest(`${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}`, {
         method: "POST",
-        body: formDataToSend,
+        body: userData,
       })
-
-      toast.dismiss(loadingId)
 
       if (response.ok) {
         const newUser = await response.json()
-        setUsers((prev) => [...prev, newUser])
-        toast.success("Usuario creado", {
-          description: `El usuario ${newUser.username} ha sido creado exitosamente.`,
-          duration: env.TOAST_DURATION,
+        setUsers((prev) => [newUser, ...prev])
+        await refreshData()
+        success("Usuario creado", {
+          description: "El nuevo usuario ha sido creado exitosamente.",
         })
-        resetForm()
-        onClose()
+        onOpenChange(false)
       } else {
-        const errorData = await response.json()
-        toast.error("Error al crear usuario", {
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
+        showError("Error al crear usuario", {
           description: errorData.detail || "Ha ocurrido un error al crear el usuario.",
-          duration: env.TOAST_DURATION,
         })
       }
-    } catch (error) {
-      console.error("Error al crear usuario:", error)
-      toast.error("Error", {
-        description: "Ha ocurrido un error al crear el usuario.",
-        duration: env.TOAST_DURATION,
+    } catch (err) {
+      console.error("Error al crear usuario:", err)
+      showError("Error", {
+        description: "Ha ocurrido un error de red o inesperado.",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const handleClose = () => {
-    resetForm()
-    onClose()
-  }
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Usuario</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuario</Label>
+              <Label htmlFor="username">Nombre de usuario *</Label>
               <Input
                 id="username"
                 name="username"
-                value={formData.username}
-                onChange={handleInputChange}
-                placeholder="Nombre de usuario"
+                value={userData.username}
+                onChange={handleChange}
+                required
+                placeholder="usuario123"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="correo@ejemplo.com"
+                value={userData.email}
+                onChange={handleChange}
+                required
+                placeholder="usuario@ejemplo.com"
               />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Nombre</Label>
               <Input
                 id="first_name"
                 name="first_name"
-                value={formData.first_name}
-                onChange={handleInputChange}
-                placeholder="Nombre"
+                value={userData.first_name}
+                onChange={handleChange}
+                placeholder="Juan"
               />
             </div>
             <div className="space-y-2">
@@ -181,68 +175,59 @@ export function CreateUserDialog({ isOpen, onClose, roles, setUsers, apiRequest 
               <Input
                 id="last_name"
                 name="last_name"
-                value={formData.last_name}
-                onChange={handleInputChange}
-                placeholder="Apellido"
+                value={userData.last_name}
+                onChange={handleChange}
+                placeholder="Pérez"
               />
             </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="password">Contraseña *</Label>
             <Input
               id="password"
               name="password"
               type="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="Contraseña"
+              value={userData.password}
+              onChange={handleChange}
+              required
+              placeholder="••••••••"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="photo">Foto de perfil</Label>
-            <Input
-              id="photo"
-              name="photo"
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="cursor-pointer"
-            />
-            {formData.photo && <p className="text-sm text-gray-600">Archivo seleccionado: {formData.photo.name}</p>}
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="is_active"
-              name="is_active"
-              checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked === true }))}
-            />
-            <Label htmlFor="is_active">Usuario activo</Label>
-          </div>
+
           <div className="space-y-2">
             <Label>Roles</Label>
-            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
-              {roles.map((role) => (
-                <div key={role.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`role-${role.id}`}
-                    checked={formData.roles.includes(role.id)}
-                    onCheckedChange={(checked) => handleRoleChange(role.id.toString(), checked === true)}
-                  />
-                  <Label htmlFor={`role-${role.id}`}>{role.name}</Label>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
+              {Array.isArray(roles) && roles.length > 0 ? (
+                roles.map((role) => (
+                  <div key={role.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`role-${role.id}`}
+                      checked={userData.groups.includes(role.id)}
+                      onCheckedChange={(checked) => handleRoleChange(role.id, Boolean(checked))}
+                    />
+                    <Label htmlFor={`role-${role.id}`} className="text-sm">
+                      {role.name}
+                    </Label>
+                  </div>
+                ))
+              ) : (
+                <p className="col-span-2 text-gray-500 text-sm">No hay roles disponibles.</p>
+              )}
             </div>
           </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancelar</Button>
-          </DialogClose>
-          <Button className="bg-[#204983]" onClick={handleCreateUser}>
-            Crear Usuario
-          </Button>
-        </DialogFooter>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={isSubmitting}>
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creando..." : "Crear Usuario"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

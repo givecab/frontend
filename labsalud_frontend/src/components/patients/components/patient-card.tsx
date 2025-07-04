@@ -24,14 +24,13 @@ import {
   User,
 } from "lucide-react"
 import { toast } from "sonner"
-import { env } from "@/config/env"
+// Remove the env import since we'll use import.meta.env directly
 
 interface PatientCardProps {
   patient: Patient
   onSelectPatient: (patient: Patient, action: string) => void
   canEdit: boolean
   canDelete: boolean
-  setPatients: React.Dispatch<React.SetStateAction<Patient[]>>
   updatePatient: (updatedPatient: any) => void
   apiRequest: (url: string, options?: any) => Promise<Response>
 }
@@ -41,7 +40,6 @@ export function PatientCard({
   onSelectPatient,
   canEdit,
   canDelete,
-  setPatients,
   updatePatient,
   apiRequest,
 }: PatientCardProps) {
@@ -213,7 +211,7 @@ export function PatientCard({
     if (!hasChanges()) {
       toast.info("Sin cambios", {
         description: "No se detectaron cambios para guardar.",
-        duration: env.TOAST_DURATION,
+        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
       })
       setIsEditing(false)
       return
@@ -223,7 +221,7 @@ export function PatientCard({
     if (!editData.dni.trim() || editData.dni.length < 7 || editData.dni.length > 8) {
       toast.error("Error de validación", {
         description: "El DNI debe tener entre 7 y 8 dígitos.",
-        duration: env.TOAST_DURATION,
+        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
       })
       return
     }
@@ -231,7 +229,7 @@ export function PatientCard({
     if (!editData.first_name.trim() || !editData.last_name.trim()) {
       toast.error("Error de validación", {
         description: "El nombre y apellido son obligatorios.",
-        duration: env.TOAST_DURATION,
+        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
       })
       return
     }
@@ -249,16 +247,7 @@ export function PatientCard({
         birth_date: formatDateForAPI(editData.birth_date),
       }
 
-      if (env.DEBUG_MODE) {
-        console.log("Datos originales del paciente:", patient)
-        console.log("Datos editados:", editData)
-        console.log("Datos a enviar:", dataToSend)
-        console.log("Fecha original (input):", editData.birth_date)
-        console.log("Fecha para backend:", dataToSend.birth_date)
-        console.log("URL:", `${env.PATIENTS_ENDPOINT}${patient.id}/`)
-      }
-
-      const response = await apiRequest(`${env.PATIENTS_ENDPOINT}${patient.id}/`, {
+      const response = await apiRequest(`${import.meta.env.VITE_PATIENTS_ENDPOINT}${patient.id}/`, {
         method: "PATCH",
         body: dataToSend,
       })
@@ -270,7 +259,7 @@ export function PatientCard({
         updatePatient(updatedPatientData)
         toast.success("Paciente actualizado", {
           description: `Los datos de ${updatedPatientData.first_name} ${updatedPatientData.last_name} han sido actualizados.`,
-          duration: env.TOAST_DURATION,
+          duration: import.meta.env.VITE_TOAST_DURATION || 3000,
         })
         setIsEditing(false)
       } else {
@@ -279,14 +268,14 @@ export function PatientCard({
         console.error("Error - Respuesta del servidor:", errorData)
         toast.error("Error al actualizar", {
           description: errorData.detail || errorData.message || "Ha ocurrido un error al actualizar el paciente.",
-          duration: env.TOAST_DURATION,
+          duration: import.meta.env.VITE_TOAST_DURATION || 3000,
         })
       }
     } catch (error) {
       console.error("Error al actualizar paciente:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al actualizar el paciente.",
-        duration: env.TOAST_DURATION,
+        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
       })
     }
   }
@@ -310,11 +299,24 @@ export function PatientCard({
   }
 
   const renderUserAvatar = (
-    user: { id: number; username: string; photo?: string },
+    user: { id: number; username: string; photo?: string } | null,
     timestamp?: string,
     showName = false,
     index?: number,
   ) => {
+    // Validar que el usuario no sea null
+    if (!user) {
+      return (
+        <div
+          key={`null-user-${index || 0}`}
+          className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-300 flex items-center justify-center border-2 border-white shadow-sm"
+          title="Usuario no disponible"
+        >
+          <User className="w-3 h-3 md:w-4 md:h-4 text-gray-500" />
+        </div>
+      )
+    }
+
     const displayName = user.username
     const tooltipText = timestamp ? `${displayName} - ${formatDateTime(timestamp)}` : displayName
     const uniqueKey = `${user.id}-${timestamp || "no-timestamp"}-${index || 0}`
@@ -394,17 +396,18 @@ export function PatientCard({
                   {renderUserAvatar(patient.created_by, patient.created_at, false, 0)}
                 </div>
 
-                {patient.updated_by.length > 0 && (
+                {patient.updated_by && patient.updated_by.length > 0 && (
                   <div className="flex items-center space-x-1">
                     <span className="text-gray-500 hidden sm:inline">Modificado:</span>
                     <span className="text-gray-500 sm:hidden">M:</span>
                     <div className="flex -space-x-1">
                       {patient.updated_by
+                        .filter((user) => user !== null)
                         .slice(0, 2)
                         .map((user, index) => renderUserAvatar(user, patient.updated_at, false, index))}
-                      {patient.updated_by.length > 2 && (
+                      {patient.updated_by.filter((user) => user !== null).length > 2 && (
                         <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-white shadow-sm text-xs">
-                          +{patient.updated_by.length - 2}
+                          +{patient.updated_by.filter((user) => user !== null).length - 2}
                         </div>
                       )}
                     </div>
@@ -658,17 +661,22 @@ export function PatientCard({
                     {renderUserAvatar(patient.created_by, patient.created_at, true, 0)}
                   </div>
 
-                  {patient.updated_by.length > 0 && (
+                  {patient.updated_by && patient.updated_by.filter((user) => user !== null).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-500 mb-2">Modificado por:</p>
                       <div className="space-y-2">
-                        {patient.updated_by.slice(0, 5).map((user, index) => (
-                          <div key={`audit-${user.id}-${index}`}>
-                            {renderUserAvatar(user, patient.updated_at, true, index)}
-                          </div>
-                        ))}
-                        {patient.updated_by.length > 5 && (
-                          <p className="text-xs text-gray-400">... y {patient.updated_by.length - 5} más</p>
+                        {patient.updated_by
+                          .filter((user) => user !== null)
+                          .slice(0, 5)
+                          .map((user, index) => (
+                            <div key={`audit-${user.id}-${index}`}>
+                              {renderUserAvatar(user, patient.updated_at, true, index)}
+                            </div>
+                          ))}
+                        {patient.updated_by.filter((user) => user !== null).length > 5 && (
+                          <p className="text-xs text-gray-400">
+                            ... y {patient.updated_by.filter((user) => user !== null).length - 5} más
+                          </p>
                         )}
                       </div>
                     </div>

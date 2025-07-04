@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { User, LogOut, Settings, UserCircle, Shield } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
 import { Link } from "react-router-dom"
 
 interface UserDropdownProps {
@@ -18,19 +18,19 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
   const { user, logout, hasPermission } = useAuth()
 
   // Verificar si el usuario tiene al menos uno de los permisos de gestión
-  // Excluimos el permiso 24 (consultar usuario) si es el único que tiene
+  // Excluimos el permiso 24 (view_customuser) si es el único que tiene
   const hasOnlyViewPermission =
-    hasPermission("24") && ![30, 31, 32, 33, 34, 35, 36].some((permId) => hasPermission(permId.toString()))
+    hasPermission("24") && ![21, 22, 23, 9, 34, 35, 36].some((permId) => hasPermission(permId.toString()))
 
   const canAccessManagement =
     !hasOnlyViewPermission &&
-    (hasPermission("30") || // crear usuario
-      hasPermission("31") || // modificar usuario
-      hasPermission("32") || // eliminar usuario
-      hasPermission("33") || // crear rol
-      hasPermission("34") || // asignar rol
-      hasPermission("35") || // quitar rol
-      hasPermission("36")) // gestionar permisos temporales
+    (hasPermission("21") || // add_customuser
+      hasPermission("22") || // change_customuser
+      hasPermission("23") || // delete_customuser
+      hasPermission("9") || // add_group
+      hasPermission("34") || // assign_role
+      hasPermission("35") || // remove_role
+      hasPermission("36")) // assign_temp_permission
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -127,7 +127,11 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
               </div>
             </div>
           )}
-          {!isMobile && <p className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</p>}
+          {!isMobile && (
+            <p className="text-sm font-medium text-gray-900">
+              {user.first_name} {user.last_name}
+            </p>
+          )}
         </div>
 
         {/* Menu Items */}
@@ -153,7 +157,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
           )}
 
           <Link
-            to="/settings"
+            to="/configuracion"
             className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 transition-colors duration-150"
             onClick={() => setIsOpen(false)}
           >

@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import { useState, useEffect, useCallback, useRef } from "react"
+import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Loader2, AlertCircle } from "lucide-react"
+import { Plus, Search, Loader2, AlertCircle, X } from "lucide-react"
 import { PatientGrid } from "./components/patient-grid"
 import { CreatePatientDialog } from "./components/create-patient-dialog"
-import { DeletePatientDialog } from "./components/delete-patient-dialog"
-import { env } from "@/config/env"
+import DeletePatientDialog from "./components/delete-patient-dialog"
 
 // Interface para usuario como viene del endpoint
 export interface User {
@@ -18,7 +19,7 @@ export interface User {
   photo?: string
 }
 
-// Interface para paciente como viene del endpoint - CORREGIDA
+// Interface para paciente como viene del endpoint
 export interface Patient {
   id: number
   dni: string
@@ -33,108 +34,104 @@ export interface Patient {
   province: string
   city: string
   address: string
-  is_active: boolean
   created_at: string
   updated_at: string
-  created_by: User // Usuario que creó el paciente
-  updated_by: User[] // Array directo de usuarios que modificaron
+  created_by: User
+  updated_by: User[]
+}
+
+// Interface para la respuesta paginada de la API
+interface PaginatedResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Patient[]
 }
 
 export default function PatientsPage() {
   const { hasPermission } = useAuth()
   const { apiRequest } = useApi()
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([])
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Estados principales
+  const [allPatients, setAllPatients] = useState<Patient[]>([]) // Todos los pacientes cargados
+  const [displayedPatients, setDisplayedPatients] = useState<Patient[]>([]) // Pacientes mostrados (filtrados)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [hasMore, setHasMore] = useState(true)
+  const [nextUrl, setNextUrl] = useState<string | null>(null)
+  const [totalCount, setTotalCount] = useState(0)
 
   // Estados de diálogos
   const [isCreating, setIsCreating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Permisos para pacientes
+  // Debounce para la búsqueda
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+  // Permisos
   const canViewPatients = hasPermission("40") // view_patient
-  const canConsultPatients = hasPermission("41") // consult_patient
   const canCreatePatient = hasPermission("37") // add_patient
   const canEditPatient = hasPermission("38") // change_patient
   const canDeletePatient = hasPermission("39") // delete_patient
+  const canAccessPatients = canViewPatients
 
-  // El usuario necesita al menos view_patient o consult_patient para acceder
-  const canAccessPatients = canViewPatients || canConsultPatients
+  // Función para construir URL con parámetros
+  const buildUrl = useCallback((search = "", offset = 0) => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL
+    const endpoint = import.meta.env.VITE_PATIENTS_ACTIVE_ENDPOINT
 
-  // Cargar pacientes
-  useEffect(() => {
-    const fetchPatients = async () => {
-      if (!canAccessPatients) {
-        setIsLoading(false)
-        return
-      }
+    const params = new URLSearchParams({
+      limit: "20",
+      offset: offset.toString(),
+    })
 
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        if (env.DEBUG_MODE) {
-          console.log("Cargando pacientes...")
-        }
-
-        const response = await apiRequest(env.PATIENTS_ACTIVE_ENDPOINT)
-
-        if (response.ok) {
-          const patientsData = await response.json()
-
-          if (env.DEBUG_MODE) {
-            console.log(`✅ Pacientes cargados: ${patientsData.length}`)
-            if (patientsData.length > 0) {
-              console.log("Estructura del primer paciente:", patientsData[0])
-              console.log("created_by:", patientsData[0].created_by)
-              console.log("updated_by:", patientsData[0].updated_by)
-            }
-          }
-
-          setPatients(patientsData)
-          setFilteredPatients(patientsData)
-        } else {
-          console.error("❌ Error al cargar pacientes:", response.status)
-          setError("Error al cargar los pacientes")
-        }
-      } catch (err) {
-        console.error("❌ Error al cargar datos:", err)
-        setError("Error al cargar los datos. Por favor, intenta nuevamente.")
-      } finally {
-        setIsLoading(false)
-      }
+    if (search.trim()) {
+      params.append("search", search.trim())
     }
 
-    fetchPatients()
-  }, [apiRequest, canAccessPatients])
+    return `${baseUrl}${endpoint}?${params.toString()}`
+  }, [])
 
-  // Filtrar pacientes por búsqueda - DNI como filtro principal
-  useEffect(() => {
+  // Función para filtrar pacientes localmente
+  const filterPatientsLocally = useCallback((patients: Patient[], searchTerm: string) => {
     if (!searchTerm.trim()) {
-      setFilteredPatients(patients)
-    } else {
-      const filtered = patients.filter((patient) => {
-        const searchLower = searchTerm.toLowerCase()
+      return patients
+    }
 
-        // Priorizar búsqueda por DNI (exacta y parcial)
+    const searchLower = searchTerm.toLowerCase().trim()
+
+    return patients
+      .filter((patient) => {
+        // Búsqueda por DNI (exacta y parcial)
         if (patient.dni.includes(searchTerm)) {
           return true
         }
 
-        // Búsqueda secundaria en otros campos
-        return (
-          `${patient.first_name} ${patient.last_name}`.toLowerCase().includes(searchLower) ||
-          patient.email.toLowerCase().includes(searchLower) ||
-          patient.phone_mobile.includes(searchTerm) ||
-          patient.phone_landline.includes(searchTerm)
-        )
-      })
+        // Búsqueda por nombre completo
+        const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
+        if (fullName.includes(searchLower)) {
+          return true
+        }
 
-      // Ordenar resultados: DNI exacto primero, luego DNI parcial, luego otros
-      filtered.sort((a, b) => {
+        // Búsqueda por email
+        if (patient.email.toLowerCase().includes(searchLower)) {
+          return true
+        }
+
+        // Búsqueda por teléfonos
+        if (patient.phone_mobile.includes(searchTerm) || patient.phone_landline.includes(searchTerm)) {
+          return true
+        }
+
+        return false
+      })
+      .sort((a, b) => {
+        // Ordenar resultados: DNI exacto primero, luego DNI parcial, luego otros
         const aExactDni = a.dni === searchTerm
         const bExactDni = b.dni === searchTerm
         const aPartialDni = a.dni.includes(searchTerm)
@@ -147,20 +144,126 @@ export default function PatientsPage() {
 
         return 0
       })
+  }, [])
 
-      setFilteredPatients(filtered)
+  // Función para cargar pacientes desde la API
+  const fetchPatientsFromAPI = useCallback(
+    async (search = "", reset = true) => {
+      if (!canAccessPatients) return
+
+      if (reset) {
+        setIsInitialLoading(true)
+        setError(null)
+      } else {
+        setIsLoadingMore(true)
+      }
+
+      try {
+        const url = reset ? buildUrl(search, 0) : nextUrl
+        if (!url) return
+
+        const response = await apiRequest(url)
+
+        if (response.ok) {
+          const data: PaginatedResponse = await response.json()
+
+          if (reset) {
+            setAllPatients(data.results)
+            setTotalCount(data.count)
+          } else {
+            setAllPatients((prev) => [...prev, ...data.results])
+          }
+
+          setNextUrl(data.next)
+          setHasMore(!!data.next)
+        } else {
+          setError("Error al cargar los pacientes")
+        }
+      } catch (err) {
+        console.error("Error al cargar datos:", err)
+        setError("Error al cargar los datos. Por favor, intenta nuevamente.")
+      } finally {
+        setIsInitialLoading(false)
+        setIsLoadingMore(false)
+      }
+    },
+    [apiRequest, canAccessPatients, buildUrl, nextUrl],
+  )
+
+  // Cargar más pacientes (scroll infinito)
+  const loadMore = useCallback(() => {
+    if (!isLoadingMore && hasMore && nextUrl && !debouncedSearchTerm.trim()) {
+      fetchPatientsFromAPI("", false)
     }
-  }, [searchTerm, patients])
+  }, [fetchPatientsFromAPI, isLoadingMore, hasMore, nextUrl, debouncedSearchTerm])
 
-  // Función para actualizar un paciente
-  const updatePatient = (updatedPatientData: Patient) => {
-    setPatients((prev) => prev.map((p) => (p.id === updatedPatientData.id ? updatedPatientData : p)))
-  }
+  // Hook de scroll infinito
+  const sentinelRef = useInfiniteScroll({
+    loading: isLoadingMore,
+    hasMore: hasMore && !debouncedSearchTerm.trim(),
+    onLoadMore: loadMore,
+    dependencies: [debouncedSearchTerm],
+  })
 
-  // Función para agregar un nuevo paciente
-  const addPatient = (newPatientData: Patient) => {
-    setPatients((prev) => [...prev, newPatientData])
-  }
+  // Efecto para carga inicial
+  useEffect(() => {
+    fetchPatientsFromAPI()
+  }, [])
+
+  // Efecto para búsqueda - filtrado local o API según el caso
+  useEffect(() => {
+    const handleSearch = async () => {
+      if (!debouncedSearchTerm.trim()) {
+        // Sin búsqueda: mostrar todos los pacientes cargados
+        setDisplayedPatients(allPatients)
+        setIsSearching(false)
+        return
+      }
+
+      setIsSearching(true)
+
+      // Primero filtrar localmente
+      const localResults = filterPatientsLocally(allPatients, debouncedSearchTerm)
+      setDisplayedPatients(localResults)
+
+      // Si tenemos pocos resultados locales y hay más datos en el servidor, buscar en API
+      if (localResults.length < 5 && hasMore) {
+        try {
+          const response = await apiRequest(buildUrl(debouncedSearchTerm, 0))
+          if (response.ok) {
+            const data: PaginatedResponse = await response.json()
+
+            // Combinar resultados únicos
+            const combinedResults = [...localResults]
+            data.results.forEach((patient) => {
+              if (!combinedResults.find((p) => p.id === patient.id)) {
+                combinedResults.push(patient)
+              }
+            })
+
+            setDisplayedPatients(filterPatientsLocally(combinedResults, debouncedSearchTerm))
+          }
+        } catch (err) {
+          console.error("Error en búsqueda API:", err)
+          // Mantener resultados locales en caso de error
+        }
+      }
+
+      setIsSearching(false)
+    }
+
+    handleSearch()
+  }, [debouncedSearchTerm, allPatients, filterPatientsLocally, hasMore, apiRequest, buildUrl])
+
+  // Funciones para manejar pacientes
+  const updatePatient = useCallback((updatedPatientData: Patient) => {
+    setAllPatients((prev) => prev.map((p) => (p.id === updatedPatientData.id ? updatedPatientData : p)))
+  }, [])
+
+  const addPatient = useCallback((newPatientData: Patient) => {
+    setAllPatients((prev) => [newPatientData, ...prev])
+    setTotalCount((prev) => prev + 1)
+  }, [])
 
   const handleSelectPatient = (patient: Patient, action: string) => {
     setSelectedPatient(patient)
@@ -177,7 +280,15 @@ export default function PatientsPage() {
     setIsDeleting(false)
   }
 
-  if (isLoading) {
+  const clearSearch = () => {
+    setSearchTerm("")
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }
+
+  // Estados de carga y error
+  if (isInitialLoading) {
     return (
       <div className="w-full max-w-7xl mx-auto py-4 px-4">
         <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6 flex justify-center items-center min-h-[300px]">
@@ -195,7 +306,15 @@ export default function PatientsPage() {
       <div className="w-full max-w-7xl mx-auto py-4 px-4">
         <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
           <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4">Gestión de Pacientes</h1>
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <p>{error}</p>
+            </div>
+            <Button onClick={() => fetchPatientsFromAPI("", true)} className="mt-3 bg-[#204983]" size="sm">
+              Reintentar
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -219,10 +338,16 @@ export default function PatientsPage() {
 
   return (
     <div className="w-full max-w-full mx-auto py-4 px-4">
-      {/* Header Container - Responsive */}
+      {/* Header Container */}
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6 mb-4 md:mb-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Gestión de Pacientes</h1>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Gestión de Pacientes</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {totalCount > 0 && `${totalCount} pacientes registrados`}
+              {searchTerm && ` • ${displayedPatients.length} resultados`}
+            </p>
+          </div>
           {canCreatePatient && (
             <Button className="bg-[#204983] w-full sm:w-auto" onClick={() => setIsCreating(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -232,40 +357,76 @@ export default function PatientsPage() {
         </div>
       </div>
 
-      {/* Search Container - Responsive */}
+      {/* Search Container */}
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6 mb-4 md:mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
           <Input
-            placeholder="Buscar por DNI, nombre, email o teléfono..."
+            ref={searchInputRef}
+            placeholder="Buscar por DNI o nombre..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-12 h-10 md:h-12 text-base md:text-lg"
+            className="pl-12 pr-10 h-10 md:h-12 text-base md:text-lg"
           />
+          {searchTerm && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+          {isSearching && (
+            <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+              <Loader2 className="h-4 w-4 text-[#204983] animate-spin" />
+            </div>
+          )}
         </div>
-        <p className="text-xs md:text-sm text-gray-500 mt-2">
-          Tip: La búsqueda por DNI tiene prioridad y mostrará resultados exactos primero
-        </p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs md:text-sm text-gray-500">Búsqueda instantánea por DNI o nombre del paciente</p>
+          {searchTerm && (
+            <p className="text-xs text-[#204983] font-medium">
+              {displayedPatients.length} resultado{displayedPatients.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Patients List */}
       <div className="space-y-4">
         <PatientGrid
-          patients={filteredPatients}
+          patients={displayedPatients}
           onSelectPatient={handleSelectPatient}
           canEdit={canEditPatient}
           canDelete={canDeletePatient}
-          setPatients={setPatients}
           updatePatient={updatePatient}
           apiRequest={apiRequest}
         />
+
+        {/* Infinite Scroll Sentinel - Solo cuando no hay búsqueda */}
+        {!searchTerm && hasMore && (
+          <div ref={sentinelRef} className="flex justify-center py-4">
+            {isLoadingMore && (
+              <div className="flex items-center">
+                <Loader2 className="h-6 w-6 text-[#204983] animate-spin mr-2" />
+                <span className="text-gray-600">Cargando más pacientes...</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No more results */}
+        {!searchTerm && !hasMore && allPatients.length > 0 && (
+          <div className="text-center py-4 text-gray-500">
+            <p>No hay más pacientes para mostrar</p>
+          </div>
+        )}
       </div>
 
       {/* Diálogos */}
       <CreatePatientDialog
         isOpen={isCreating}
         onClose={closeAllDialogs}
-        setPatients={setPatients}
         addPatient={addPatient}
         apiRequest={apiRequest}
       />
@@ -274,7 +435,7 @@ export default function PatientsPage() {
         isOpen={isDeleting}
         onClose={closeAllDialogs}
         patient={selectedPatient}
-        setPatients={setPatients}
+        setPatients={setAllPatients}
         apiRequest={apiRequest}
       />
     </div>

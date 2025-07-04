@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
-import type { User, Role, Permission } from "@/components/admin/management-page"
+import type { User, Role, Permission } from "@/types"
 import { UserTable } from "./components/user-table"
 import { CreateUserDialog } from "./components/create-user-dialog"
 import { EditUserDialog } from "./components/edit-user-dialog"
@@ -20,9 +20,10 @@ interface UserManagementProps {
   roles: Role[]
   permissions: Permission[]
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
+  refreshData: () => Promise<void>
 }
 
-export function UserManagement({ users, roles, permissions, setUsers }: UserManagementProps) {
+export function UserManagement({ users, roles, permissions, setUsers, refreshData }: UserManagementProps) {
   const { hasPermission } = useAuth()
   const { apiRequest } = useApi()
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -33,27 +34,37 @@ export function UserManagement({ users, roles, permissions, setUsers }: UserMana
   const [isRoleRemove, setIsRoleRemove] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Permisos
-  const canViewUsers = hasPermission("24")
-  const canCreateUser = hasPermission("30")
+  // Permisos actualizados
+  const canViewUsers = hasPermission("24") // view_customuser
+  const canCreateUser = hasPermission("21") // add_customuser
+  const canEditUser = hasPermission("22") // change_customuser
+  const canDeleteUser = hasPermission("23") // delete_customuser
+  const canAssignRole = hasPermission("34") // assign_role
+  const canRemoveRole = hasPermission("35") // remove_role
+  const canAssignTempPermission = hasPermission("36") // assign_temp_permission
 
   const handleSelectUser = (user: User, action: string) => {
+    if (!user || !user.id) {
+      console.error("Usuario inválido seleccionado:", user)
+      return
+    }
+
     setSelectedUser(user)
     switch (action) {
       case "edit":
-        setIsEditing(true)
+        if (canEditUser) setIsEditing(true)
         break
       case "tempPermission":
-        setIsTempPermission(true)
+        if (canAssignTempPermission) setIsTempPermission(true)
         break
       case "assignRole":
-        setIsRoleAssign(true)
+        if (canAssignRole) setIsRoleAssign(true)
         break
       case "removeRole":
-        setIsRoleRemove(true)
+        if (canRemoveRole) setIsRoleRemove(true)
         break
       case "delete":
-        setIsDeleting(true)
+        if (canDeleteUser) setIsDeleting(true)
         break
     }
   }
@@ -67,6 +78,13 @@ export function UserManagement({ users, roles, permissions, setUsers }: UserMana
     setIsRoleRemove(false)
     setIsDeleting(false)
   }
+
+  // Validar datos
+  const validUsers = Array.isArray(users) ? users.filter((user) => user && user.id) : []
+  const validRoles = Array.isArray(roles) ? roles.filter((role) => role && role.id) : []
+  const validPermissions = Array.isArray(permissions)
+    ? permissions.filter((permission) => permission && permission.id)
+    : []
 
   return (
     <div>
@@ -82,7 +100,15 @@ export function UserManagement({ users, roles, permissions, setUsers }: UserMana
       </div>
 
       {canViewUsers ? (
-        <UserTable users={users} onSelectUser={handleSelectUser} />
+        <UserTable
+          users={validUsers}
+          onSelectUser={handleSelectUser}
+          canEdit={canEditUser}
+          canDelete={canDeleteUser}
+          canAssignRole={canAssignRole}
+          canRemoveRole={canRemoveRole}
+          canManageTempPermissions={canAssignTempPermission}
+        />
       ) : (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-md">
           <div className="flex items-center">
@@ -94,53 +120,60 @@ export function UserManagement({ users, roles, permissions, setUsers }: UserMana
 
       {/* Dialogs */}
       <CreateUserDialog
-        isOpen={isCreating}
-        onClose={closeAllDialogs}
-        roles={roles}
+        open={isCreating}
+        onOpenChange={(open) => !open && closeAllDialogs()}
+        roles={validRoles}
         setUsers={setUsers}
         apiRequest={apiRequest}
+        refreshData={refreshData}
       />
 
       <EditUserDialog
-        isOpen={isEditing}
-        onClose={closeAllDialogs}
+        open={isEditing}
+        onOpenChange={(open) => !open && closeAllDialogs()}
         user={selectedUser}
+        roles={validRoles}
         setUsers={setUsers}
         apiRequest={apiRequest}
+        refreshData={refreshData}
       />
 
       <TempPermissionDialog
-        isOpen={isTempPermission}
-        onClose={closeAllDialogs}
+        open={isTempPermission}
+        onOpenChange={(open) => !open && closeAllDialogs()}
         user={selectedUser}
-        permissions={permissions}
+        permissions={validPermissions}
         setUsers={setUsers}
         apiRequest={apiRequest}
       />
 
       <RoleAssignDialog
-        isOpen={isRoleAssign}
-        onClose={closeAllDialogs}
+        open={isRoleAssign}
+        onOpenChange={(open) => !open && closeAllDialogs()}
         user={selectedUser}
-        roles={roles}
+        roles={validRoles}
         setUsers={setUsers}
         apiRequest={apiRequest}
+        refreshData={refreshData}
       />
 
       <RoleRemoveDialog
-        isOpen={isRoleRemove}
-        onClose={closeAllDialogs}
+        open={isRoleRemove}
+        onOpenChange={(open) => !open && closeAllDialogs()}
         user={selectedUser}
+        roles={validRoles}
         setUsers={setUsers}
         apiRequest={apiRequest}
+        refreshData={refreshData}
       />
 
       <DeleteUserDialog
-        isOpen={isDeleting}
-        onClose={closeAllDialogs}
+        open={isDeleting}
+        onOpenChange={(open) => !open && closeAllDialogs()}
         user={selectedUser}
         setUsers={setUsers}
         apiRequest={apiRequest}
+        refreshData={refreshData}
       />
     </div>
   )

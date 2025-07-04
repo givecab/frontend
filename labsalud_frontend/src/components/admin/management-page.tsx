@@ -1,48 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
 import { PermissionManagement } from "./permission-management"
 import { Loader2, AlertCircle } from "lucide-react"
-import { env } from "@/config/env"
-
-// Interfaces para los datos - EXPORTADAS
-export interface User {
-  id: number
-  username: string
-  email: string
-  first_name: string
-  last_name: string
-  is_active: boolean
-  groups?: {
-    id: number
-    name: string
-  }[]
-  temp_permissions?: TempPermission[]
-}
-
-export interface Role {
-  id: number
-  name: string
-  permissions: number[]
-}
-
-export interface Permission {
-  id: number
-  codename: string
-  name: string
-}
-
-export interface TempPermission {
-  id: number
-  permission: number
-  name: string
-  expires_at: string
-}
+import type { User, Role, Permission } from "@/types"
 
 export default function ManagementPage() {
   const { hasPermission } = useAuth()
@@ -55,79 +21,84 @@ export default function ManagementPage() {
 
   // Verificar si el usuario tiene al menos uno de los permisos de gestión
   const hasOnlyViewPermission =
-    hasPermission("24") && ![30, 31, 32, 33, 34, 35, 36].some((permId) => hasPermission(permId.toString()))
+    hasPermission("24") &&
+    !["21", "22", "23", "9", "10", "11", "34", "35", "36"].some((permId) => hasPermission(permId))
 
   const canAccessManagement =
     !hasOnlyViewPermission &&
-    (hasPermission(24) || // consultar usuario
-      hasPermission(30) || // crear usuario
-      hasPermission(31) || // modificar usuario
-      hasPermission(32) || // eliminar usuario
-      hasPermission(33) || // crear rol
-      hasPermission(34) || // asignar rol
-      hasPermission(35) || // quitar rol
-      hasPermission(36)) // gestionar permisos temporales
+    (hasPermission("24") || // view_customuser
+      hasPermission("21") || // add_customuser
+      hasPermission("22") || // change_customuser
+      hasPermission("23") || // delete_customuser
+      hasPermission("9") || // add_group
+      hasPermission("10") || // change_group
+      hasPermission("11") || // delete_group
+      hasPermission("12") || // view_group
+      hasPermission("34") || // assign_role
+      hasPermission("35") || // remove_role
+      hasPermission("36")) // assign_temp_permission
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true)
-      setError(null)
+  const refreshData = async () => {
+    setIsLoading(true)
+    setError(null)
 
-      try {
-        if (env.DEBUG_MODE) {
-          console.log("Cargando datos de gestión...")
-        }
+    try {
+      console.log("Cargando datos de gestión...")
 
-        // Cargar usuarios
-        const usersResponse = await apiRequest(env.USERS_ENDPOINT)
+      // Cargar usuarios - permisos: 21, 22, 23, 24
+      if (hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) {
+        const usersResponse = await apiRequest("api/users/active/")
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
-          setUsers(usersData)
-
-          if (env.DEBUG_MODE) {
-            console.log(`Usuarios cargados: ${usersData.length}`)
+          if (usersData && Array.isArray(usersData.results)) {
+            setUsers(usersData.results)
+            console.log(`Usuarios cargados: ${usersData.results.length}`)
           }
         } else {
           console.error("Error al cargar usuarios:", usersResponse.status)
         }
+      }
 
-        // Cargar roles
-        const rolesResponse = await apiRequest(env.ROLES_ENDPOINT)
+      // Cargar roles - permisos: 9, 10, 11, 12
+      if (hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) {
+        const rolesResponse = await apiRequest("api/roles/")
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json()
-          setRoles(rolesData)
-
-          if (env.DEBUG_MODE) {
-            console.log(`Roles cargados: ${rolesData.length}`)
+          if (rolesData && Array.isArray(rolesData.results)) {
+            setRoles(rolesData.results)
+            console.log(`Roles cargados: ${rolesData.results.length}`)
           }
         } else {
           console.error("Error al cargar roles:", rolesResponse.status)
         }
+      }
 
-        // Cargar permisos
-        const permissionsResponse = await apiRequest(env.PERMISSIONS_ENDPOINT)
+      // Cargar permisos - permiso: 8
+      if (hasPermission("8")) {
+        const permissionsResponse = await apiRequest("api/permissions/")
         if (permissionsResponse.ok) {
           const permissionsData = await permissionsResponse.json()
-          setPermissions(permissionsData)
-
-          if (env.DEBUG_MODE) {
-            console.log(`Permisos cargados: ${permissionsData.length}`)
+          if (permissionsData && Array.isArray(permissionsData.results)) {
+            setPermissions(permissionsData.results)
+            console.log(`Permisos cargados: ${permissionsData.results.length}`)
           }
         } else {
           console.error("Error al cargar permisos:", permissionsResponse.status)
         }
-      } catch (err) {
-        console.error("Error al cargar datos:", err)
-        setError("Error al cargar los datos. Por favor, intenta nuevamente.")
-      } finally {
-        setIsLoading(false)
       }
+    } catch (err) {
+      console.error("Error al cargar datos:", err)
+      setError("Error al cargar los datos. Por favor, intenta nuevamente.")
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     if (canAccessManagement) {
-      fetchData()
+      refreshData()
     }
-  }, [apiRequest, canAccessManagement])
+  }, [canAccessManagement])
 
   if (isLoading) {
     return (
@@ -176,22 +147,38 @@ export default function ManagementPage() {
 
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="mb-6">
-            <TabsTrigger value="users">Usuarios</TabsTrigger>
-            <TabsTrigger value="roles">Roles</TabsTrigger>
-            <TabsTrigger value="permissions">Permisos</TabsTrigger>
+            {(hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) && (
+              <TabsTrigger value="users">Usuarios</TabsTrigger>
+            )}
+            {(hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) && (
+              <TabsTrigger value="roles">Roles</TabsTrigger>
+            )}
+            {hasPermission("8") && <TabsTrigger value="permissions">Permisos</TabsTrigger>}
           </TabsList>
 
-          <TabsContent value="users">
-            <UserManagement users={users} roles={roles} permissions={permissions} setUsers={setUsers} />
-          </TabsContent>
+          {(hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) && (
+            <TabsContent value="users">
+              <UserManagement
+                users={users}
+                roles={roles}
+                permissions={permissions}
+                setUsers={setUsers}
+                refreshData={refreshData}
+              />
+            </TabsContent>
+          )}
 
-          <TabsContent value="roles">
-            <RoleManagement roles={roles} permissions={permissions} setRoles={setRoles} />
-          </TabsContent>
+          {(hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) && (
+            <TabsContent value="roles">
+              <RoleManagement roles={roles} permissions={permissions} setRoles={setRoles} refreshData={refreshData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="permissions">
-            <PermissionManagement permissions={permissions} />
-          </TabsContent>
+          {hasPermission("8") && (
+            <TabsContent value="permissions">
+              <PermissionManagement permissions={permissions} />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
