@@ -19,10 +19,12 @@ export default function ManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Verificar si el usuario tiene al menos uno de los permisos de gestión
+  // Verificar si el usuario tiene solo permiso de vista y ningún otro de gestión
   const hasOnlyViewPermission =
     hasPermission("24") &&
-    !["21", "22", "23", "9", "10", "11", "34", "35", "36"].some((permId) => hasPermission(permId))
+    !["21", "22", "23", "9", "10", "11", "34", "35", "36"].some((permId) =>
+      hasPermission(permId),
+    )
 
   const canAccessManagement =
     !hasOnlyViewPermission &&
@@ -30,13 +32,13 @@ export default function ManagementPage() {
       hasPermission("21") || // add_customuser
       hasPermission("22") || // change_customuser
       hasPermission("23") || // delete_customuser
-      hasPermission("9") || // add_group
+      hasPermission("9")  || // add_group
       hasPermission("10") || // change_group
       hasPermission("11") || // delete_group
       hasPermission("12") || // view_group
       hasPermission("34") || // assign_role
       hasPermission("35") || // remove_role
-      hasPermission("36")) // assign_temp_permission
+      hasPermission("36"))   // assign_temp_permission
 
   const refreshData = async () => {
     setIsLoading(true)
@@ -46,7 +48,12 @@ export default function ManagementPage() {
       console.log("Cargando datos de gestión...")
 
       // Cargar usuarios - permisos: 21, 22, 23, 24
-      if (hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) {
+      if (
+        hasPermission("24") ||
+        hasPermission("21") ||
+        hasPermission("22") ||
+        hasPermission("23")
+      ) {
         const usersResponse = await apiRequest("api/users/active/")
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
@@ -59,23 +66,31 @@ export default function ManagementPage() {
         }
       }
 
-      // Cargar roles - permisos: 9, 10, 11, 12
-      if (hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) {
-        const rolesResponse = await apiRequest("api/roles/")
+      // Cargar roles - permisos: 9, 10, 11, 12 (paginado)
+      if (
+        hasPermission("12") ||
+        hasPermission("9") ||
+        hasPermission("10") ||
+        hasPermission("11")
+      ) {
+        const rolesResponse = await apiRequest("api/roles/?limit=20&offset=0&search=")
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json()
           if (rolesData && Array.isArray(rolesData.results)) {
             setRoles(rolesData.results)
-            console.log(`Roles cargados: ${rolesData.results.length}`)
+            console.log(`Roles cargados: ${rolesData.results.length} / ${rolesData.count}`)
+            // rolesData.next → para scroll infinito si se implementa después
           }
         } else {
           console.error("Error al cargar roles:", rolesResponse.status)
         }
       }
 
-      // Cargar permisos - permiso: 8
+      // Cargar permisos - permiso: 8 (paginado)
       if (hasPermission("8")) {
-        const permissionsResponse = await apiRequest("api/permissions/")
+        const permissionsResponse = await apiRequest(
+          "api/permissions/?limit=20&offset=0&search="
+        )
         if (permissionsResponse.ok) {
           const permissionsData = await permissionsResponse.json()
           if (permissionsData && Array.isArray(permissionsData.results)) {
@@ -144,7 +159,6 @@ export default function ManagementPage() {
     <div className="max-w-6xl mx-auto py-6">
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Gestión de Usuarios y Permisos</h1>
-
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="mb-6">
             {(hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) && (
@@ -170,7 +184,11 @@ export default function ManagementPage() {
 
           {(hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) && (
             <TabsContent value="roles">
-              <RoleManagement roles={roles} permissions={permissions} setRoles={setRoles} refreshData={refreshData} />
+              <RoleManagement
+                roles={roles}
+                setRoles={setRoles}
+                refreshData={refreshData}
+              />
             </TabsContent>
           )}
 

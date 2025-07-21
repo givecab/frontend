@@ -1,56 +1,132 @@
-"use client"
+import { useState, useCallback, useEffect, useRef } from "react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { AlertTriangle } from "lucide-react"
-
-interface IdleWarningModalProps {
-  isOpen: boolean
-  timeLeft: number
-  onExtend: () => void
-  onLogout: () => void
+interface IdleTimeoutProps {
+  onIdle: () => void;
+  idleTime: number;
+  warningTime: number;
 }
 
-export function IdleWarningModal({ isOpen, timeLeft, onExtend, onLogout }: IdleWarningModalProps) {
-  return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent
-        className="sm:max-w-md"
-        id="idle-warning-modal"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Sesión por expirar
-          </DialogTitle>
-          <DialogDescription>
-            Tu sesión expirará por inactividad en <span className="font-bold text-red-600">{timeLeft}</span> segundos.
-          </DialogDescription>
-        </DialogHeader>
+export function useIdleTimeout({
+  onIdle,
+  idleTime,
+  warningTime
+}: IdleTimeoutProps) {
+  const [showWarning, setShowWarning] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(Math.ceil(warningTime / 1000));
+  
+  const warningTimerRef = useRef<number | undefined>(undefined);
+  const logoutTimerRef = useRef<number | undefined>(undefined);
+  const countdownTimerRef = useRef<number | undefined>(undefined);
+  const isWarningActiveRef = useRef(false);
 
-        <div className="text-center py-4">
-          <div className="text-6xl font-bold text-red-600 mb-2">{timeLeft}</div>
-          <p className="text-sm text-muted-foreground">¿Deseas continuar con tu sesión?</p>
-        </div>
+  const clearTimers = useCallback(() => {
+    if (warningTimerRef.current !== undefined) {
+      window.clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = undefined;
+    }
+    
+    if (logoutTimerRef.current !== undefined) {
+      window.clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = undefined;
+    }
+    
+    if (countdownTimerRef.current !== undefined) {
+      window.clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = undefined;
+    }
+  }, []);
 
-        <DialogFooter className="flex gap-2 sm:gap-2">
-          <Button variant="outline" onClick={onLogout} className="flex-1 bg-transparent">
-            Cerrar sesión
-          </Button>
-          <Button onClick={onExtend} className="flex-1">
-            Continuar sesión
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
+  const startWarningPhase = useCallback(() => {
+    if (isWarningActiveRef.current) {
+      return;
+    }
+
+    isWarningActiveRef.current = true;
+    setShowWarning(true);
+    
+    // Initialize countdown
+    const initialSeconds = Math.ceil(warningTime / 1000);
+    setTimeLeft(initialSeconds);
+    
+    // Set the end time for precise countdown
+    const startTime = Date.now();
+    const endTime = startTime + warningTime;
+    
+    countdownTimerRef.current = window.setInterval(() => {
+      const secondsLeft = Math.ceil((endTime - Date.now()) / 1000);
+      
+      if (secondsLeft <= 0) {
+        clearTimers();
+        setShowWarning(false);
+        isWarningActiveRef.current = false;
+        onIdle();
+      } else {
+        setTimeLeft(secondsLeft);
+      }
+    }, 1000);
+    
+    // Backup timer to ensure logout happens
+    logoutTimerRef.current = window.setTimeout(() => {
+      clearTimers();
+      setShowWarning(false);
+      isWarningActiveRef.current = false;
+      onIdle();
+    }, warningTime);
+    
+  }, [warningTime, onIdle, clearTimers]);
+
+  const resetTimers = useCallback(() => {
+    if (isWarningActiveRef.current) {
+      return;
+    }
+
+    clearTimers();
+    
+    warningTimerRef.current = window.setTimeout(() => {
+      startWarningPhase();
+    }, idleTime - warningTime);
+    
+  }, [idleTime, warningTime, clearTimers, startWarningPhase]);
+
+  const handleActivity = useCallback(() => {
+    if (isWarningActiveRef.current) {
+      return;
+    }
+    resetTimers();
+  }, [resetTimers]);
+
+  const extendSession = useCallback(() => {
+    isWarningActiveRef.current = false;
+    setShowWarning(false);
+    clearTimers();
+    resetTimers();
+  }, [clearTimers, resetTimers]);
+
+  useEffect(() => {
+    const events = [
+      "mousemove",
+      "mousedown",
+      "keypress", 
+      "scroll", 
+      "touchstart",
+      "click"
+    ];
+    
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity);
+    });
+    
+    resetTimers();
+    
+    return () => {
+      clearTimers();
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+    };
+  }, [handleActivity, resetTimers, clearTimers]);
+
+  return { showWarning, timeLeft, extendSession };
 }
+
+export default useIdleTimeout;

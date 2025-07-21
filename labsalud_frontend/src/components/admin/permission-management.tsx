@@ -1,66 +1,114 @@
 "use client"
 
+import { useState, useEffect, useRef } from "react"
+import { useApi } from "@/hooks/use-api"
 import type { Permission } from "@/types"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertCircle } from "lucide-react"
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
+import { AlertCircle } from "lucide-react"
+import type { UIEvent, ChangeEvent } from "react"
 
-interface PermissionManagementProps {
-  permissions: Permission[]
-}
+export function PermissionManagement() {
+  const { apiRequest } = useApi()
 
-export function PermissionManagement({ permissions }: PermissionManagementProps) {
-  const [searchTerm, setSearchTerm] = useState("")
+  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState("")
+  const [searching, setSearching] = useState(false)
+  const permsContainerRef = useRef<HTMLDivElement>(null)
 
-  // Validar datos
-  const validPermissions = Array.isArray(permissions)
-    ? permissions.filter((permission) => permission && permission.id)
-    : []
+  // Cargar lote de permisos, admite búsqueda
+  const loadMore = async (reset = false) => {
+    if (loading || (!hasMore && !reset)) return
+    setLoading(true)
+    try {
+      const res = await apiRequest(
+        `api/permissions/?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const batch: Permission[] = data.results || []
+        setPermissions((prev) => reset ? batch : [...prev, ...batch])
+        setOffset((prev) => reset ? batch.length : prev + batch.length)
+        setHasMore(!!data.next && batch.length === 20)
+      } else {
+        setHasMore(false)
+      }
+    } catch (err) {
+      setHasMore(false)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const filteredPermissions = validPermissions.filter(
-    (permission) =>
-      (permission.codename || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      permission.id.toString().includes(searchTerm),
-  )
+  // Inicial/filtro
+  useEffect(() => {
+    setOffset(0)
+    setHasMore(true)
+    setPermissions([])
+    if (search) setSearching(true)
+    loadMore(true).then(() => setSearching(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
+  // Scroll infinito
+  const onPermsScroll = (e: UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 20) {
+      loadMore()
+    }
+  }
+
+  // Input de búsqueda
+  const handleSearch = (e: ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value)
+  }
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Lista de Permisos</h2>
-
-        <div className="w-64">
-          <Input placeholder="Buscar permisos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </div>
+      <h2 className="mb-4 text-xl font-semibold text-gray-800">Lista de Permisos</h2>
+      <div className="mb-4">
+        <Input
+          type="text"
+          placeholder="Buscar permisos por nombre o codename..."
+          value={search}
+          onChange={handleSearch}
+          className="w-full max-w-md"
+        />
       </div>
-
-      <div className="rounded-md border">
+      <div
+        ref={permsContainerRef}
+        onScroll={onPermsScroll}
+        className="max-h-96 overflow-y-auto border rounded-md p-3 bg-white"
+      >
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
-              <TableHead>Código</TableHead>
-              <TableHead>Descripción</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Codename</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPermissions.length > 0 ? (
-              filteredPermissions.map((permission) => (
-                <TableRow key={permission.id}>
-                  <TableCell>{permission.id}</TableCell>
-                  <TableCell className="font-medium">{permission.codename || "Sin código"}</TableCell>
-                  <TableCell>
-                    <code className="bg-gray-100 px-2 py-1 rounded text-sm">{permission.codename || "Sin código"}</code>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
+            {permissions.map((perm) => (
+              <TableRow key={perm.id}>
+                <TableCell>{perm.id}</TableCell>
+                <TableCell>{perm.name}</TableCell>
+                <TableCell>{perm.codename}</TableCell>
+              </TableRow>
+            ))}
+            {(loading || searching) && (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-4">
-                  <div className="flex flex-col items-center justify-center text-gray-500">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <p>{searchTerm ? "No se encontraron permisos" : "No hay permisos disponibles"}</p>
-                  </div>
+                <TableCell colSpan={3} className="text-center">Cargando permisos...</TableCell>
+              </TableRow>
+            )}
+            {!hasMore && permissions.length === 0 && !loading && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center">
+                  <AlertCircle className="inline w-6 h-6 mr-2" />
+                  No hay permisos disponibles.
                 </TableCell>
               </TableRow>
             )}
