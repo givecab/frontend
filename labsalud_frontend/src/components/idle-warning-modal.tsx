@@ -1,54 +1,66 @@
-import React from "react";
+"use client"
+
+import type React from "react"
+import { AlertTriangle, Clock } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface IdleWarningModalProps {
-  isOpen: boolean;
-  timeLeft: number;
-  onExtend: () => void;
-  onLogout: () => void;
+  isOpen: boolean
+  timeLeft: number
+  onExtend: () => void
+  onLogout: () => void
 }
 
-export function IdleWarningModal({ 
-  isOpen, 
-  timeLeft, 
-  onExtend, 
-  onLogout 
-}: IdleWarningModalProps) {
-  if (!isOpen) return null;
-
-  // Format time as MM:SS
+export const IdleWarningModal: React.FC<IdleWarningModalProps> = ({ isOpen, timeLeft, onExtend, onLogout }) => {
   const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    if (mins > 0) {
+      return `${mins}:${secs.toString().padStart(2, "0")}`
+    }
+    return `${secs}`
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-        <div className="mb-4">
-          <h3 className="text-lg font-medium">¿Sigues ahí?</h3>
-          <p className="text-gray-500 mt-2">
-            Tu sesión está a punto de expirar por inactividad.
-            Se cerrará automáticamente en <strong>{formatTime(timeLeft)}</strong>.
+    <Dialog open={isOpen} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-orange-600">
+            <AlertTriangle className="h-5 w-5" />
+            Sesión por expirar
+          </DialogTitle>
+          <DialogDescription className="text-center py-4">Tu sesión expirará por inactividad en:</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col items-center py-6">
+          <div className="flex items-center gap-2 text-3xl font-bold text-red-600 mb-2">
+            <Clock className="h-8 w-8" />
+            <span>{formatTime(timeLeft)}</span>
+          </div>
+          <p className="text-sm text-gray-600 text-center">
+            {timeLeft <= 10 ? "¡Tu sesión se cerrará muy pronto!" : "¿Deseas continuar con tu sesión?"}
           </p>
         </div>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onLogout}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium"
-          >
+
+        <DialogFooter className="flex gap-2 sm:gap-2">
+          <Button variant="outline" onClick={onLogout} className="flex-1 bg-transparent">
             Cerrar sesión
-          </button>
-          <button
-            onClick={onExtend}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium"
-          >
+          </Button>
+          <Button onClick={onExtend} className="flex-1 bg-[#204983] hover:bg-[#1a3d6f]">
             Continuar sesión
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
-export default IdleWarningModal;
+export default IdleWarningModal

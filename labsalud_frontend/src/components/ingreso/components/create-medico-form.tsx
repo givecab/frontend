@@ -1,0 +1,156 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { User, Save, X } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card"
+import { Button } from "../../ui/button"
+import { Input } from "../../ui/input"
+import { Label } from "../../ui/label"
+import { useApi } from "../../../hooks/use-api"
+import { toast } from "sonner"
+import type { Medico } from "../../../types"
+
+interface CreateMedicoFormProps {
+  onMedicoCreated: (medico: Medico) => void
+  onCancel: () => void
+}
+
+export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoFormProps) {
+  const { apiRequest } = useApi()
+  const [formData, setFormData] = useState({
+    first_name: "",
+    last_name: "",
+    license: "",
+    phone: "",
+    email: "",
+  })
+  const [isCreating, setIsCreating] = useState(false)
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  const handleCreateMedico = async () => {
+    if (!formData.first_name || !formData.last_name || !formData.license) {
+      toast.error("Complete los campos obligatorios")
+      return
+    }
+
+    try {
+      setIsCreating(true)
+      const baseUrl = import.meta.env.VITE_API_BASE_URL
+
+      console.log("Creating medico with data:", formData)
+
+      const response = await apiRequest(`${baseUrl}/api/analysis/medicos/`, {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const newMedico = await response.json()
+        console.log("Medico created:", newMedico)
+        onMedicoCreated(newMedico)
+        toast.success("Médico creado exitosamente")
+      } else {
+        const errorData = await response.json()
+        console.error("Medico creation error:", errorData)
+        toast.error("Error al crear médico", {
+          description: errorData.detail || "Ha ocurrido un error al crear el médico.",
+        })
+      }
+    } catch (error) {
+      console.error("Error creating medico:", error)
+      toast.error("Error al crear el médico")
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  return (
+    <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-[#204983]">
+          <User className="h-5 w-5 text-[#204983]" />
+          Crear Nuevo Médico
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="first_name">Nombre *</Label>
+            <Input
+              id="first_name"
+              name="first_name"
+              value={formData.first_name}
+              onChange={handleInputChange}
+              placeholder="Juan"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="last_name">Apellido *</Label>
+            <Input
+              id="last_name"
+              name="last_name"
+              value={formData.last_name}
+              onChange={handleInputChange}
+              placeholder="Pérez"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="license">Matrícula *</Label>
+          <Input
+            id="license"
+            name="license"
+            value={formData.license}
+            onChange={handleInputChange}
+            placeholder="12345"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phone">Teléfono</Label>
+          <Input id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="Teléfono" />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="correo@ejemplo.com"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-4">
+          <Button onClick={handleCreateMedico} disabled={isCreating} className="flex-1 bg-[#204983] hover:bg-[#1a3d6f]">
+            {isCreating ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            {isCreating ? "Creando..." : "Crear Médico"}
+          </Button>
+          <Button variant="outline" onClick={onCancel}>
+            <X className="h-4 w-4 mr-2" />
+            Cancelar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}

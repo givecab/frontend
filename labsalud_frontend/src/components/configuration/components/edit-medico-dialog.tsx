@@ -1,73 +1,42 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, CheckCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
-import { toast } from "sonner"
-
-interface User {
-  id: number
-  username: string
-  photo?: string
-}
+import { useToast } from "@/hooks/use-toast"
 
 interface Medico {
   id: number
   first_name: string
   last_name: string
   license: string
-  created_by: User | null
-  updated_by: User[]
+  is_active: boolean
   created_at: string
   updated_at: string
+  created_by: any
+  updated_by: any[]
 }
 
 interface EditMedicoDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  isOpen: boolean
   medico: Medico
+  onClose: () => void
   onSuccess: () => void
 }
 
-interface FormData {
-  first_name: string
-  last_name: string
-  license: string
-}
-
-interface ValidationState {
-  first_name: { isValid: boolean; message: string }
-  last_name: { isValid: boolean; message: string }
-  license: { isValid: boolean; message: string }
-}
-
-export function EditMedicoDialog({ open, onOpenChange, medico, onSuccess }: EditMedicoDialogProps) {
-  const [formData, setFormData] = useState<FormData>({
+export const EditMedicoDialog: React.FC<EditMedicoDialogProps> = ({ isOpen, medico, onClose, onSuccess }) => {
+  const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     license: "",
   })
-  const [validation, setValidation] = useState<ValidationState>({
-    first_name: { isValid: true, message: "" },
-    last_name: { isValid: true, message: "" },
-    license: { isValid: true, message: "" },
-  })
-  const [loading, setLoading] = useState(false)
-
+  const [isLoading, setIsLoading] = useState(false)
   const { apiRequest } = useApi()
+  const { error } = useToast()
 
   useEffect(() => {
     if (medico) {
@@ -76,190 +45,77 @@ export function EditMedicoDialog({ open, onOpenChange, medico, onSuccess }: Edit
         last_name: medico.last_name,
         license: medico.license,
       })
-      setValidation({
-        first_name: { isValid: true, message: "Nombre válido" },
-        last_name: { isValid: true, message: "Apellido válido" },
-        license: { isValid: true, message: "Matrícula válida" },
-      })
     }
   }, [medico])
 
-  const validateField = (name: keyof FormData, value: string) => {
-    let isValid = false
-    let message = ""
-
-    switch (name) {
-      case "first_name":
-        isValid = value.trim().length >= 2
-        message = isValid ? "Nombre válido" : "El nombre debe tener al menos 2 caracteres"
-        break
-      case "last_name":
-        isValid = value.trim().length >= 2
-        message = isValid ? "Apellido válido" : "El apellido debe tener al menos 2 caracteres"
-        break
-      case "license":
-        isValid = value.trim().length >= 3
-        message = isValid ? "Matrícula válida" : "La matrícula debe tener al menos 3 caracteres"
-        break
-    }
-
-    setValidation((prev) => ({
-      ...prev,
-      [name]: { isValid, message },
-    }))
-  }
-
-  const handleInputChange = (name: keyof FormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
-    validateField(name, value)
-  }
-
-  const isFormValid = () => {
-    return Object.values(validation).every((field) => field.isValid)
-  }
-
-  const getChangedFields = () => {
-    const changes: Partial<FormData> = {}
-    if (formData.first_name !== medico.first_name) changes.first_name = formData.first_name
-    if (formData.last_name !== medico.last_name) changes.last_name = formData.last_name
-    if (formData.license !== medico.license) changes.license = formData.license
-    return changes
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid()) return
-
-    const changes = getChangedFields()
-    if (Object.keys(changes).length === 0) {
-      toast.info("No hay cambios para guardar")
-      return
-    }
+    setIsLoading(true)
 
     try {
-      setLoading(true)
       const response = await apiRequest(`/api/analysis/medicos/${medico.id}/`, {
-        method: "PATCH",
-        body: changes,
+        method: "PUT",
+        body: formData,
       })
 
-      if (response.ok) {
-        onSuccess()
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
-        console.error("Error updating medico:", errorData)
-        toast.error(errorData.detail || errorData.message || "Error al actualizar el médico")
+        throw new Error(errorData.detail || "Error al actualizar el médico")
       }
-    } catch (error) {
-      console.error("Error updating medico:", error)
-      toast.error("Error al actualizar el médico")
+
+      onSuccess()
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Error desconocido"
+      error("Error al actualizar médico", { description: errorMessage })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
-  }
-
-  const renderValidationIcon = (field: keyof ValidationState) => {
-    if (!formData[field]) return null
-    return validation[field].isValid ? (
-      <CheckCircle className="w-4 h-4 text-green-500" />
-    ) : (
-      <AlertCircle className="w-4 h-4 text-red-500" />
-    )
-  }
-
-  const renderValidationMessage = (field: keyof ValidationState) => {
-    if (!formData[field] || !validation[field].message) return null
-    return (
-      <p className={`text-xs mt-1 ${validation[field].isValid ? "text-green-600" : "text-red-600"}`}>
-        {validation[field].message}
-      </p>
-    )
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar Médico</DialogTitle>
-          <DialogDescription>Modifica los datos del médico. Todos los campos son obligatorios.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="first_name">Nombre</Label>
-              <div className="relative">
-                <Input
-                  id="first_name"
-                  value={formData.first_name}
-                  onChange={(e) => handleInputChange("first_name", e.target.value)}
-                  placeholder="Ingresa el nombre"
-                  className={`pr-10 ${
-                    formData.first_name
-                      ? validation.first_name.isValid
-                        ? "border-green-500 focus:border-green-500"
-                        : "border-red-500 focus:border-red-500"
-                      : ""
-                  }`}
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  {renderValidationIcon("first_name")}
-                </div>
-              </div>
-              {renderValidationMessage("first_name")}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="last_name">Apellido</Label>
-              <div className="relative">
-                <Input
-                  id="last_name"
-                  value={formData.last_name}
-                  onChange={(e) => handleInputChange("last_name", e.target.value)}
-                  placeholder="Ingresa el apellido"
-                  className={`pr-10 ${
-                    formData.last_name
-                      ? validation.last_name.isValid
-                        ? "border-green-500 focus:border-green-500"
-                        : "border-red-500 focus:border-red-500"
-                      : ""
-                  }`}
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  {renderValidationIcon("last_name")}
-                </div>
-              </div>
-              {renderValidationMessage("last_name")}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="license">Matrícula Profesional</Label>
-              <div className="relative">
-                <Input
-                  id="license"
-                  value={formData.license}
-                  onChange={(e) => handleInputChange("license", e.target.value)}
-                  placeholder="Ingresa la matrícula profesional"
-                  className={`pr-10 ${
-                    formData.license
-                      ? validation.license.isValid
-                        ? "border-green-500 focus:border-green-500"
-                        : "border-red-500 focus:border-red-500"
-                      : ""
-                  }`}
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  {renderValidationIcon("license")}
-                </div>
-              </div>
-              {renderValidationMessage("license")}
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="first_name">Nombre</Label>
+            <Input
+              id="first_name"
+              value={formData.first_name}
+              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+              required
+            />
           </div>
+
+          <div>
+            <Label htmlFor="last_name">Apellido</Label>
+            <Input
+              id="last_name"
+              value={formData.last_name}
+              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="license">Matrícula</Label>
+            <Input
+              id="license"
+              value={formData.license}
+              onChange={(e) => setFormData({ ...formData, license: e.target.value })}
+              required
+            />
+          </div>
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!isFormValid() || loading}>
-              {loading ? "Guardando..." : "Guardar Cambios"}
+            <Button type="submit" disabled={isLoading} className="bg-[#204983] hover:bg-[#1a3d6f]">
+              {isLoading ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>
         </form>

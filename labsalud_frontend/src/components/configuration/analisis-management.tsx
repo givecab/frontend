@@ -3,34 +3,46 @@
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/hooks/use-api"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Loader2,
-  PlusCircle,
-  Search,
-  AlertCircle,
-  Trash2,
-  Edit3,
-  ChevronDown,
-  ChevronRight,
-  FileTextIcon,
-  PackageSearch,
-} from "lucide-react"
-import type { AnalysisPanel, User as ConfigUser } from "./configuration-page"
-import { CreatePanelDialog } from "./components/create-panel-dialog"
-import { EditPanelDialog } from "./components/edit-panel-dialog"
-import { DeletePanelDialog } from "./components/delete-panel-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
 import { useDebounce } from "@/hooks/use-debounce"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Loader2,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  TestTube,
+  Pencil,
+  Trash,
+  PackageX,
+  Clock,
+  Calendar,
+  Plus,
+  User,
+  Settings,
+} from "lucide-react"
 import { AnalysisList } from "./components/analysis-list"
+import { CreatePanelDialog } from "./components/create-panel-dialog"
+import { EditPanelDialog } from "./components/edit-panel-dialog"
+import { DeletePanelDialog } from "./components/delete-panel-dialog"
+
+interface Panel {
+  id: number
+  created_by: { id: number; username: string; photo?: string } | null
+  updated_by: { id: number; username: string; photo?: string }[]
+  code: string | null
+  name: string | null
+  bio_unit: string | null
+  is_urgent: boolean
+  is_active: boolean
+  created_at: string | null
+  updated_at: string | null
+}
 
 interface AnalisisManagementProps {
   canViewPanels: boolean
@@ -44,38 +56,127 @@ interface AnalisisManagementProps {
 
 const PAGE_LIMIT = 20
 
-const UserAvatar: React.FC<{ user: ConfigUser | null }> = ({ user }) => {
-  if (!user) {
+const formatFullDate = (dateString: string | null): string => {
+  if (!dateString) return "Fecha no disponible"
+
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "Fecha inválida"
+
+    return date.toLocaleString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch {
+    return "Fecha inválida"
+  }
+}
+
+const UserAvatar = ({
+  user,
+  date,
+}: { user: { id: number; username: string; photo?: string } | null; date: string }) => {
+  if (user === null || !user) {
     return (
-      <TooltipProvider delayDuration={100}>
+      <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger>
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-xs bg-gray-200 text-gray-500">?</AvatarFallback>
+          <TooltipTrigger className="cursor-help">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-gray-100">
+                <Settings className="h-4 w-4 text-gray-600" />
+              </AvatarFallback>
             </Avatar>
           </TooltipTrigger>
-          <TooltipContent>Usuario desconocido</TooltipContent>
+          <TooltipContent>
+            <p>Creado por el sistema</p>
+            <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
+          </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     )
   }
-  const initials =
-    `${user.first_name ? user.first_name[0] : ""}${user.last_name ? user.last_name[0] : ""}`.toUpperCase() ||
-    user.username[0].toUpperCase()
+
   return (
-    <TooltipProvider delayDuration={100}>
+    <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger>
-          <Avatar className="h-6 w-6">
-            {user.photo && <AvatarImage src={user.photo || "/placeholder.svg"} alt={user.username} />}
-            <AvatarFallback className="text-xs bg-slate-200 text-slate-700">{initials}</AvatarFallback>
+        <TooltipTrigger className="cursor-help">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={user.photo || "/placeholder.svg"} />
+            <AvatarFallback className="bg-blue-100">
+              {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
+            </AvatarFallback>
           </Avatar>
         </TooltipTrigger>
         <TooltipContent>
-          {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+          <p>Creado por: {user.username}</p>
+          <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  )
+}
+
+const UpdatedByAvatars = ({ updatedBy }: { updatedBy: { id: number; username: string; photo?: string }[] }) => {
+  if (!updatedBy || updatedBy.length === 0) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger className="cursor-help">
+            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-100 text-gray-500 text-sm">
+              <Settings className="h-4 w-4 text-gray-600" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Sin modificaciones</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  const displayUsers = updatedBy.slice(0, 3)
+  const remainingCount = updatedBy.length - 3
+
+  return (
+    <div className="flex -space-x-2">
+      {displayUsers.map((user) => (
+        <TooltipProvider key={user.id}>
+          <Tooltip>
+            <TooltipTrigger className="cursor-help">
+              <Avatar className="h-8 w-8 border-2 border-white">
+                <AvatarImage src={user.photo || "/placeholder.svg"} />
+                <AvatarFallback className="bg-blue-100">
+                  {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
+                </AvatarFallback>
+              </Avatar>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Modificado por: {user.username}</p>
+              <p className="text-xs text-gray-500">Última modificación</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+      {remainingCount > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger className="cursor-help">
+              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-200 text-gray-600 text-xs border-2 border-white">
+                +{remainingCount}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {remainingCount} modificación{remainingCount > 1 ? "es" : ""} adicional{remainingCount > 1 ? "es" : ""}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
   )
 }
 
@@ -91,43 +192,41 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
   const { apiRequest } = useApi()
   const toastActions = useToast()
 
-  const [panels, setPanels] = useState<AnalysisPanel[]>([])
+  const [panels, setPanels] = useState<Panel[]>([])
   const [totalPanels, setTotalPanels] = useState(0)
   const [panelsNextUrl, setPanelsNextUrl] = useState<string | null>(null)
-  const [isLoadingPanelsInitial, setIsLoadingPanelsInitial] = useState(true)
-  const [isLoadingMorePanels, setIsLoadingMorePanels] = useState(false)
-  const [panelsError, setPanelsError] = useState<string | null>(null)
-  const [panelSearchTerm, setPanelSearchTerm] = useState("")
-  const debouncedPanelSearchTerm = useDebounce(panelSearchTerm, 500)
-  const [showInactivePanels, setShowInactivePanels] = useState(false)
-
   const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set())
-  const [refreshCounter, setRefreshCounter] = useState(0)
 
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [searchTerm, setSearchTerm] = useState("")
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
+
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Dialogs state
   const [isCreatePanelModalOpen, setIsCreatePanelModalOpen] = useState(false)
   const [isEditPanelModalOpen, setIsEditPanelModalOpen] = useState(false)
   const [isDeletePanelModalOpen, setIsDeletePanelModalOpen] = useState(false)
-  const [selectedPanel, setSelectedPanel] = useState<AnalysisPanel | null>(null)
+  const [selectedPanel, setSelectedPanel] = useState<Panel | null>(null)
 
   const buildPanelsUrl = useCallback(
-    (offset = 0, search = debouncedPanelSearchTerm, inactive = showInactivePanels) => {
+    (offset = 0, search = debouncedSearchTerm) => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const endpoint = inactive
-        ? import.meta.env.VITE_ANALYSIS_PANELS_ENDPOINT
-        : import.meta.env.VITE_ANALYSIS_PANELS_ACTIVE_ENDPOINT
-
-      let url = `${baseUrl}${endpoint}?limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${baseUrl}/api/analysis/panels/?limit=${PAGE_LIMIT}&offset=${offset}&is_active=true`
       if (search) url += `&search=${encodeURIComponent(search)}`
       return url
     },
-    [debouncedPanelSearchTerm, showInactivePanels],
+    [debouncedSearchTerm],
   )
 
   const fetchPanels = useCallback(
     async (isNewSearchOrFilter = false) => {
       if (!canViewPanels) {
-        setPanelsError("No tienes permiso para ver paneles.")
-        setIsLoadingPanelsInitial(false)
+        setError("No tienes permiso para ver paneles de análisis.")
+        setIsLoadingInitial(false)
         return
       }
 
@@ -139,15 +238,15 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
         currentUrlToFetch = buildPanelsUrl(0)
       } else {
         if (!panelsNextUrl) {
-          setIsLoadingMorePanels(false)
+          setIsLoadingMore(false)
           return
         }
         currentUrlToFetch = panelsNextUrl
       }
 
-      setIsLoadingPanelsInitial(isNewSearchOrFilter && panels.length === 0)
-      setIsLoadingMorePanels(!isNewSearchOrFilter)
-      setPanelsError(null)
+      setIsLoadingInitial(isNewSearchOrFilter && panels.length === 0)
+      setIsLoadingMore(!isNewSearchOrFilter)
+      setError(null)
 
       try {
         const response = await apiRequest(currentUrlToFetch)
@@ -157,40 +256,41 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
           setTotalPanels(data.count)
           setPanelsNextUrl(data.next)
         } else {
-          setPanelsError("Error al cargar los paneles.")
+          setError("Error al cargar los paneles.")
           toastActions.error("Error", { description: "No se pudieron cargar los paneles." })
         }
       } catch (err) {
         console.error("Error fetching panels:", err)
-        setPanelsError("Ocurrió un error inesperado al cargar los paneles.")
+        setError("Ocurrió un error inesperado al cargar paneles.")
         toastActions.error("Error", { description: "Error de conexión o servidor (paneles)." })
       } finally {
-        setIsLoadingPanelsInitial(false)
-        setIsLoadingMorePanels(false)
+        setIsLoadingInitial(false)
+        setIsLoadingMore(false)
       }
     },
-    [apiRequest, canViewPanels, toastActions, buildPanelsUrl, panelsNextUrl],
+    [apiRequest, toastActions, buildPanelsUrl, panelsNextUrl, panels.length, canViewPanels],
   )
 
   useEffect(() => {
     if (canViewPanels) {
       fetchPanels(true)
     }
-  }, [canViewPanels, debouncedPanelSearchTerm, showInactivePanels])
+  }, [canViewPanels, debouncedSearchTerm, refreshKey])
 
   const hasMorePanels = !!panelsNextUrl && panels.length < totalPanels
-  const loadMorePanelsSentinelRef = useInfiniteScroll({
-    loading: isLoadingMorePanels,
+
+  const loadMoreSentinelRef = useInfiniteScroll({
+    loading: isLoadingMore,
     hasMore: hasMorePanels,
     onLoadMore: () => {
-      if (panelsNextUrl && !isLoadingMorePanels) {
+      if (panelsNextUrl && !isLoadingMore) {
         fetchPanels(false)
       }
     },
-    dependencies: [panelsNextUrl, isLoadingMorePanels, hasMorePanels],
+    dependencies: [panelsNextUrl, isLoadingMore, hasMorePanels],
   })
 
-  const togglePanelExpansion = (panelId: number) => {
+  const togglePanel = (panelId: number) => {
     setExpandedPanels((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(panelId)) {
@@ -202,270 +302,294 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
     })
   }
 
-  const handleSuccess = () => {
-    fetchPanels(true)
-    setRefreshCounter((c) => c + 1)
+  const handleCreatePanelSuccess = () => {
     setIsCreatePanelModalOpen(false)
-    setIsEditPanelModalOpen(false)
-    setIsDeletePanelModalOpen(false)
-    setSelectedPanel(null)
+    setRefreshKey((prev) => prev + 1)
+    toastActions.success("Éxito", { description: "Panel creado correctamente." })
   }
 
-  const handleDialogClose = (setter: React.Dispatch<React.SetStateAction<boolean>>) => {
-    setter(false)
+  const handleEditPanelSuccess = () => {
+    setIsEditPanelModalOpen(false)
     setSelectedPanel(null)
+    setRefreshKey((prev) => prev + 1)
+    toastActions.success("Éxito", { description: "Panel actualizado correctamente." })
+  }
+
+  const handleDeletePanelSuccess = () => {
+    setIsDeletePanelModalOpen(false)
+    setSelectedPanel(null)
+    setRefreshKey((prev) => prev + 1)
+    toastActions.success("Éxito", { description: "Panel desactivado correctamente." })
   }
 
   if (!canViewPanels && !canCreatePanels) {
     return (
-      <div className="text-gray-600 bg-gray-50 p-4 rounded-md flex items-center">
-        <AlertCircle className="mr-2" /> No tienes permisos para gestionar análisis.
-      </div>
-    )
-  }
-
-  if (isLoadingPanelsInitial && panels.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-[#204983]" />
-        <span className="ml-2">Cargando paneles...</span>
-      </div>
-    )
-  }
-
-  if (panelsError && panels.length === 0) {
-    return (
-      <div className="text-red-600 bg-red-50 p-4 rounded-md flex items-center">
-        <AlertCircle className="mr-2" /> {panelsError}
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <div className="flex items-center">
+          <PackageX className="h-5 w-5 mr-2" />
+          <p>No tienes permisos para gestionar análisis.</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="md:flex md:items-center md:justify-between">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate flex items-center">
-                <FileTextIcon className="mr-3 h-7 w-7 text-[#204983]" />
-                Paneles de Análisis
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Administra los paneles de análisis y sus determinaciones asociadas.
-              </p>
-            </div>
-            {canCreatePanels && (
-              <div className="mt-4 flex md:mt-0 md:ml-4">
-                <Button
-                  onClick={() => setIsCreatePanelModalOpen(true)}
-                  style={{ backgroundColor: "#204983", color: "white" }}
-                >
-                  <PlusCircle className="mr-2 h-5 w-5" /> Nuevo Panel
-                </Button>
-              </div>
-            )}
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <TestTube className="h-5 w-5" />
+          Paneles de Análisis ({totalPanels})
+        </h3>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Buscar panel..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-64"
+              disabled={!canViewPanels}
+            />
           </div>
-          <div className="mt-6 md:flex md:items-center md:justify-between">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input
-                placeholder="Buscar panel (nombre, código)..."
-                value={panelSearchTerm}
-                onChange={(e) => setPanelSearchTerm(e.target.value)}
-                className="pl-10 w-full"
-                disabled={!canViewPanels}
-              />
-            </div>
-            <div className="mt-4 md:mt-0 flex items-center space-x-2">
-              <Switch
-                id="show-inactive-panels"
-                checked={showInactivePanels}
-                onCheckedChange={setShowInactivePanels}
-                disabled={!canViewPanels}
-              />
-              <Label htmlFor="show-inactive-panels" className="text-sm text-gray-600">
-                Mostrar inactivos
-              </Label>
-            </div>
-          </div>
+          {canCreatePanels && (
+            <Button className="bg-[#204983] hover:bg-[#1a3d6f]" onClick={() => setIsCreatePanelModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Panel
+            </Button>
+          )}
         </div>
       </div>
 
-      {panelsError && panels.length > 0 && (
-        <div className="text-red-500 bg-red-50 p-3 rounded-md mb-4">{panelsError}</div>
+      {isLoadingInitial && (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          <span className="ml-2 text-gray-500">Cargando paneles...</span>
+        </div>
       )}
 
-      {panels.length === 0 && !isLoadingPanelsInitial && !panelsError && (
-        <div className="text-center text-gray-500 py-12 bg-white shadow sm:rounded-lg">
-          <PackageSearch className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <h3 className="text-lg font-medium text-gray-900">No se encontraron Paneles</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {panelSearchTerm ? "Ningún panel coincide con tu búsqueda." : "No hay paneles registrados."}
-            {!showInactivePanels && " Prueba activando 'Mostrar inactivos'."}
-          </p>
+      {!isLoadingInitial && error && <div className="text-center text-red-500 py-8">{error}</div>}
+
+      {!isLoadingInitial && !error && panels.length === 0 && (
+        <div className="text-center text-gray-400 py-8">
+          <PackageX className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <p>No se encontraron paneles</p>
+          {searchTerm && <p className="text-sm">que coincidan con la búsqueda.</p>}
         </div>
       )}
 
       {panels.length > 0 && (
-        <div className="space-y-4">
-          {panels.map((panel) => (
-            <Card
-              key={panel.id}
-              className={`transition-all duration-200 shadow-sm hover:shadow-md ${!panel.is_active ? "bg-gray-50 opacity-80" : "bg-white"}`}
-            >
-              <CardHeader
-                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => togglePanelExpansion(panel.id)}
+        <div className="space-y-3">
+          {panels.map((panel) => {
+            const isExpanded = expandedPanels.has(panel.id)
+
+            return (
+              <div
+                key={panel.id}
+                className={`border rounded-lg bg-white shadow-sm transition-all duration-300 ${
+                  !panel.is_active ? "opacity-70 bg-gray-50" : ""
+                } ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
               >
-                <div className="flex justify-between items-center">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="text-base font-semibold text-gray-800 truncate" title={panel.name}>
-                        {panel.name}
-                      </h3>
-                      {!panel.is_active && (
-                        <Badge variant="outline" className="text-xs border-gray-400 text-gray-600">
-                          Inactivo
-                        </Badge>
-                      )}
-                      {panel.is_urgent && (
-                        <Badge variant="destructive" className="text-xs">
-                          Urgente
-                        </Badge>
-                      )}
+                {/* Header del Panel */}
+                <div
+                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => togglePanel(panel.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-500" />
+                        )}
+                        <TestTube className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-medium text-gray-900 truncate">{panel.name || "Sin nombre"}</h4>
+                          {panel.is_urgent && (
+                            <Badge variant="destructive" className="text-xs flex-shrink-0">
+                              U
+                            </Badge>
+                          )}
+                          {!panel.is_active && (
+                            <Badge variant="outline" className="text-xs flex-shrink-0">
+                              Inactivo
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-gray-500 mt-1 flex-wrap">
+                          <span className="flex items-center gap-1 flex-shrink-0">
+                            Código:
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono bg-blue-100 text-blue-800 border-blue-300 font-semibold ml-1"
+                            >
+                              {panel.code || "N/A"}
+                            </Badge>
+                          </span>
+                          <span className="truncate">UB: {panel.bio_unit || "N/A"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Código: {panel.code} &bull; Unidad Bioq.: {panel.bio_unit}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {canEditPanels && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setSelectedPanel(panel)
-                                setIsEditPanelModalOpen(true)
-                              }}
-                              className="h-8 w-8 text-gray-500 hover:text-gray-700"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Editar Panel</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {canDeletePanels && panel.is_active && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setSelectedPanel(panel)
-                                setIsDeletePanelModalOpen(true)
-                              }}
-                              className="h-8 w-8 text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Desactivar Panel</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-gray-500 hover:text-gray-700"
-                      onClick={() => togglePanelExpansion(panel.id)}
-                    >
-                      {expandedPanels.has(panel.id) ? (
-                        <ChevronDown className="h-5 w-5" />
-                      ) : (
-                        <ChevronRight className="h-5 w-5" />
-                      )}
-                    </Button>
+
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {/* Avatares con labels - Solo en desktop */}
+                      <div className="hidden lg:flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-500">Creado por:</span>
+                          <UserAvatar user={panel.created_by} date={panel.created_at || ""} />
+                        </div>
+                        {panel.updated_by && panel.updated_by.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">Editado por:</span>
+                            <UpdatedByAvatars updatedBy={panel.updated_by} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="flex space-x-2">
+                        {canEditPanels && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedPanel(panel)
+                              setIsEditPanelModalOpen(true)
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDeletePanels && panel.is_active && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-red-200 hover:bg-red-50 bg-transparent"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedPanel(panel)
+                              setIsDeletePanelModalOpen(true)
+                            }}
+                          >
+                            <Trash className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="text-xs text-gray-400 mt-2 flex items-center space-x-2">
-                  <div
-                    className="flex items-center space-x-1"
-                    title={`Creado por ${panel.created_by?.username || "Sistema"} el ${new Date(panel.created_at).toLocaleDateString()}`}
-                  >
-                    <UserAvatar user={panel.created_by} />
-                    <span>{new Date(panel.created_at).toLocaleDateString()}</span>
-                  </div>
-                  {panel.updated_by && panel.updated_by.length > 0 && (
-                    <div
-                      className="flex items-center space-x-1"
-                      title={`Última modif. por ${panel.updated_by[panel.updated_by.length - 1]?.username || "Sistema"} el ${new Date(panel.updated_at).toLocaleDateString()}`}
-                    >
-                      <span>| Mod:</span>
-                      <UserAvatar user={panel.updated_by[panel.updated_by.length - 1]} />
-                      <span>{new Date(panel.updated_at).toLocaleDateString()}</span>
+
+                {/* Detalle del Panel Expandido */}
+                {isExpanded && (
+                  <div className="border-t bg-gray-50">
+                    {/* Información de auditoría del panel */}
+                    <div className="p-4 bg-blue-50 border-b">
+                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Información de Auditoría</h5>
+                      <div className="space-y-4">
+                        {/* Información de creación */}
+                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Calendar className="h-4 w-4 text-blue-600" />
+                            <h6 className="text-xs font-semibold text-blue-800">Creación</h6>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <UserAvatar user={panel.created_by} date={panel.created_at || ""} />
+                            <div>
+                              <p className="text-sm font-medium">Usuario: {panel.created_by?.username || "Sistema"}</p>
+                              <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                                <Calendar className="h-3 w-3" />
+                                {formatFullDate(panel.created_at)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Información de última modificación */}
+                        {panel.updated_by && panel.updated_by.length > 0 && (
+                          <div className="bg-white p-3 rounded-md border border-green-200">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Clock className="h-4 w-4 text-green-600" />
+                              <h6 className="text-xs font-semibold text-green-800">Última Modificación</h6>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage
+                                  src={panel.updated_by[panel.updated_by.length - 1]?.photo || "/placeholder.svg"}
+                                />
+                                <AvatarFallback className="bg-green-100">
+                                  {panel.updated_by[panel.updated_by.length - 1]?.username?.charAt(0).toUpperCase() || (
+                                    <User className="h-4 w-4" />
+                                  )}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Usuario: {panel.updated_by[panel.updated_by.length - 1]?.username}
+                                </p>
+                                <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatFullDate(panel.updated_at)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardHeader>
-              {expandedPanels.has(panel.id) && (
-                <CardContent className="p-4 pt-0 border-t mt-2">
-                  <AnalysisList
-                    panel={panel}
-                    showInactive={showInactivePanels}
-                    canCreate={canCreateAnalyses}
-                    canEdit={canEditAnalyses}
-                    canDelete={canDeleteAnalyses}
-                    refreshKey={refreshCounter}
-                  />
-                </CardContent>
-              )}
-            </Card>
-          ))}
+
+                    {/* Lista de análisis */}
+                    <AnalysisList
+                      panel={panel}
+                      showInactive={false}
+                      canCreate={canCreateAnalyses}
+                      canEdit={canEditAnalyses}
+                      canDelete={canDeleteAnalyses}
+                      refreshKey={refreshKey}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
       {hasMorePanels && (
-        <div ref={loadMorePanelsSentinelRef} className="flex justify-center items-center py-6">
-          {isLoadingMorePanels && <Loader2 className="h-6 w-6 animate-spin text-[#204983]" />}
+        <div ref={loadMoreSentinelRef} className="flex justify-center items-center py-4">
+          {isLoadingMore && <Loader2 className="h-5 w-5 animate-spin text-gray-400" />}
         </div>
       )}
-      {!hasMorePanels && panels.length > 0 && !isLoadingPanelsInitial && (
-        <p className="text-center text-sm text-gray-500 mt-8">Fin de los resultados.</p>
+
+      {!hasMorePanels && panels.length > 0 && !isLoadingInitial && (
+        <p className="text-center text-sm text-gray-400 mt-4">No hay más paneles para mostrar.</p>
       )}
 
-      {isCreatePanelModalOpen && canCreatePanels && (
+      {/* Dialogs */}
+      {isCreatePanelModalOpen && (
         <CreatePanelDialog
           open={isCreatePanelModalOpen}
-          onOpenChange={(open: boolean) => {
-            if (!open) handleDialogClose(setIsCreatePanelModalOpen)
-          }}
-          onSuccess={handleSuccess}
+          onOpenChange={setIsCreatePanelModalOpen}
+          onSuccess={handleCreatePanelSuccess}
         />
       )}
-      {isEditPanelModalOpen && selectedPanel && canEditPanels && (
+
+      {isEditPanelModalOpen && selectedPanel && (
         <EditPanelDialog
           open={isEditPanelModalOpen}
-          onOpenChange={(open: boolean) => {
-            if (!open) handleDialogClose(setIsEditPanelModalOpen)
-          }}
-          onSuccess={handleSuccess}
+          onOpenChange={setIsEditPanelModalOpen}
+          onSuccess={handleEditPanelSuccess}
           panel={selectedPanel}
         />
       )}
-      {isDeletePanelModalOpen && selectedPanel && canDeletePanels && (
+
+      {isDeletePanelModalOpen && selectedPanel && (
         <DeletePanelDialog
           open={isDeletePanelModalOpen}
-          onOpenChange={(open: boolean) => {
-            if (!open) handleDialogClose(setIsDeletePanelModalOpen)
-          }}
-          onSuccess={handleSuccess}
+          onOpenChange={setIsDeletePanelModalOpen}
+          onSuccess={handleDeletePanelSuccess}
           panel={selectedPanel}
         />
       )}

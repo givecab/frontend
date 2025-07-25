@@ -22,34 +22,31 @@ import { Loader2 } from "lucide-react"
 import type { AnalysisPanel } from "../configuration-page"
 
 interface EditPanelDialogProps {
-  open: boolean // Cambiado de isOpen a open
-  onOpenChange: (open: boolean) => void // Cambiado de onClose a onOpenChange
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSuccess: (updatedPanel: AnalysisPanel) => void
   panel: AnalysisPanel | null
 }
 
 export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenChange, onSuccess, panel }) => {
   const { apiRequest } = useApi()
-  const toastActions = useToast() // Cambiado a toastActions
+  const toastActions = useToast()
   const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [bioUnit, setBioUnit] = useState("")
   const [isUrgent, setIsUrgent] = useState(false)
-  const [isActive, setIsActive] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (panel && open) {
-      // Usar 'open'
       setCode(panel.code.toString())
       setName(panel.name)
       setBioUnit(panel.bio_unit)
       setIsUrgent(panel.is_urgent)
-      setIsActive(panel.is_active)
       setErrors({})
     }
-  }, [panel, open]) // Dependencia 'open'
+  }, [panel, open])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -72,15 +69,14 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
       if (name !== panel.name) panelUpdateData.name = name
       if (bioUnit !== panel.bio_unit) panelUpdateData.bio_unit = bioUnit
       if (isUrgent !== panel.is_urgent) panelUpdateData.is_urgent = isUrgent
-      if (isActive !== panel.is_active) panelUpdateData.is_active = isActive
 
       if (Object.keys(panelUpdateData).length === 0) {
         toastActions.info("Sin cambios", { description: "No se realizaron modificaciones." })
-        onOpenChange(false) // Usar onOpenChange
+        onOpenChange(false)
         return
       }
 
-      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/analysis/panels/" + `${panel.id}/`, {
+      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/api/analysis/panels/" + `${panel.id}/`, {
         method: "PATCH",
         body: panelUpdateData,
       })
@@ -89,9 +85,9 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
         const updatedPanel = await response.json()
         toastActions.success("Éxito", { description: "Panel actualizado correctamente." })
         onSuccess(updatedPanel)
-        onOpenChange(false) // Usar onOpenChange
+        onOpenChange(false)
       } else {
-        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" })) // Manejo de error si no es JSON
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         const backendErrors = errorData.errors || errorData.detail || errorData
         if (typeof backendErrors === "object" && backendErrors !== null) {
           const formattedErrors: Record<string, string> = {}
@@ -121,55 +117,63 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {" "}
-      {/* Usar 'open' y 'onOpenChange' */}
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Editar Panel: {panel.name}</DialogTitle>
           <DialogDescription>Modifica los datos del panel.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          {errors.form && <p className="text-sm text-red-500 col-span-2">{errors.form}</p>}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-code" className="text-right">
-              Código
-            </Label>
-            <Input id="edit-code" value={code} onChange={(e) => setCode(e.target.value)} className="col-span-3" />
-            {errors.code && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.code}</p>}
+        <div className="space-y-6 py-4">
+          {errors.form && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{errors.form}</div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-code">Código *</Label>
+            <Input
+              id="edit-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ingrese el código numérico"
+            />
+            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-name" className="text-right">
-              Nombre
-            </Label>
-            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
-            {errors.name && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.name}</p>}
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-name">Nombre *</Label>
+            <Input
+              id="edit-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ingrese el nombre del panel"
+            />
+            {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-bioUnit" className="text-right">
-              Unidad Bioq.
-            </Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-bioUnit">Unidad Bioquímica *</Label>
             <Input
               id="edit-bioUnit"
               value={bioUnit}
               onChange={(e) => setBioUnit(e.target.value)}
-              className="col-span-3"
+              placeholder="Ingrese la unidad bioquímica"
             />
-            {errors.bioUnit && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.bioUnit}</p>}
+            {errors.bioUnit && <p className="text-sm text-red-500">{errors.bioUnit}</p>}
           </div>
-          <div className="flex items-center space-x-2 col-span-4 justify-end">
-            <Label htmlFor="edit-isUrgent">Urgente</Label>
+
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <Label htmlFor="edit-isUrgent" className="font-medium">
+                Panel Urgente
+              </Label>
+              <p className="text-sm text-gray-500">Marcar si este panel es de carácter urgente</p>
+            </div>
             <Switch id="edit-isUrgent" checked={isUrgent} onCheckedChange={setIsUrgent} />
           </div>
-          <div className="flex items-center space-x-2 col-span-4 justify-end">
-            <Label htmlFor="edit-isActive">Activo</Label>
-            <Switch id="edit-isActive" checked={isActive} onCheckedChange={setIsActive} />
-          </div>
         </div>
+
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-              {" "}
-              {/* Usar onOpenChange */}
               Cancelar
             </Button>
           </DialogClose>

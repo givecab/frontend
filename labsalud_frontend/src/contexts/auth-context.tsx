@@ -1,14 +1,6 @@
 "use client"
 
-import { 
-  createContext, 
-  useContext, 
-  useState, 
-  useEffect,
-  useCallback, 
-  useRef,
-  type ReactNode 
-} from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { IdleWarningModal } from "@/components/idle-warning-modal"
 import useIdleTimeout from "@/hooks/use-idle-timeout"
@@ -35,6 +27,7 @@ interface User {
   photo?: string
   roles: Role[]
   permissions: Permission[]
+  temp_permissions?: Permission[]
 }
 
 interface AuthContextType {
@@ -66,9 +59,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { success, error } = useToast()
   const initializationRef = useRef(false)
 
+  // Configuración del tiempo de inactividad (en milisegundos)
   const [idleConfig] = useState({
-    idleTime: 10 * 1000,
-    warningTime: 5 * 1000
+    idleTime: 5 * 60 * 1000, // 10 segundos
+    warningTime: 30 * 1000, // 5 segundos
   })
 
   const logout = useCallback(() => {
@@ -79,14 +73,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null)
     setIsAuthenticated(false)
     success("Sesión cerrada", {
-      description: "Has cerrado sesión exitosamente"
+      description: "Has cerrado sesión exitosamente",
     })
   }, [success])
 
   const { showWarning, timeLeft, extendSession } = useIdleTimeout({
     onIdle: logout,
     idleTime: idleConfig.idleTime,
-    warningTime: idleConfig.warningTime
+    warningTime: idleConfig.warningTime,
   })
 
   const hasPermission = useCallback(
@@ -95,12 +89,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const permissionStr = permission.toString()
       return user.permissions.some(
         (perm) =>
-          perm.id.toString() === permissionStr || 
-          perm.codename === permissionStr || 
-          perm.name === permissionStr
+          perm.id.toString() === permissionStr || perm.codename === permissionStr || perm.name === permissionStr,
       )
     },
-    [user]
+    [user],
   )
 
   const isInGroup = useCallback(
@@ -108,7 +100,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!user) return false
       return user.roles.some((role) => role.name === groupName)
     },
-    [user]
+    [user],
   )
 
   const refreshToken = useCallback(async (): Promise<boolean> => {
@@ -124,7 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ refresh: refreshTokenValue }),
-        }
+        },
       )
 
       if (!response.ok) throw new Error()
@@ -153,11 +145,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
-            .catch(() => ({ detail: "Error de autenticación" }))
-          
+          const errorData = await response.json().catch(() => ({ detail: "Error de autenticación" }))
+
           error("Error de inicio de sesión", {
-            description: errorData.detail || "Credenciales inválidas"
+            description: errorData.detail || "Credenciales inválidas",
           })
           return false
         }
@@ -169,26 +160,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setToken(data.access)
         setUser(data.user)
         setIsAuthenticated(true)
-        
+
         success("Inicio de sesión exitoso", {
-          description: "Bienvenido de vuelta"
+          description: "Bienvenido de vuelta",
         })
         return true
       } catch {
         error("Error de conexión", {
-          description: "No se pudo conectar con el servidor"
+          description: "No se pudo conectar con el servidor",
         })
         return false
       } finally {
         setIsLoading(false)
       }
     },
-    [success, error]
+    [success, error],
   )
 
   const refreshUser = useCallback(async () => {
     if (initializationRef.current) return
-    
+
     const tokenValue = localStorage.getItem("access_token")
     const savedUser = localStorage.getItem("user")
 
@@ -225,7 +216,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     hasPermission,
     isInGroup,
     refreshUser,
-    refreshToken
+    refreshToken,
   }
 
   if (!isInitialized) {
@@ -236,12 +227,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider value={value}>
       {children}
       {isAuthenticated && showWarning && (
-        <IdleWarningModal 
-          isOpen={true}
-          timeLeft={timeLeft} 
-          onExtend={extendSession} 
-          onLogout={logout}
-        />
+        <IdleWarningModal isOpen={true} timeLeft={timeLeft} onExtend={extendSession} onLogout={logout} />
       )}
     </AuthContext.Provider>
   )

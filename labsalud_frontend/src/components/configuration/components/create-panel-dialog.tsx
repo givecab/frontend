@@ -22,35 +22,31 @@ import { Loader2 } from "lucide-react"
 import type { AnalysisPanel } from "../configuration-page"
 
 interface CreatePanelDialogProps {
-  open: boolean // Cambiado de isOpen a open
-  onOpenChange: (open: boolean) => void // Cambiado de onClose a onOpenChange
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSuccess: (newPanel: AnalysisPanel) => void
 }
 
 export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOpenChange, onSuccess }) => {
   const { apiRequest } = useApi()
-  const toastActions = useToast() // Cambiado a toastActions
+  const toastActions = useToast()
   const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [bioUnit, setBioUnit] = useState("")
   const [isUrgent, setIsUrgent] = useState(false)
-  const [isActive, setIsActive] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (open) {
-      // Usar 'open'
-      // Reset form
       setCode("")
       setName("")
       setBioUnit("")
       setIsUrgent(false)
-      setIsActive(true)
       setErrors({})
       setIsLoading(false)
     }
-  }, [open]) // Dependencia 'open'
+  }, [open])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -73,9 +69,9 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
         name,
         bio_unit: bioUnit,
         is_urgent: isUrgent,
-        is_active: isActive,
+        is_active: true, // Siempre activo al crear
       }
-      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/analysis/panels/", {
+      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/api/analysis/panels/", {
         method: "POST",
         body: panelData,
       })
@@ -84,9 +80,9 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
         const newPanel = await response.json()
         toastActions.success("Éxito", { description: "Panel creado correctamente." })
         onSuccess(newPanel)
-        onOpenChange(false) // Usar onOpenChange
+        onOpenChange(false)
       } else {
-        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" })) // Manejo de error si no es JSON
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         const backendErrors = errorData.errors || errorData.detail || errorData
         if (typeof backendErrors === "object" && backendErrors !== null) {
           const formattedErrors: Record<string, string> = {}
@@ -114,50 +110,63 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {" "}
-      {/* Usar 'open' y 'onOpenChange' */}
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Panel de Análisis</DialogTitle>
           <DialogDescription>Completa los datos para el nuevo panel.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          {errors.form && <p className="text-sm text-red-500 col-span-2">{errors.form}</p>}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="code" className="text-right">
-              Código
-            </Label>
-            <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} className="col-span-3" />
-            {errors.code && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.code}</p>}
+        <div className="space-y-6 py-4">
+          {errors.form && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{errors.form}</div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="code">Código *</Label>
+            <Input
+              id="code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ingrese el código numérico"
+            />
+            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Nombre
-            </Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
-            {errors.name && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.name}</p>}
+
+          <div className="space-y-2">
+            <Label htmlFor="name">Nombre *</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ingrese el nombre del panel"
+            />
+            {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="bioUnit" className="text-right">
-              Unidad Bioq.
-            </Label>
-            <Input id="bioUnit" value={bioUnit} onChange={(e) => setBioUnit(e.target.value)} className="col-span-3" />
-            {errors.bioUnit && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.bioUnit}</p>}
+
+          <div className="space-y-2">
+            <Label htmlFor="bioUnit">Unidad Bioquímica *</Label>
+            <Input
+              id="bioUnit"
+              value={bioUnit}
+              onChange={(e) => setBioUnit(e.target.value)}
+              placeholder="Ingrese la unidad bioquímica"
+            />
+            {errors.bioUnit && <p className="text-sm text-red-500">{errors.bioUnit}</p>}
           </div>
-          <div className="flex items-center space-x-2 col-span-4 justify-end">
-            <Label htmlFor="isUrgent">Urgente</Label>
+
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <Label htmlFor="isUrgent" className="font-medium">
+                Panel Urgente
+              </Label>
+              <p className="text-sm text-gray-500">Marcar si este panel es de carácter urgente</p>
+            </div>
             <Switch id="isUrgent" checked={isUrgent} onCheckedChange={setIsUrgent} />
           </div>
-          <div className="flex items-center space-x-2 col-span-4 justify-end">
-            <Label htmlFor="isActive">Activo</Label>
-            <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
-          </div>
         </div>
+
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-              {" "}
-              {/* Usar onOpenChange */}
               Cancelar
             </Button>
           </DialogClose>

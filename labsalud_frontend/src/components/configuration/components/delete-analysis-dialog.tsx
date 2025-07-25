@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useApi } from "@/hooks/use-api"
+import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,16 +14,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useApi } from "@/hooks/use-api"
-import { useToast } from "@/hooks/use-toast"
-import { Loader2, Trash2 } from "lucide-react"
-import type { AnalysisItem } from "../configuration-page"
+import { Button } from "@/components/ui/button"
+import { Loader2, AlertTriangle, TestTube2 } from "lucide-react"
+
+interface AnalysisItem {
+  id: number
+  name: string
+  code: string
+  measure_unit: string
+  is_active: boolean
+}
 
 interface DeleteAnalysisDialogProps {
-  open: boolean // Cambiado de isOpen a open
-  onOpenChange: (open: boolean) => void // Cambiado de onClose a onOpenChange
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSuccess: () => void
-  analysis: AnalysisItem | null
+  analysis: AnalysisItem
 }
 
 export const DeleteAnalysisDialog: React.FC<DeleteAnalysisDialogProps> = ({
@@ -32,68 +39,105 @@ export const DeleteAnalysisDialog: React.FC<DeleteAnalysisDialogProps> = ({
   analysis,
 }) => {
   const { apiRequest } = useApi()
-  const toastActions = useToast() // Corregido
-  const [isLoading, setIsLoading] = useState(false)
+  const toastActions = useToast()
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = async () => {
-    if (!analysis) return
-
-    setIsLoading(true)
+    setIsDeleting(true)
     try {
-      // Para "eliminar" (desactivar) una determinación, usualmente se hace un PATCH
-      // cambiando `is_active` a `false`. Un DELETE real podría ser destructivo.
-      // Si la API realmente usa DELETE para desactivar, entonces está bien.
-      // Si usa PATCH, hay que cambiar el método y el body.
-      // Asumiendo que la API usa DELETE para marcar como inactivo (como dice el toast):
-      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/analysis/analyses/" + analysis.id + "/", {
-        method: "DELETE", // O "PATCH" con body: { is_active: false } si la API lo requiere
+      const baseUrl = import.meta.env.VITE_API_BASE_URL
+      const response = await apiRequest(`${baseUrl}/api/analysis/analyses/${analysis.id}/`, {
+        method: "DELETE",
       })
 
-      if (response.ok || response.status === 204) {
-        // 204 No Content es común para DELETE exitoso
-        toastActions.success("Éxito", { description: `Determinación "${analysis.name}" marcada como inactiva.` })
+      if (response.ok) {
+        toastActions.success("Éxito", {
+          description: "Determinación eliminada correctamente.",
+        })
         onSuccess()
-        onOpenChange(false)
       } else {
-        const errorData = await response.json().catch(() => ({})) // Evitar error si no hay JSON body
+        const errorData = await response.json().catch(() => ({}))
         toastActions.error("Error", {
-          description: errorData.detail || "No se pudo eliminar/desactivar la determinación.",
+          description: errorData.detail || "No se pudo eliminar la determinación.",
         })
       }
     } catch (error) {
       console.error("Error deleting analysis:", error)
-      toastActions.error("Error", { description: "Ocurrió un error inesperado." })
+      toastActions.error("Error", {
+        description: "Error de conexión. Inténtalo de nuevo.",
+      })
     } finally {
-      setIsLoading(false)
+      setIsDeleting(false)
     }
   }
 
-  if (!analysis) return null
-
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center">
-            <Trash2 className="mr-2 h-5 w-5 text-red-500" />
-            Confirmar Desactivación
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            ¿Estás seguro de que deseas marcar la determinación "<strong>{analysis.name}</strong>" (Código:{" "}
-            {analysis.code}) como inactiva? Esta acción es reversible editando la determinación.
-          </AlertDialogDescription>
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <AlertDialogTitle className="text-lg font-semibold text-gray-900">
+                Eliminar Determinación
+              </AlertDialogTitle>
+            </div>
+          </div>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Cancelar
+
+        <AlertDialogDescription asChild>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <TestTube2 className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-red-900 mb-1">{analysis.name}</h4>
+                  <div className="space-y-1 text-sm text-red-700">
+                    <p>
+                      <span className="font-medium">Código:</span> {analysis.code}
+                    </p>
+                    <p>
+                      <span className="font-medium">Unidad:</span> {analysis.measure_unit}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-600">
+              <p className="font-medium text-gray-900 mb-2">⚠️ Esta acción no se puede deshacer</p>
+              <p>
+                Al eliminar esta determinación, se perderán todos los datos asociados y no podrá ser utilizada en
+                futuros análisis.
+              </p>
+            </div>
+          </div>
+        </AlertDialogDescription>
+
+        <AlertDialogFooter className="gap-2">
+          <AlertDialogCancel asChild>
+            <Button variant="outline" disabled={isDeleting}>
+              Cancelar
+            </Button>
           </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sí, marcar como inactiva
+          <AlertDialogAction asChild>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar Determinación"
+              )}
+            </Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

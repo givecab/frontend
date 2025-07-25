@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback } from "react"
 import { toast } from "sonner"
 
 type ToastOptions = {
@@ -13,28 +14,28 @@ type ToastOptions = {
 
 export function useToast() {
   const showToast = {
-    success: (title: string, options?: ToastOptions) => {
+    success: useCallback((title: string, options?: ToastOptions) => {
       toast.success(title, options)
-    },
-    error: (title: string, options?: ToastOptions) => {
+    }, []),
+    error: useCallback((title: string, options?: ToastOptions) => {
       toast.error(title, options)
-    },
-    warning: (title: string, options?: ToastOptions) => {
+    }, []),
+    warning: useCallback((title: string, options?: ToastOptions) => {
       toast.warning(title, options)
-    },
-    info: (title: string, options?: ToastOptions) => {
+    }, []),
+    info: useCallback((title: string, options?: ToastOptions) => {
       toast.info(title, options)
-    },
-    loading: (title: string, options?: ToastOptions) => {
+    }, []),
+    loading: useCallback((title: string, options?: ToastOptions) => {
       return toast.loading(title, options)
-    },
-    dismiss: (toastId?: string) => {
+    }, []),
+    dismiss: useCallback((toastId?: string) => {
       if (toastId) {
         toast.dismiss(toastId)
       } else {
         toast.dismiss()
       }
-    },
+    }, []),
   }
 
   return showToast

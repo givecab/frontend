@@ -8,8 +8,10 @@ import ManagementPage from "./components/admin/management-page"
 import PatientsPage from "./components/patients/patients-page"
 import ProfilePage from "./components/profile/profile-page"
 import ForgotPassword from "./components/forgot-password"
-import { Toaster } from "sonner"
 import ConfigurationPage from "./components/configuration/configuration-page"
+import IngresoPage from "./components/ingreso/ingreso-page"
+import { Toaster } from "sonner"
+import ProtocolosPage from "./components/protocolos/protocolos-page"
 
 function App() {
   return (
@@ -67,6 +69,26 @@ function App() {
             }
           >
             <Route index element={<ConfigurationPage />} />
+          </Route>
+          <Route
+            path="/ingreso"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<IngresoPage />} />
+          </Route>
+          <Route
+            path="/protocolos"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ProtocolosPage />} />
           </Route>
         </Routes>
       </Router>

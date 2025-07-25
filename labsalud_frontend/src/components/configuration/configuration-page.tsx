@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import useAuth from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, Loader2, Settings, Users, ShieldCheckIcon, FileTextIcon } from "lucide-react"
+import { AlertCircle, Loader2 } from "lucide-react"
 import { MedicosManagement } from "./medicos-management"
 import { ObrasSocialesManagement } from "./obras-sociales-management"
 import { AnalisisManagement } from "./analisis-management"
@@ -72,23 +72,28 @@ export default function ConfigurationPage() {
   const { hasPermission } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
 
-  const canViewMedicos = hasPermission(46) || hasPermission(98)
-  const canCreateMedicos = hasPermission(43) || hasPermission(96)
-  const canEditMedicos = hasPermission(44) || hasPermission(97)
-  const canDeleteMedicos = hasPermission(45)
+  // Permisos para médicos - actualizados con los nuevos números
+  const canViewMedicos = hasPermission(46) // view_medico
+  const canCreateMedicos = hasPermission(43) // add_medico
+  const canEditMedicos = hasPermission(44) // change_medico
+  const canDeleteMedicos = hasPermission(45) // delete_medico
 
-  const canViewOoss = hasPermission(53) || hasPermission(101)
-  const canCreateOoss = hasPermission(50) || hasPermission(99)
-  const canEditOoss = hasPermission(51) || hasPermission(100)
-  const canDeleteOoss = hasPermission(52)
+  // Permisos para obras sociales - actualizados con los nuevos números
+  const canViewOoss = hasPermission(53) // view_ooss
+  const canCreateOoss = hasPermission(50) // add_ooss
+  const canEditOoss = hasPermission(51) // change_ooss
+  const canDeleteOoss = hasPermission(52) // delete_ooss
 
-  const VIEW_ANALYSIS_PANELS_PERMISSION = 60
-  const CREATE_ANALYSIS_PANELS_PERMISSION = 61
-  const EDIT_ANALYSIS_PANELS_PERMISSION = 62
-  const DELETE_ANALYSIS_PANELS_PERMISSION = 63
-  const CREATE_ANALYSES_PERMISSION = 65
-  const EDIT_ANALYSES_PERMISSION = 66
-  const DELETE_ANALYSES_PERMISSION = 67
+  // Permisos para paneles de análisis - actualizados con los nuevos números
+  const VIEW_ANALYSIS_PANELS_PERMISSION = 60 // view_panel
+  const CREATE_ANALYSIS_PANELS_PERMISSION = 57 // add_panel
+  const EDIT_ANALYSIS_PANELS_PERMISSION = 58 // change_panel
+  const DELETE_ANALYSIS_PANELS_PERMISSION = 59 // delete_panel
+
+  // Permisos para análisis/determinaciones - actualizados con los nuevos números
+  const CREATE_ANALYSES_PERMISSION = 64 // add_analysis
+  const EDIT_ANALYSES_PERMISSION = 65 // change_analysis
+  const DELETE_ANALYSES_PERMISSION = 66 // delete_analysis
 
   const canViewAnalysisPanels = hasPermission(VIEW_ANALYSIS_PANELS_PERMISSION)
   const canCreateAnalysisPanels = hasPermission(CREATE_ANALYSIS_PANELS_PERMISSION)
@@ -137,92 +142,81 @@ export default function ConfigurationPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-8 w-8 text-[#204983] animate-spin" />
+      <div className="max-w-6xl mx-auto py-6">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6 flex justify-center items-center min-h-[300px]">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 text-[#204983] animate-spin mb-2" />
+            <p className="text-gray-600">Cargando configuración...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!hasAccessToConfiguration) {
     return (
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            <p>No tienes permisos para acceder a la configuración del sistema.</p>
+      <div className="max-w-6xl mx-auto py-6">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Configuración del Sistema</h1>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <p>No tienes permisos para acceder a la configuración del sistema.</p>
+            </div>
           </div>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold leading-tight text-gray-900 flex items-center">
-          <Settings className="mr-3 h-8 w-8 text-[#204983]" />
-          Configuración del Sistema
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Administra las entidades principales del sistema como Médicos, Obras Sociales y Análisis.
-        </p>
-      </div>
+    <div className="max-w-6xl mx-auto py-6">
+      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Configuración del Sistema</h1>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="mb-6">
+            {hasAccessToMedicos && <TabsTrigger value="medicos">Médicos</TabsTrigger>}
+            {hasAccessToOoss && <TabsTrigger value="obras-sociales">Obras Sociales</TabsTrigger>}
+            {hasAccessToAnalisis && <TabsTrigger value="analisis">Análisis</TabsTrigger>}
+          </TabsList>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="mb-6 grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
           {hasAccessToMedicos && (
-            <TabsTrigger value="medicos" className="flex items-center justify-center gap-2">
-              <Users className="h-4 w-4" /> Médicos
-            </TabsTrigger>
+            <TabsContent value="medicos">
+              <MedicosManagement
+                canView={canViewMedicos}
+                canCreate={canCreateMedicos}
+                canEdit={canEditMedicos}
+                canDelete={canDeleteMedicos}
+              />
+            </TabsContent>
           )}
+
           {hasAccessToOoss && (
-            <TabsTrigger value="obras-sociales" className="flex items-center justify-center gap-2">
-              <ShieldCheckIcon className="h-4 w-4" /> Obras Sociales
-            </TabsTrigger>
+            <TabsContent value="obras-sociales">
+              <ObrasSocialesManagement
+                canView={canViewOoss}
+                canCreate={canCreateOoss}
+                canEdit={canEditOoss}
+                canDelete={canDeleteOoss}
+              />
+            </TabsContent>
           )}
+
           {hasAccessToAnalisis && (
-            <TabsTrigger value="analisis" className="flex items-center justify-center gap-2">
-              <FileTextIcon className="h-4 w-4" /> Análisis
-            </TabsTrigger>
+            <TabsContent value="analisis">
+              <AnalisisManagement
+                canViewPanels={canViewAnalysisPanels}
+                canCreatePanels={canCreateAnalysisPanels}
+                canEditPanels={canEditAnalysisPanels}
+                canDeletePanels={canDeleteAnalysisPanels}
+                canCreateAnalyses={canCreateAnalyses}
+                canEditAnalyses={canEditAnalyses}
+                canDeleteAnalyses={canDeleteAnalyses}
+              />
+            </TabsContent>
           )}
-        </TabsList>
-
-        {hasAccessToMedicos && (
-          <TabsContent value="medicos">
-            <MedicosManagement
-              canView={canViewMedicos}
-              canCreate={canCreateMedicos}
-              canEdit={canEditMedicos}
-              canDelete={canDeleteMedicos}
-            />
-          </TabsContent>
-        )}
-
-        {hasAccessToOoss && (
-          <TabsContent value="obras-sociales">
-            <ObrasSocialesManagement
-              canView={canViewOoss}
-              canCreate={canCreateOoss}
-              canEdit={canEditOoss}
-              canDelete={canDeleteOoss}
-            />
-          </TabsContent>
-        )}
-
-        {hasAccessToAnalisis && (
-          <TabsContent value="analisis">
-            <AnalisisManagement
-              canViewPanels={canViewAnalysisPanels}
-              canCreatePanels={canCreateAnalysisPanels}
-              canEditPanels={canEditAnalysisPanels}
-              canDeletePanels={canDeleteAnalysisPanels}
-              canCreateAnalyses={canCreateAnalyses}
-              canEditAnalyses={canEditAnalyses}
-              canDeleteAnalyses={canDeleteAnalyses}
-            />
-          </TabsContent>
-        )}
-      </Tabs>
-    </main>
+        </Tabs>
+      </div>
+    </div>
   )
 }

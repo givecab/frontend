@@ -1,19 +1,53 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
-import { useApi } from "@/hooks/use-api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, PlusCircle, Search, AlertCircle, PackageSearch, Users } from "lucide-react"
-import type { Medico } from "./configuration-page"
+import { Search, Plus, Eye, Pencil, Trash, Settings, User } from "lucide-react"
+import { useApi } from "@/hooks/use-api"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
+import { toast } from "sonner"
 import { CreateMedicoDialog } from "./components/create-medico-dialog"
 import { EditMedicoDialog } from "./components/edit-medico-dialog"
 import { DeleteMedicoDialog } from "./components/delete-medico-dialog"
-import { MedicoCard } from "./components/medico-card"
-import { useToast } from "@/hooks/use-toast"
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
-import { useDebounce } from "@/hooks/use-debounce"
+import { MedicoDetailsDialog } from "./components/medico-details-dialog"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+interface Medico {
+  id: number
+  first_name: string
+  last_name: string
+  license: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  created_by: {
+    id: number
+    username: string
+    first_name: string
+    last_name: string
+    photo?: string
+  } | null
+  updated_by: Array<{
+    id: number
+    username: string
+    first_name: string
+    last_name: string
+    photo?: string
+    updated_at: string
+  }>
+}
+
+interface ApiResponse {
+  results: Medico[]
+  count: number
+  next: string | null
+  previous: string | null
+}
 
 interface MedicosManagementProps {
   canView: boolean
@@ -22,271 +56,378 @@ interface MedicosManagementProps {
   canDelete: boolean
 }
 
-const PAGE_LIMIT = 20
+const UserAvatar = ({ user, date }: { user: any; date: string }) => {
+  if (user === null || !user) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger className="cursor-help">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-gray-100">
+                <Settings className="h-4 w-4 text-gray-600" />
+              </AvatarFallback>
+            </Avatar>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Creado por el sistema</p>
+            <p className="text-xs text-gray-500">{new Date(date).toLocaleString("es-ES")}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger className="cursor-help">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={user.photo || "/placeholder.svg"} />
+            <AvatarFallback className="bg-blue-100">
+              {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
+            </AvatarFallback>
+          </Avatar>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Creado por: {user.username}</p>
+          <p className="text-xs text-gray-500">{new Date(date).toLocaleString("es-ES")}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+const UpdatedByAvatars = ({ updatedBy }: { updatedBy: Medico["updated_by"] }) => {
+  if (!updatedBy || updatedBy.length === 0) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger className="cursor-help">
+            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-100 text-gray-500 text-sm">
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Sin modificaciones</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  const displayUsers = updatedBy.slice(0, 3)
+  const remainingCount = updatedBy.length - 3
+
+  return (
+    <div className="flex -space-x-2">
+      {displayUsers.map((user) => (
+        <TooltipProvider key={user.id}>
+          <Tooltip>
+            <TooltipTrigger className="cursor-help">
+              <Avatar className="h-8 w-8 border-2 border-white">
+                <AvatarImage src={user.photo || "/placeholder.svg"} />
+                <AvatarFallback className="bg-blue-100">
+                  {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
+                </AvatarFallback>
+              </Avatar>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Modificado por: {user.username}</p>
+              <p className="text-xs text-gray-500">{new Date(user.updated_at).toLocaleString("es-ES")}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+      {remainingCount > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger className="cursor-help">
+              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-200 text-gray-600 text-xs border-2 border-white">
+                +{remainingCount}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {remainingCount} modificación{remainingCount > 1 ? "es" : ""} adicional{remainingCount > 1 ? "es" : ""}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  )
+}
 
 export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, canCreate, canEdit, canDelete }) => {
-  const { apiRequest } = useApi()
-  const toastActions = useToast()
-
   const [medicos, setMedicos] = useState<Medico[]>([])
-  const [totalMedicos, setTotalMedicos] = useState(0)
-  const [nextUrl, setNextUrl] = useState<string | null>(null)
-  const [isLoadingInitial, setIsLoadingInitial] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
+  const [selectedMedico, setSelectedMedico] = useState<Medico | null>(null)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
+
+  const { apiRequest } = useApi()
   const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [selectedMedico, setSelectedMedico] = useState<Medico | null>(null)
-
-  const buildUrl = useCallback(
-    (offset = 0, search = debouncedSearchTerm) => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const endpoint = import.meta.env.VITE_MEDICOS_ACTIVE_ENDPOINT
-
-      let url = `${baseUrl}${endpoint}?limit=${PAGE_LIMIT}&offset=${offset}`
-      if (search) {
-        url += `&search=${encodeURIComponent(search)}`
-      }
-      return url
-    },
-    [debouncedSearchTerm],
-  )
+  const buildUrl = useCallback((searchTerm: string, offset: number) => {
+    const params = new URLSearchParams({
+      limit: "20",
+      offset: offset.toString(),
+      search: searchTerm,
+    })
+    return `/api/analysis/medicos/active/?${params.toString()}`
+  }, [])
 
   const fetchMedicos = useCallback(
-    async (isNewSearch = false) => {
-      if (!canView) {
-        setError("No tienes permiso para ver médicos.")
-        setIsLoadingInitial(false)
-        return
-      }
+    async (reset = false) => {
+      if (isLoading) return
 
-      let currentUrlToFetch: string
-      if (isNewSearch) {
-        setMedicos([])
-        setNextUrl(null)
-        setTotalMedicos(0)
-        currentUrlToFetch = buildUrl(0)
-      } else {
-        if (!nextUrl) {
-          setIsLoadingMore(false)
-          return
-        }
-        currentUrlToFetch = nextUrl
-      }
-
-      setIsLoadingInitial(isNewSearch && medicos.length === 0)
-      setIsLoadingMore(!isNewSearch)
+      setIsLoading(true)
       setError(null)
 
       try {
-        const response = await apiRequest(currentUrlToFetch)
-        if (response.ok) {
-          const data = await response.json()
-          setMedicos((prev) => (isNewSearch ? data.results : [...prev, ...data.results]))
-          setTotalMedicos(data.count)
-          setNextUrl(data.next)
-        } else {
-          setError("Error al cargar los médicos.")
-          toastActions.error("Error", { description: "No se pudieron cargar los médicos." })
+        const currentOffset = reset ? 0 : offset
+        const url = buildUrl(debouncedSearchTerm, currentOffset)
+        const response = await apiRequest(url)
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`)
         }
+
+        const data: ApiResponse = await response.json()
+
+        if (reset) {
+          setMedicos(data.results)
+          setOffset(20)
+        } else {
+          setMedicos((prev) => [...prev, ...data.results])
+          setOffset((prev) => prev + 20)
+        }
+
+        setHasMore(data.next !== null)
       } catch (err) {
-        console.error("Error fetching medicos:", err)
-        setError("Ocurrió un error inesperado al cargar los médicos.")
-        toastActions.error("Error", { description: "Error de conexión o servidor." })
+        const errorMessage = err instanceof Error ? err.message : "Error desconocido"
+        setError(errorMessage)
+        toast.error(`Error al cargar médicos: ${errorMessage}`)
       } finally {
-        setIsLoadingInitial(false)
-        setIsLoadingMore(false)
+        setIsLoading(false)
       }
     },
-    [apiRequest, canView, toastActions, buildUrl, nextUrl],
+    [apiRequest, buildUrl, debouncedSearchTerm, offset, isLoading],
   )
 
-  useEffect(() => {
-    if (canView) {
-      fetchMedicos(true)
-    }
-  }, [canView, debouncedSearchTerm])
-
-  const hasMore = !!nextUrl && medicos.length < totalMedicos
-
-  const loadMoreSentinelRef = useInfiniteScroll({
-    loading: isLoadingMore,
+  const lastElementRef = useInfiniteScroll({
+    loading: isLoading,
     hasMore,
-    onLoadMore: () => {
-      if (nextUrl && !isLoadingMore) {
-        fetchMedicos(false)
-      }
-    },
-    dependencies: [nextUrl, isLoadingMore, hasMore],
+    onLoadMore: () => fetchMedicos(false),
   })
 
-  const handleDialogClose = (setter: React.Dispatch<React.SetStateAction<boolean>>) => {
-    setter(false)
-    setSelectedMedico(null)
-  }
+  useEffect(() => {
+    fetchMedicos(true)
+  }, [debouncedSearchTerm])
 
   const handleCreateSuccess = () => {
+    setShowCreateDialog(false)
     fetchMedicos(true)
-    setIsCreateModalOpen(false)
+    toast.success("Médico creado exitosamente")
   }
 
   const handleEditSuccess = () => {
-    fetchMedicos(true)
-    setIsEditModalOpen(false)
+    setShowEditDialog(false)
     setSelectedMedico(null)
+    fetchMedicos(true)
+    toast.success("Médico actualizado exitosamente")
   }
 
   const handleDeleteSuccess = () => {
-    fetchMedicos(true)
-    setIsDeleteModalOpen(false)
+    setShowDeleteDialog(false)
     setSelectedMedico(null)
+    fetchMedicos(true)
+    toast.success("Médico eliminado exitosamente")
   }
 
-  if (!canView && !canCreate) {
+  if (!canView) {
     return (
-      <div className="text-gray-600 bg-gray-50 p-4 rounded-md flex items-center">
-        <AlertCircle className="mr-2" /> No tienes permisos para gestionar médicos.
-      </div>
-    )
-  }
-
-  if (isLoadingInitial && medicos.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-[#204983]" />
-        <span className="ml-2">Cargando médicos...</span>
-      </div>
-    )
-  }
-
-  if (error && medicos.length === 0) {
-    return (
-      <div className="text-red-600 bg-red-50 p-4 rounded-md flex items-center">
-        <AlertCircle className="mr-2" /> {error}
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Sin permisos</h3>
+          <p className="text-gray-500">No tienes permisos para ver esta sección.</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="md:flex md:items-center md:justify-between">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate flex items-center">
-                <Users className="mr-3 h-7 w-7 text-[#204983]" />
-                Médicos Activos
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Consulta, crea, edita y desactiva médicos registrados en el sistema.
-              </p>
-            </div>
-            {canCreate && (
-              <div className="mt-4 flex md:mt-0 md:ml-4">
-                <Button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  style={{ backgroundColor: "#204983", color: "white" }}
-                >
-                  <PlusCircle className="mr-2 h-5 w-5" /> Nuevo Médico
-                </Button>
-              </div>
-            )}
-          </div>
-          <div className="mt-6">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input
-                placeholder="Buscar médico (nombre, matrícula)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full"
-                disabled={!canView}
-              />
-            </div>
-          </div>
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Gestión de Médicos</h2>
+        <p className="text-gray-600">Administra los médicos del sistema</p>
       </div>
 
-      {error && medicos.length > 0 && <div className="text-red-500 bg-red-50 p-3 rounded-md mb-4">{error}</div>}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Buscar médicos..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {canCreate && (
+          <Button onClick={() => setShowCreateDialog(true)} className="bg-[#204983] hover:bg-[#1a3d6f]">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Médico
+          </Button>
+        )}
+      </div>
 
-      {medicos.length === 0 && !isLoadingInitial && !error && (
-        <div className="text-center text-gray-500 py-12 bg-white shadow sm:rounded-lg">
-          <PackageSearch className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <h3 className="text-lg font-medium text-gray-900">No se encontraron médicos</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            No hay médicos activos que coincidan con tu búsqueda o no hay médicos registrados.
-          </p>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-red-800">{error}</p>
         </div>
       )}
 
-      {medicos.length > 0 && (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-8">
-          {medicos.map((medico) => (
-            <MedicoCard
-              key={medico.id}
-              medico={medico}
-              onEdit={
-                canEdit
-                  ? () => {
-                      setSelectedMedico(medico)
-                      setIsEditModalOpen(true)
-                    }
-                  : undefined
-              }
-              onDelete={
-                canDelete
-                  ? () => {
-                      setSelectedMedico(medico)
-                      setIsDeleteModalOpen(true)
-                    }
-                  : undefined
-              }
-            />
-          ))}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Nombre
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Apellido
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Matrícula
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Creado por
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Modificado por
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {medicos.map((medico) => (
+                <tr
+                  key={medico.id}
+                  ref={medicos.indexOf(medico) === medicos.length - 1 ? lastElementRef : null}
+                  className="hover:bg-gray-50"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{medico.first_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.last_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.license}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <UserAvatar user={medico.created_by} date={medico.created_at} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <UpdatedByAvatars updatedBy={medico.updated_by} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMedico(medico)
+                          setShowDetailsDialog(true)
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedMedico(medico)
+                            setShowEditDialog(true)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-200 hover:bg-red-50 bg-transparent"
+                          onClick={() => {
+                            setSelectedMedico(medico)
+                            setShowDeleteDialog(true)
+                          }}
+                        >
+                          <Trash className="h-4 w-4 text-red-500" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      {hasMore && (
-        <div ref={loadMoreSentinelRef} className="flex justify-center items-center py-6">
-          {isLoadingMore && <Loader2 className="h-6 w-6 animate-spin text-[#204983]" />}
-        </div>
-      )}
-      {!hasMore && medicos.length > 0 && !isLoadingInitial && (
-        <p className="text-center text-sm text-gray-500 mt-8">Fin de los resultados.</p>
-      )}
+        {isLoading && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#204983]"></div>
+          </div>
+        )}
 
-      {isCreateModalOpen && canCreate && (
-        <CreateMedicoDialog
-          open={isCreateModalOpen}
-          onOpenChange={(open) => {
-            if (!open) handleDialogClose(setIsCreateModalOpen)
-          }}
-          onSuccess={handleCreateSuccess}
-        />
-      )}
-      {isEditModalOpen && selectedMedico && canEdit && (
-        <EditMedicoDialog
-          open={isEditModalOpen}
-          onOpenChange={(open) => {
-            if (!open) handleDialogClose(setIsEditModalOpen)
-          }}
-          onSuccess={handleEditSuccess}
-          medico={selectedMedico}
-        />
-      )}
-      {isDeleteModalOpen && selectedMedico && canDelete && (
-        <DeleteMedicoDialog
-          open={isDeleteModalOpen}
-          onOpenChange={(open) => {
-            if (!open) handleDialogClose(setIsDeleteModalOpen)
-          }}
-          onSuccess={handleDeleteSuccess}
-          medico={selectedMedico}
-        />
+        {!isLoading && medicos.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No se encontraron médicos</p>
+          </div>
+        )}
+      </div>
+
+      <CreateMedicoDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onSuccess={handleCreateSuccess}
+      />
+
+      {selectedMedico && (
+        <>
+          <EditMedicoDialog
+            isOpen={showEditDialog}
+            medico={selectedMedico}
+            onClose={() => {
+              setShowEditDialog(false)
+              setSelectedMedico(null)
+            }}
+            onSuccess={handleEditSuccess}
+          />
+
+          <DeleteMedicoDialog
+            isOpen={showDeleteDialog}
+            medico={selectedMedico}
+            onClose={() => {
+              setShowDeleteDialog(false)
+              setSelectedMedico(null)
+            }}
+            onSuccess={handleDeleteSuccess}
+          />
+
+          <MedicoDetailsDialog
+            isOpen={showDetailsDialog}
+            medico={selectedMedico}
+            onClose={() => {
+              setShowDetailsDialog(false)
+              setSelectedMedico(null)
+            }}
+          />
+        </>
       )}
     </div>
   )

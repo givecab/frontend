@@ -126,7 +126,7 @@ export interface ObraSocial extends BaseEntity {
 }
 
 export interface AnalysisPanel extends BaseEntity {
-  code: number
+  code: string | null
   name: string
   bio_unit: string
   is_urgent: boolean
@@ -138,6 +138,35 @@ export interface Analysis extends BaseEntity {
   panel: number
   formula: string
   measure_unit: string
+}
+
+// ============================================================================
+// PROTOCOLOS Y ANÁLISIS DE PROTOCOLO
+// ============================================================================
+
+export interface Protocol extends BaseEntity {
+  patient: number
+  ooss: number
+  medico: number
+  contact_method?: "email" | "whatsapp" | "call"
+  state?: "carga_pendiente" | "carga_completa" | "validacion_pendiente" | "finalizado"
+  paid?: boolean
+  is_active?: boolean
+  protocol_analyses?: ProtocolAnalysis[]
+}
+
+export interface ProtocolAnalysis extends BaseEntity {
+  protocol: number
+  analysis: number
+  is_active?: boolean
+}
+
+export interface ProtocolResult extends BaseEntity {
+  protocol_analysis: number
+  value: string
+  reference_value?: string
+  is_normal?: boolean
+  observations?: string
 }
 
 // ============================================================================

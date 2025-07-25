@@ -15,15 +15,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import type { AnalysisItem } from "../configuration-page"
 
 interface CreateAnalysisDialogProps {
-  open: boolean // Cambiado de isOpen a open
-  onOpenChange: (open: boolean) => void // Cambiado de onClose a onOpenChange
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSuccess: (newAnalysis: AnalysisItem) => void
   panelId: number
 }
@@ -35,12 +35,11 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
   panelId,
 }) => {
   const { apiRequest } = useApi()
-  const toastActions = useToast() // Corregido: usar el objeto devuelto directamente
+  const toastActions = useToast()
   const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [measureUnit, setMeasureUnit] = useState("")
   const [formula, setFormula] = useState("")
-  const [isActive, setIsActive] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -50,7 +49,6 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
       setName("")
       setMeasureUnit("")
       setFormula("")
-      setIsActive(true)
       setErrors({})
       setIsLoading(false)
     }
@@ -76,22 +74,19 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
         code,
         name,
         measure_unit: measureUnit,
-        formula,
-        is_active: isActive,
+        formula: formula || null,
+        is_active: true, // Siempre activo al crear
       }
-      const response = await apiRequest(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_ANALYSIS_ANALYSES_ENDPOINT}`,
-        {
-          method: "POST",
-          body: analysisData,
-        },
-      )
+      const response = await apiRequest(`${import.meta.env.VITE_API_BASE_URL}/api/analysis/analyses/`, {
+        method: "POST",
+        body: analysisData,
+      })
 
       if (response.ok) {
         const newAnalysis = await response.json()
         toastActions.success("Éxito", { description: "Determinación creada correctamente." })
         onSuccess(newAnalysis)
-        onOpenChange(false) // Cerrar el diálogo
+        onOpenChange(false)
       } else {
         const errorData = await response.json()
         const backendErrors = errorData.errors || errorData.detail || errorData
@@ -121,57 +116,62 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Nueva Determinación para Panel ID: {panelId}</DialogTitle>
-          <DialogDescription>Completa los datos para la nueva determinación.</DialogDescription>
+          <DialogTitle>Nueva Determinación</DialogTitle>
+          <DialogDescription>Completa los datos para la nueva determinación del panel.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          {errors.form && <p className="text-sm text-red-500 col-span-2">{errors.form}</p>}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="analysis-code" className="text-right">
-              Código
-            </Label>
-            <Input id="analysis-code" value={code} onChange={(e) => setCode(e.target.value)} className="col-span-3" />
-            {errors.code && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.code}</p>}
+        <div className="space-y-6 py-4">
+          {errors.form && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{errors.form}</div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="analysis-code">Código *</Label>
+            <Input
+              id="analysis-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ingrese el código de la determinación"
+            />
+            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="analysis-name" className="text-right">
-              Nombre
-            </Label>
-            <Input id="analysis-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
-            {errors.name && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.name}</p>}
+
+          <div className="space-y-2">
+            <Label htmlFor="analysis-name">Nombre *</Label>
+            <Input
+              id="analysis-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ingrese el nombre de la determinación"
+            />
+            {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="analysis-measureUnit" className="text-right">
-              Unidad Med.
-            </Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="analysis-measureUnit">Unidad de Medida *</Label>
             <Input
               id="analysis-measureUnit"
               value={measureUnit}
               onChange={(e) => setMeasureUnit(e.target.value)}
-              className="col-span-3"
+              placeholder="ej: mg/dL, UI/L, etc."
             />
-            {errors.measureUnit && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.measureUnit}</p>}
+            {errors.measureUnit && <p className="text-sm text-red-500">{errors.measureUnit}</p>}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="analysis-formula" className="text-right">
-              Fórmula
-            </Label>
-            <Input
+
+          <div className="space-y-2">
+            <Label htmlFor="analysis-formula">Fórmula (Opcional)</Label>
+            <Textarea
               id="analysis-formula"
               value={formula}
               onChange={(e) => setFormula(e.target.value)}
-              className="col-span-3"
-              placeholder="Opcional"
+              placeholder="Ingrese la fórmula de cálculo si aplica"
+              rows={3}
             />
-            {errors.formula && <p className="text-sm text-red-500 col-span-4 col-start-2">{errors.formula}</p>}
-          </div>
-          <div className="flex items-center space-x-2 col-span-4 justify-end">
-            <Label htmlFor="analysis-isActive">Activa</Label>
-            <Switch id="analysis-isActive" checked={isActive} onCheckedChange={setIsActive} />
+            {errors.formula && <p className="text-sm text-red-500">{errors.formula}</p>}
           </div>
         </div>
+
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
