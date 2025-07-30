@@ -134,8 +134,5 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
-<<<<<<< HEAD
+
 .DS_Store
-=======
-.DS_Store
->>>>>>> main
