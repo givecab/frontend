@@ -417,7 +417,7 @@ export default function IngresoPage() {
         )}
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fillButton {
           0% { 
             width: 0%; 

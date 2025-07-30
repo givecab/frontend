@@ -134,7 +134,7 @@ export default function ProfilePage() {
       // Solo hacer la petición si hay algo que actualizar
       if (formDataToSend.has("email") || formDataToSend.has("password") || formDataToSend.has("photo")) {
         const baseUrl = import.meta.env.VITE_API_BASE_URL
-        const endpoint = import.meta.env.VITE_PROFILE_ENDPOINT
+        const endpoint = import.meta.env.VITE_AUTH_ME_ENDPOINT
 
         const response = await apiRequest(`${baseUrl}${endpoint}`, {
           method: "PATCH",
@@ -144,8 +144,21 @@ export default function ProfilePage() {
         if (response.ok) {
           const updatedUser = await response.json()
 
-          // Actualizar el usuario en localStorage
-          localStorage.setItem("user", JSON.stringify(updatedUser))
+          // Obtener el usuario actual del localStorage
+          const currentUserData = localStorage.getItem("user")
+          if (currentUserData) {
+            const currentUser = JSON.parse(currentUserData)
+            
+            // Actualizar solo los campos que pueden haber cambiado
+            const updatedUserData = {
+              ...currentUser,
+              email: updatedUser.email || currentUser.email,
+              photo: updatedUser.photo !== undefined ? updatedUser.photo : currentUser.photo
+            }
+
+            // Guardar el objeto usuario actualizado
+            localStorage.setItem("user", JSON.stringify(updatedUserData))
+          }
 
           toast.success("Perfil actualizado correctamente")
 

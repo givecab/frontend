@@ -19,9 +19,10 @@ import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
 
 interface CreateMedicoDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  isOpen: boolean
+  onOpenChange: (isOpen: boolean) => void
   onSuccess: () => void
+  onClose: () => void
 }
 
 interface FormData {
@@ -36,7 +37,7 @@ interface ValidationState {
   license: { isValid: boolean; message: string }
 }
 
-export function CreateMedicoDialog({ open, onOpenChange, onSuccess }: CreateMedicoDialogProps) {
+export function CreateMedicoDialog({ isOpen, onOpenChange, onSuccess }: CreateMedicoDialogProps) {
   const [formData, setFormData] = useState<FormData>({
     first_name: "",
     last_name: "",
@@ -136,7 +137,7 @@ export function CreateMedicoDialog({ open, onOpenChange, onSuccess }: CreateMedi
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Médico</DialogTitle>

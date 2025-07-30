@@ -22,13 +22,14 @@ interface Medico {
 }
 
 interface DeleteMedicoDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  isOpen: boolean
   medico: Medico
   onSuccess: () => void
+  onClose?: () => void
+  onOpenChange: (open: boolean) => void
 }
 
-export function DeleteMedicoDialog({ open, onOpenChange, medico, onSuccess }: DeleteMedicoDialogProps) {
+export function DeleteMedicoDialog({ isOpen, onOpenChange, medico, onSuccess }: DeleteMedicoDialogProps) {
   const [loading, setLoading] = useState(false)
   const { apiRequest } = useApi()
 
@@ -53,7 +54,7 @@ export function DeleteMedicoDialog({ open, onOpenChange, medico, onSuccess }: De
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>

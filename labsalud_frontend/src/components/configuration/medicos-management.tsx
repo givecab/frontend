@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Plus, Eye, Pencil, Trash, Settings, User } from "lucide-react"
+import { Search, Plus, Eye, Pencil, Trash, Settings } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
@@ -24,22 +24,22 @@ interface Medico {
   license: string
   is_active: boolean
   created_at: string
-  updated_at: string
   created_by: {
     id: number
     username: string
-    first_name: string
-    last_name: string
-    photo?: string
+    photo: string
   } | null
-  updated_by: Array<{
-    id: number
-    username: string
-    first_name: string
-    last_name: string
-    photo?: string
-    updated_at: string
-  }>
+  history: HistoryEntry[]
+}
+
+interface HistoryEntry {
+  version: number
+  user: {
+  id: number
+  username: string
+  photo: string
+} | null
+  created_at: string
 }
 
 interface ApiResponse {
@@ -54,110 +54,36 @@ interface MedicosManagementProps {
   canCreate: boolean
   canEdit: boolean
   canDelete: boolean
+  medico?: Medico
 }
 
-const UserAvatar = ({ user, date }: { user: any; date: string }) => {
-  if (user === null || !user) {
+const UserAvatar: React.FC<{
+  user: { id: number; username: string; photo: string } | null | undefined
+  size?: "sm" | "md"
+}> = ({ user, size = "md" }) => {
+  const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8"
+
+  if (!user || !user.username || user.username.trim() === "") {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-gray-100">
-                <Settings className="h-4 w-4 text-gray-600" />
-              </AvatarFallback>
-            </Avatar>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Creado por el sistema</p>
-            <p className="text-xs text-gray-500">{new Date(date).toLocaleString("es-ES")}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Avatar className={sizeClasses}>
+        <AvatarFallback className="text-xs bg-gray-200 text-gray-500">
+          <Settings className="h-4 w-4 text-gray-600" />
+        </AvatarFallback>
+      </Avatar>
     )
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger className="cursor-help">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user.photo || "/placeholder.svg"} />
-            <AvatarFallback className="bg-blue-100">
-              {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
-            </AvatarFallback>
-          </Avatar>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Creado por: {user.username}</p>
-          <p className="text-xs text-gray-500">{new Date(date).toLocaleString("es-ES")}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Avatar className={sizeClasses}>
+      <AvatarImage src={user.photo || undefined} alt={user.username} />
+      <AvatarFallback className="text-xs bg-slate-200 text-slate-700">
+        {user.username.substring(0, 2).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
   )
 }
 
-const UpdatedByAvatars = ({ updatedBy }: { updatedBy: Medico["updated_by"] }) => {
-  if (!updatedBy || updatedBy.length === 0) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-100 text-gray-500 text-sm">
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Sin modificaciones</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    )
-  }
-
-  const displayUsers = updatedBy.slice(0, 3)
-  const remainingCount = updatedBy.length - 3
-
-  return (
-    <div className="flex -space-x-2">
-      {displayUsers.map((user) => (
-        <TooltipProvider key={user.id}>
-          <Tooltip>
-            <TooltipTrigger className="cursor-help">
-              <Avatar className="h-8 w-8 border-2 border-white">
-                <AvatarImage src={user.photo || "/placeholder.svg"} />
-                <AvatarFallback className="bg-blue-100">
-                  {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
-                </AvatarFallback>
-              </Avatar>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Modificado por: {user.username}</p>
-              <p className="text-xs text-gray-500">{new Date(user.updated_at).toLocaleString("es-ES")}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ))}
-      {remainingCount > 0 && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger className="cursor-help">
-              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-200 text-gray-600 text-xs border-2 border-white">
-                +{remainingCount}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {remainingCount} modificación{remainingCount > 1 ? "es" : ""} adicional{remainingCount > 1 ? "es" : ""}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-    </div>
-  )
-}
-
-export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, canCreate, canEdit, canDelete }) => {
+export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: MedicosManagementProps) {
   const [medicos, setMedicos] = useState<Medico[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -178,8 +104,9 @@ export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, c
       limit: "20",
       offset: offset.toString(),
       search: searchTerm,
+      is_active: "true",
     })
-    return `/api/analysis/medicos/active/?${params.toString()}`
+    return `/api/analysis/medicos/?${params.toString()}`
   }, [])
 
   const fetchMedicos = useCallback(
@@ -261,6 +188,59 @@ export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, c
     )
   }
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getUserDisplayName = (user: { id: number; username: string; photo: string } | null | undefined) => {
+    if (!user || !user.username || user.username.trim() === "") {
+      return "Sistema"
+    }
+    return user.username
+  }
+
+  const getCreationInfo = (medicoItem: Medico) => {
+    if (medicoItem.history && medicoItem.history.length > 0) {
+      // La primera entrada del history es la creación (version 1)
+      const creationEntry = medicoItem.history.find((entry) => entry.version === 1)
+      if (creationEntry) {
+        return {
+          user: creationEntry.user,
+          date: creationEntry.created_at,
+        }
+      }
+    }
+    // Fallback a los datos originales
+    return {
+      user: medicoItem.created_by,
+      date: medicoItem.created_at,
+    }
+  }
+
+  const getLatestUpdate = (medicoItem: Medico) => {
+    if (medicoItem.history && medicoItem.history.length > 1) {
+      // Ordenar por version descendente y tomar la más reciente
+      const sortedHistory = [...medicoItem.history].sort((a, b) => b.version - a.version)
+      const latestEntry = sortedHistory[0]
+
+      if (latestEntry.version > 1) {
+        return {
+          user: latestEntry.user,
+          date: latestEntry.created_at,
+          version: latestEntry.version,
+        }
+      }
+    }
+    return null
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -298,10 +278,7 @@ export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, c
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nombre
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Apellido
+                  Nombre y Apellido
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Matrícula
@@ -318,62 +295,112 @@ export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, c
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {medicos.map((medico) => (
-                <tr
-                  key={medico.id}
-                  ref={medicos.indexOf(medico) === medicos.length - 1 ? lastElementRef : null}
-                  className="hover:bg-gray-50"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{medico.first_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.last_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.license}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <UserAvatar user={medico.created_by} date={medico.created_at} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <UpdatedByAvatars updatedBy={medico.updated_by} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedMedico(medico)
-                          setShowDetailsDialog(true)
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {canEdit && (
+              {medicos.map((medico) => {
+                const creationInfo = getCreationInfo(medico)
+                const latestUpdate = getLatestUpdate(medico)
+                
+                return (
+                  <tr
+                    key={medico.id}
+                    ref={medicos.indexOf(medico) === medicos.length - 1 ? lastElementRef : null}
+                    className="hover:bg-gray-50"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {medico.first_name} {medico.last_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.license}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <TooltipProvider>
+                        <div className="flex items-center space-x-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <UserAvatar user={creationInfo.user} size="md" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-lg">
+                                <strong>Creado por:</strong> {getUserDisplayName(creationInfo.user)}
+                                <br />
+                                <strong>Fecha:</strong> {formatDate(creationInfo.date)}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <TooltipProvider>
+                        <div>
+                          <Tooltip>
+                            {latestUpdate ? (
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  <UserAvatar user={latestUpdate?.user} size="md" />
+                                </div>
+                              </TooltipTrigger>
+                            ): null}
+                            <TooltipContent>
+                              <p className="text-sm">
+                                {latestUpdate ? (
+                                  <>
+                                    <strong>Modificado por:</strong> {getUserDisplayName(latestUpdate.user)}
+                                    <br />
+                                    <strong>Fecha:</strong> {formatDate(latestUpdate.date)}
+                                    <br />
+                                    <strong>Versión:</strong> {latestUpdate.version}
+                                  </>
+                                ) : (
+                                  <span>Sin modificaciones</span>
+                                )}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
                             setSelectedMedico(medico)
-                            setShowEditDialog(true)
+                            setShowDetailsDialog(true)
                           }}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                      {canDelete && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-red-200 hover:bg-red-50 bg-transparent"
-                          onClick={() => {
-                            setSelectedMedico(medico)
-                            setShowDeleteDialog(true)
-                          }}
-                        >
-                          <Trash className="h-4 w-4 text-red-500" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {canEdit && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedMedico(medico)
+                              setShowEditDialog(true)
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-red-200 hover:bg-red-50 bg-transparent"
+                            onClick={() => {
+                              setSelectedMedico(medico)
+                              setShowDeleteDialog(true)
+                            }}
+                          >
+                            <Trash className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -395,6 +422,7 @@ export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, c
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         onSuccess={handleCreateSuccess}
+        onOpenChange={(isOpen) => setShowCreateDialog(isOpen)}
       />
 
       {selectedMedico && (
@@ -417,6 +445,7 @@ export const MedicosManagement: React.FC<MedicosManagementProps> = ({ canView, c
               setSelectedMedico(null)
             }}
             onSuccess={handleDeleteSuccess}
+            onOpenChange={() => setShowDeleteDialog(false)}
           />
 
           <MedicoDetailsDialog

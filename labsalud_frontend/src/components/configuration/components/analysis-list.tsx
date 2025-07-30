@@ -4,7 +4,6 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
@@ -35,27 +34,26 @@ interface AnalysisItem {
   name: string
   code: string
   measure_unit: string
-  formula?: string
-  is_active: boolean
+  formula: string
   panel: number
   created_by: {
     id: number
     username: string
-    photo?: string
+    photo: string
   } | null
   updated_by: Array<{
     id: number
     username: string
-    photo?: string
+    photo: string
   }> | null
-  created_at: string | null
-  updated_at: string | null
+  created_at: string 
+  updated_at: string 
 }
 
 interface Panel {
   id: number
-  name: string | null
-  code: string | null
+  name: string 
+  code: number
 }
 
 interface AnalysisListProps {
@@ -380,9 +378,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
             return (
               <div
                 key={analysis.id}
-                className={`border rounded-md transition-all duration-300 ${
-                  !analysis.is_active ? "bg-gray-50 opacity-70 border-gray-200" : "bg-white border-gray-100"
-                } ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
+                className={`border rounded-md transition-all duration-300 ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
               >
                 <div
                   className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -400,14 +396,9 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
                     <div>
                       <p className="text-sm font-medium text-gray-800 flex items-center gap-2">
                         {analysis.name}
-                        {!analysis.is_active && (
-                          <Badge variant="outline" className="text-xs">
-                            Inactiva
-                          </Badge>
-                        )}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Código: {analysis.code} | Unidad: {analysis.measure_unit}
+                        | Unidad de Medida: {analysis.measure_unit}
                       </p>
                     </div>
                   </div>
@@ -448,7 +439,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
                           </Tooltip>
                         </TooltipProvider>
                       )}
-                      {canDelete && analysis.is_active && (
+                      {canDelete && (
                         <TooltipProvider delayDuration={100}>
                           <Tooltip>
                             <TooltipTrigger asChild>

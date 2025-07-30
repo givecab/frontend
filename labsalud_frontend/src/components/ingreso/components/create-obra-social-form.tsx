@@ -93,34 +93,6 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="phone">Teléfono</Label>
-          <Input id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="Teléfono" />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="correo@ejemplo.com"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="address">Dirección</Label>
-          <Input
-            id="address"
-            name="address"
-            value={formData.address}
-            onChange={handleInputChange}
-            placeholder="Dirección"
-          />
-        </div>
-
         <div className="flex gap-2 pt-4">
           <Button
             onClick={handleCreateObraSocial}

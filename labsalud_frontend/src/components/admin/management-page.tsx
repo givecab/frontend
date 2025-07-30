@@ -54,7 +54,7 @@ export default function ManagementPage() {
         hasPermission("22") ||
         hasPermission("23")
       ) {
-        const usersResponse = await apiRequest("api/users/active/")
+        const usersResponse = await apiRequest("api/users/active/?is_staff=false")
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
           if (usersData && Array.isArray(usersData.results)) {
@@ -194,7 +194,7 @@ export default function ManagementPage() {
 
           {hasPermission("8") && (
             <TabsContent value="permissions">
-              <PermissionManagement permissions={permissions} />
+              <PermissionManagement permission={permissions} />
             </TabsContent>
           )}
         </Tabs>

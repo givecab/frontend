@@ -44,7 +44,7 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
     }
   }
 
-  const { setLastElementRef } = useInfiniteScroll({
+  const setLastElementRef = useInfiniteScroll({
     loading: isLoadingMore,
     hasMore,
     onLoadMore: loadMorePanels,

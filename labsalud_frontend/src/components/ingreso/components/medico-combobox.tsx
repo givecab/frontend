@@ -123,18 +123,6 @@ export function MedicoCombobox({
             <CommandEmpty>
               <div className="text-center py-4">
                 <p className="text-sm text-gray-500 mb-2">No se encontraron médicos</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onShowCreateMedico()
-                    setOpen(false)
-                  }}
-                  className="border-[#204983] text-[#204983] hover:bg-[#204983] hover:text-white"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Crear médico
-                </Button>
               </div>
             </CommandEmpty>
             <CommandGroup>
@@ -146,7 +134,7 @@ export function MedicoCombobox({
                     onMedicoSelect(selectedMedico?.id === medico.id ? null : medico)
                     setOpen(false)
                   }}
-                  ref={index === allMedicos.length - 5 ? () => loadMoreMedicos() : undefined}
+                  ref={index === allMedicos.length - 5 ? (el: HTMLDivElement | null) => { if (el) loadMoreMedicos(); } : undefined}
                 >
                   <Check
                     className={cn("mr-2 h-4 w-4", selectedMedico?.id === medico.id ? "opacity-100" : "opacity-0")}

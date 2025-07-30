@@ -146,7 +146,7 @@ export function ObraSocialCombobox({
                     onObraSocialSelect(selectedObraSocial?.id === obraSocial.id ? null : obraSocial)
                     setOpen(false)
                   }}
-                  ref={index === allObrasSociales.length - 5 ? () => loadMoreObrasSociales() : undefined}
+                  ref={index === allObrasSociales.length - 5 ? (el: HTMLDivElement | null) => { if (el) loadMoreObrasSociales(); } : undefined}
                 >
                   <Check
                     className={cn(

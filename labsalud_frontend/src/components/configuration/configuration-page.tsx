@@ -12,9 +12,9 @@ import { AnalisisManagement } from "./analisis-management"
 export interface User {
   id: number
   username: string
-  first_name?: string
-  last_name?: string
-  photo?: string
+  first_name: string
+  last_name: string
+  photo: string
 }
 
 export interface Medico {
@@ -23,10 +23,23 @@ export interface Medico {
   last_name: string
   license: string
   is_active: boolean
-  created_by: User | null
-  updated_by: User[]
+  created_by: {
+    id: number
+    username: string
+    photo: string
+  } | null
   created_at: string
-  updated_at: string
+  history: HistoryEntry[]
+}
+
+export interface HistoryEntry {
+  version: number
+  user: {
+    id: number
+    username: string
+    photo: string
+  } | null
+  created_at: string
 }
 
 export interface ObraSocial {
@@ -42,33 +55,42 @@ export interface ObraSocial {
 
 export interface AnalysisPanel {
   id: number
-  created_by: User | null
-  updated_by: User[]
   code: number
   name: string
   bio_unit: string
   is_urgent: boolean
-  is_active: boolean
+  created_by: {
+    id: number
+    username: string
+    photo: string
+  } | null
   created_at: string
-  updated_at: string
+  history: HistoryEntry[]
   analyses?: AnalysisItem[]
 }
 
 export interface AnalysisItem {
   id: number
   panel: number
-  created_by: User | null
-  updated_by: User[]
+  created_by: {
+    id: number
+    username: string
+    photo: string
+  } | null
+  updated_by: Array<{
+    id: number
+    username: string
+    photo: string
+  }> | null
   code: string
   name: string
   measure_unit: string
   formula: string
-  is_active: boolean
   created_at: string
   updated_at: string
 }
 
-export default function ConfigurationPage() {
+export default function ConfigurationPage(medico: Medico) {
   const { hasPermission } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
 
@@ -187,6 +209,7 @@ export default function ConfigurationPage() {
                 canCreate={canCreateMedicos}
                 canEdit={canEditMedicos}
                 canDelete={canDeleteMedicos}
+                medico={medico}
               />
             </TabsContent>
           )}

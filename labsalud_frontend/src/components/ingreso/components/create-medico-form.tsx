@@ -118,24 +118,6 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
             required
           />
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="phone">Teléfono</Label>
-          <Input id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="Teléfono" />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="correo@ejemplo.com"
-          />
-        </div>
-
         <div className="flex gap-2 pt-4">
           <Button onClick={handleCreateMedico} disabled={isCreating} className="flex-1 bg-[#204983] hover:bg-[#1a3d6f]">
             {isCreating ? (

@@ -20,11 +20,10 @@ import { Loader2, AlertTriangle, TestTube } from "lucide-react"
 
 interface Panel {
   id: number
-  name: string | null
-  code: string | null
-  bio_unit: string | null
+  name: string
+  code: number
+  bio_unit: string
   is_urgent: boolean
-  is_active: boolean
 }
 
 interface DeletePanelDialogProps {

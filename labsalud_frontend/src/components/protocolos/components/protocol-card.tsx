@@ -300,8 +300,8 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     setIsMarkingPaid(true)
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/protocols/${protocol.id}/`, {
-        method: "PATCH",
+      const response = await apiRequest(`${baseUrl}/api/analysis/protocols/${protocol.id}/pay/`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -644,7 +644,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
                                   <span className="text-gray-600">
                                     {getUserDisplayName(entry.user)} • v{entry.version}
                                   </span>
-                                  <span className="text-gray-500 ml-2">{formatDateShort(entry.created_at)}</span>
+                                  <span className="text-gray-500 ml-2">{formatDate(entry.created_at)}</span>
                                 </div>
                               </div>
                             ))}

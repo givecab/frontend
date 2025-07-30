@@ -1,31 +1,96 @@
 "use client"
+import { useState, useEffect } from "react"
 import useAuth from "@/contexts/auth-context"
+import { useApi } from "@/hooks/use-api"
+import { useToast } from "@/hooks/use-toast"
 import { User, Shield, Clock, TestTube, Users, TrendingUp, Calendar, CheckCircle } from "lucide-react"
 
-interface TempPermission {
+interface Permission {
   id: number
+  codename: string
   name: string
-  expires_at: string
+  temporary: boolean
+  expires_at: string | null
+}
+
+interface Stats {
+  analysisToday: number
+  patientsToday: number
+  pendingResults: number
+  completedAnalysis: number
+  monthlyGrowth: number
+  averageProcessingTime: number
 }
 
 export default function Home() {
-  const { user } = useAuth()
+  const { user } = useAuth()  
+  const { apiRequest } = useApi()
+  const { error: showErrorToast } = useToast()
+  
+  const [stats, setStats] = useState<Stats>({
+    analysisToday: 0,
+    patientsToday: 0,
+    pendingResults: 23, // Mantener valor fijo hasta que haya endpoint
+    completedAnalysis: 0,
+    monthlyGrowth: 0,
+    averageProcessingTime: 0,
+  })
+  const [loading, setLoading] = useState(true)
 
-  const getActivePermissions = (): TempPermission[] => {
+  const getActivePermissions = (): Permission[] => {
     if (!user || !user.temp_permissions) return []
     const now = new Date()
-    return user.temp_permissions.filter((perm: TempPermission) => new Date(perm.expires_at) > now)
+    return user.temp_permissions.filter((perm: Permission) => 
+      perm.expires_at && new Date(perm.expires_at) > now
+    )
   }
 
-  // Datos simulados que luego vendrán de la API
-  const stats = {
-    analysisToday: 127,
-    patientsToday: 89,
-    pendingResults: 23,
-    completedAnalysis: 1456,
-    monthlyGrowth: 12.5,
-    averageProcessingTime: 45, // minutos
+  const fetchStats = async () => {
+    try {
+      setLoading(true)
+      
+      // Llamadas paralelas a todos los endpoints
+      const [
+        analysisResponse,
+        completedResponse,
+        avgTimeResponse,
+        patientsResponse,
+        growthResponse
+      ] = await Promise.all([
+        apiRequest('/api/analysis/protocols/stats/created-today/'),
+        apiRequest('/api/analysis/protocols/stats/analyses-completed-month/'),
+        apiRequest('/api/analysis/protocols/stats/avg-result-load-time/'),
+        apiRequest('/api/analysis/protocols/stats/panels-today/'),
+        apiRequest('/api/analysis/protocols/stats/patient-growth/')
+      ])
+
+      const [analysisData, completedData, avgTimeData, patientsData, growthData] = await Promise.all([
+        analysisResponse.json(),
+        completedResponse.json(),
+        avgTimeResponse.json(),
+        patientsResponse.json(),
+        growthResponse.json()
+      ])
+
+      setStats(prevStats => ({
+        ...prevStats,
+        analysisToday: analysisData.created_today || 0,
+        completedAnalysis: completedData.results_validated_this_month || 0,
+        averageProcessingTime: avgTimeData.avg_result_load_time ? Math.round(avgTimeData.avg_result_load_time) : 0,
+        patientsToday: patientsData.panels_today || 0,
+        monthlyGrowth: growthData.growth_percent !== null ? Number(growthData.growth_percent.toFixed(1)) : 0,
+      }))
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+      showErrorToast('Error al cargar las estadísticas')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
 
   return (
     <div className="max-w-6xl mx-auto py-6">
@@ -59,12 +124,12 @@ export default function Home() {
             <h3 className="font-semibold text-green-800">Permisos Temporales Activos</h3>
           </div>
           <div className="space-y-2">
-            {getActivePermissions().map((perm: TempPermission, index: number) => (
+            {getActivePermissions().map((perm: Permission, index: number) => (
               <div key={index} className="flex items-center justify-between bg-white/95 backdrop-blur-sm rounded p-2">
                 <span className="text-sm font-medium text-green-800">{perm.name}</span>
                 <div className="flex items-center space-x-1 text-xs text-green-600">
                   <Clock className="w-3 h-3" />
-                  <span>Expira: {new Date(perm.expires_at).toLocaleString("es-ES")}</span>
+                  <span>Expira: {perm.expires_at ? new Date(perm.expires_at).toLocaleString("es-ES") : 'Sin fecha'}</span>
                 </div>
               </div>
             ))}
@@ -82,7 +147,13 @@ export default function Home() {
             </div>
             <span className="text-xs text-blue-500 font-medium">HOY</span>
           </div>
-          <h3 className="text-2xl font-bold text-blue-800 mb-1">{stats.analysisToday}</h3>
+          <h3 className="text-2xl font-bold text-blue-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-blue-200 h-8 w-16 rounded"></div>
+            ) : (
+              stats.analysisToday.toLocaleString()
+            )}
+          </h3>
           <p className="text-blue-600 text-sm">Análisis realizados</p>
         </div>
 
@@ -94,7 +165,13 @@ export default function Home() {
             </div>
             <span className="text-xs text-green-500 font-medium">HOY</span>
           </div>
-          <h3 className="text-2xl font-bold text-green-800 mb-1">{stats.patientsToday}</h3>
+          <h3 className="text-2xl font-bold text-green-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-green-200 h-8 w-16 rounded"></div>
+            ) : (
+              stats.patientsToday.toLocaleString()
+            )}
+          </h3>
           <p className="text-green-600 text-sm">Pacientes atendidos</p>
         </div>
 
@@ -106,7 +183,7 @@ export default function Home() {
             </div>
             <span className="text-xs text-orange-500 font-medium">PENDIENTE</span>
           </div>
-          <h3 className="text-2xl font-bold text-orange-800 mb-1">{stats.pendingResults}</h3>
+          <h3 className="text-2xl font-bold text-orange-800 mb-1">{stats.pendingResults.toLocaleString()}</h3>
           <p className="text-orange-600 text-sm">Resultados por validar</p>
         </div>
 
@@ -118,7 +195,13 @@ export default function Home() {
             </div>
             <span className="text-xs text-purple-500 font-medium">ESTE MES</span>
           </div>
-          <h3 className="text-2xl font-bold text-purple-800 mb-1">{stats.completedAnalysis.toLocaleString()}</h3>
+          <h3 className="text-2xl font-bold text-purple-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-purple-200 h-8 w-20 rounded"></div>
+            ) : (
+              stats.completedAnalysis.toLocaleString()
+            )}
+          </h3>
           <p className="text-purple-600 text-sm">Análisis completados</p>
         </div>
 
@@ -130,7 +213,13 @@ export default function Home() {
             </div>
             <span className="text-xs text-emerald-500 font-medium">CRECIMIENTO</span>
           </div>
-          <h3 className="text-2xl font-bold text-emerald-800 mb-1">+{stats.monthlyGrowth}%</h3>
+          <h3 className="text-2xl font-bold text-emerald-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-emerald-200 h-8 w-16 rounded"></div>
+            ) : (
+              `${stats.monthlyGrowth >= 0 ? '+' : ''}${stats.monthlyGrowth}%`
+            )}
+          </h3>
           <p className="text-emerald-600 text-sm">vs. mes anterior</p>
         </div>
 
@@ -142,7 +231,13 @@ export default function Home() {
             </div>
             <span className="text-xs text-indigo-500 font-medium">PROMEDIO</span>
           </div>
-          <h3 className="text-2xl font-bold text-indigo-800 mb-1">{stats.averageProcessingTime} min</h3>
+          <h3 className="text-2xl font-bold text-indigo-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-indigo-200 h-8 w-20 rounded"></div>
+            ) : (
+              `${stats.averageProcessingTime} min`
+            )}
+          </h3>
           <p className="text-indigo-600 text-sm">Tiempo de procesamiento</p>
         </div>
       </div>

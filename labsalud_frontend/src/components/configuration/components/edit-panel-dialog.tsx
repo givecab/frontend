@@ -25,7 +25,7 @@ interface EditPanelDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: (updatedPanel: AnalysisPanel) => void
-  panel: AnalysisPanel | null
+  panel: AnalysisPanel
 }
 
 export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenChange, onSuccess, panel }) => {

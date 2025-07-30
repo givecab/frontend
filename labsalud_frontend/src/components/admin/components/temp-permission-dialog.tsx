@@ -23,6 +23,7 @@ interface TempPermissionDialogProps {
   user: User | null
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
   apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
+  permissions?: Permission[]
 }
 
 export function TempPermissionDialog({

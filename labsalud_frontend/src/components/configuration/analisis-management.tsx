@@ -20,28 +20,30 @@ import {
   Pencil,
   Trash,
   PackageX,
-  Clock,
-  Calendar,
   Plus,
-  User,
   Settings,
+  History, 
+  Clock,
 } from "lucide-react"
 import { AnalysisList } from "./components/analysis-list"
 import { CreatePanelDialog } from "./components/create-panel-dialog"
 import { EditPanelDialog } from "./components/edit-panel-dialog"
 import { DeletePanelDialog } from "./components/delete-panel-dialog"
+import type { HistoryEntry } from "./configuration-page"
 
 interface Panel {
   id: number
-  created_by: { id: number; username: string; photo?: string } | null
-  updated_by: { id: number; username: string; photo?: string }[]
-  code: string | null
-  name: string | null
-  bio_unit: string | null
+  code: number
+  name: string
+  bio_unit: string
   is_urgent: boolean
-  is_active: boolean
-  created_at: string | null
-  updated_at: string | null
+  created_by: {
+      id: number
+      username: string
+      photo: string
+    } | null
+    created_at: string
+    history: HistoryEntry[]
 }
 
 interface AnalisisManagementProps {
@@ -56,127 +58,29 @@ interface AnalisisManagementProps {
 
 const PAGE_LIMIT = 20
 
-const formatFullDate = (dateString: string | null): string => {
-  if (!dateString) return "Fecha no disponible"
+const UserAvatar: React.FC<{
+  user: { id: number; username: string; photo: string } | null | undefined
+  size?: "sm" | "md"
+}> = ({ user, size = "md" }) => {
+  const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8"
 
-  try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return "Fecha inválida"
-
-    return date.toLocaleString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch {
-    return "Fecha inválida"
-  }
-}
-
-const UserAvatar = ({
-  user,
-  date,
-}: { user: { id: number; username: string; photo?: string } | null; date: string }) => {
-  if (user === null || !user) {
+  if (!user || !user.username || user.username.trim() === "") {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-gray-100">
-                <Settings className="h-4 w-4 text-gray-600" />
-              </AvatarFallback>
-            </Avatar>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Creado por el sistema</p>
-            <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Avatar className={sizeClasses}>
+        <AvatarFallback className="text-xs bg-gray-200 text-gray-500">
+          <Settings className="h-4 w-4 text-gray-600" />
+        </AvatarFallback>
+      </Avatar>
     )
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger className="cursor-help">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user.photo || "/placeholder.svg"} />
-            <AvatarFallback className="bg-blue-100">
-              {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
-            </AvatarFallback>
-          </Avatar>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Creado por: {user.username}</p>
-          <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
-
-const UpdatedByAvatars = ({ updatedBy }: { updatedBy: { id: number; username: string; photo?: string }[] }) => {
-  if (!updatedBy || updatedBy.length === 0) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-100 text-gray-500 text-sm">
-              <Settings className="h-4 w-4 text-gray-600" />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Sin modificaciones</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    )
-  }
-
-  const displayUsers = updatedBy.slice(0, 3)
-  const remainingCount = updatedBy.length - 3
-
-  return (
-    <div className="flex -space-x-2">
-      {displayUsers.map((user) => (
-        <TooltipProvider key={user.id}>
-          <Tooltip>
-            <TooltipTrigger className="cursor-help">
-              <Avatar className="h-8 w-8 border-2 border-white">
-                <AvatarImage src={user.photo || "/placeholder.svg"} />
-                <AvatarFallback className="bg-blue-100">
-                  {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
-                </AvatarFallback>
-              </Avatar>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Modificado por: {user.username}</p>
-              <p className="text-xs text-gray-500">Última modificación</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ))}
-      {remainingCount > 0 && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger className="cursor-help">
-              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-200 text-gray-600 text-xs border-2 border-white">
-                +{remainingCount}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {remainingCount} modificación{remainingCount > 1 ? "es" : ""} adicional{remainingCount > 1 ? "es" : ""}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-    </div>
+    <Avatar className={sizeClasses}>
+      <AvatarImage src={user.photo || undefined} alt={user.username} />
+      <AvatarFallback className="text-xs bg-slate-200 text-slate-700">
+        {user.username.substring(0, 2).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
   )
 }
 
@@ -333,6 +237,62 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
     )
   }
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getUserDisplayName = (user: { id: number; username: string; photo: string } | null | undefined) => {
+    if (!user || !user.username || user.username.trim() === "") {
+      return "Sistema"
+    }
+    return user.username
+  }
+
+  const getCreationInfo = (panelItem: Panel) => {
+    if (panelItem.history && panelItem.history.length > 0) {
+      // La primera entrada del history es la creación (version 1)
+      const creationEntry = panelItem.history.find((entry) => entry.version === 1)
+      if (creationEntry) {
+        return {
+          user: creationEntry.user,
+          date: creationEntry.created_at,
+        }
+      }
+    }
+    // Fallback a los datos originales
+    return {
+      user: panelItem.created_by,
+      date: panelItem.created_at,
+    }
+  }
+
+  const getLatestUpdate = (panelItem: Panel) => {
+    if (panelItem.history && panelItem.history.length > 1) {
+      // Ordenar por version descendente y tomar la más reciente
+      const sortedHistory = [...panelItem.history].sort((a, b) => b.version - a.version)
+      const latestEntry = sortedHistory[0]
+
+      if (latestEntry.version > 1) {
+        return {
+          user: latestEntry.user,
+          date: latestEntry.created_at,
+          version: latestEntry.version,
+        }
+      }
+    }
+    return null
+  }
+
+  const creationInfo = getCreationInfo(panels[0])
+  const latestUpdate = getLatestUpdate(panels[0])
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -385,9 +345,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
             return (
               <div
                 key={panel.id}
-                className={`border rounded-lg bg-white shadow-sm transition-all duration-300 ${
-                  !panel.is_active ? "opacity-70 bg-gray-50" : ""
-                } ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
+                className={`border rounded-lg bg-white shadow-sm transition-all duration-300 $ ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
               >
                 {/* Header del Panel */}
                 <div
@@ -412,11 +370,6 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
                               U
                             </Badge>
                           )}
-                          {!panel.is_active && (
-                            <Badge variant="outline" className="text-xs flex-shrink-0">
-                              Inactivo
-                            </Badge>
-                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-gray-500 mt-1 flex-wrap">
                           <span className="flex items-center gap-1 flex-shrink-0">
@@ -435,18 +388,50 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
 
                     <div className="flex items-center gap-3 flex-shrink-0">
                       {/* Avatares con labels - Solo en desktop */}
-                      <div className="hidden lg:flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-gray-500">Creado por:</span>
-                          <UserAvatar user={panel.created_by} date={panel.created_at || ""} />
+                      <TooltipProvider>
+                        <div className="flex items-center space-x-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <UserAvatar user={creationInfo.user} size="md" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-lg">
+                                <strong>Creado por:</strong> {getUserDisplayName(creationInfo.user)}
+                                <br />
+                                <strong>Fecha:</strong> {formatDate(creationInfo.date)}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
-                        {panel.updated_by && panel.updated_by.length > 0 && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">Editado por:</span>
-                            <UpdatedByAvatars updatedBy={panel.updated_by} />
-                          </div>
-                        )}
-                      </div>
+                        <div>
+                          <Tooltip>
+                            {latestUpdate ? (
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  <UserAvatar user={latestUpdate?.user} size="md" />
+                                </div>
+                              </TooltipTrigger>
+                            ): null}
+                            <TooltipContent>
+                              <p className="text-sm">
+                                {latestUpdate ? (
+                                  <>
+                                    <strong>Modificado por:</strong> {getUserDisplayName(latestUpdate.user)}
+                                    <br />
+                                    <strong>Fecha:</strong> {formatDate(latestUpdate.date)}
+                                    <br />
+                                    <strong>Versión:</strong> {latestUpdate.version}
+                                  </>
+                                ) : (
+                                  <span>Sin modificaciones</span>
+                                )}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
 
                       {/* Botones de acción */}
                       <div className="flex space-x-2">
@@ -463,7 +448,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
-                        {canDeletePanels && panel.is_active && (
+                        {canDeletePanels && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -486,59 +471,64 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
                 {isExpanded && (
                   <div className="border-t bg-gray-50">
                     {/* Información de auditoría del panel */}
-                    <div className="p-4 bg-blue-50 border-b">
-                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Información de Auditoría</h5>
-                      <div className="space-y-4">
-                        {/* Información de creación */}
-                        <div className="bg-white p-3 rounded-md border border-blue-200">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Calendar className="h-4 w-4 text-blue-600" />
-                            <h6 className="text-xs font-semibold text-blue-800">Creación</h6>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <UserAvatar user={panel.created_by} date={panel.created_at || ""} />
-                            <div>
-                              <p className="text-sm font-medium">Usuario: {panel.created_by?.username || "Sistema"}</p>
-                              <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
-                                <Calendar className="h-3 w-3" />
-                                {formatFullDate(panel.created_at)}
-                              </p>
-                            </div>
+                    {latestUpdate ? (
+                    <div className="flex items-start space-x-3">
+                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-700">Última modificación</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <UserAvatar user={latestUpdate.user} />
+                          <div>
+                            <p className="text-sm text-gray-600">{getUserDisplayName(latestUpdate.user)}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(latestUpdate.date)} • Versión {latestUpdate.version}
+                            </p>
                           </div>
                         </div>
-
-                        {/* Información de última modificación */}
-                        {panel.updated_by && panel.updated_by.length > 0 && (
-                          <div className="bg-white p-3 rounded-md border border-green-200">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Clock className="h-4 w-4 text-green-600" />
-                              <h6 className="text-xs font-semibold text-green-800">Última Modificación</h6>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage
-                                  src={panel.updated_by[panel.updated_by.length - 1]?.photo || "/placeholder.svg"}
-                                />
-                                <AvatarFallback className="bg-green-100">
-                                  {panel.updated_by[panel.updated_by.length - 1]?.username?.charAt(0).toUpperCase() || (
-                                    <User className="h-4 w-4" />
-                                  )}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="text-sm font-medium">
-                                  Usuario: {panel.updated_by[panel.updated_by.length - 1]?.username}
-                                </p>
-                                <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
-                                  <Clock className="h-3 w-3" />
-                                  {formatFullDate(panel.updated_at)}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
+                  ) : (
+                    <div className="flex items-start space-x-3">
+                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-700">Actualizaciones</p>
+                        <p className="text-sm text-gray-500 mt-1">Sin actualizaciones</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Historial completo si hay múltiples versiones */}
+                  {panel.history && panel.history.length >= 2 && (
+                    <div className="flex items-start space-x-3">
+                      <History className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-700">
+                          Historial completo ({panel.history.length} versiones)
+                        </p>
+                        <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
+                          {panel.history
+                            .sort((a, b) => b.version - a.version)
+                            .slice(0, 5) // Mostrar solo las últimas 5 versiones
+                            .map((entry) => (
+                              <div key={entry.version} className="flex items-center space-x-2 text-xs">
+                                <UserAvatar user={entry.user} size="sm" />
+                                <div className="flex-1">
+                                  <span className="text-gray-600">
+                                    {getUserDisplayName(entry.user)} • v{entry.version}
+                                  </span>
+                                  <span className="text-gray-500 ml-2">{formatDate(entry.created_at)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          {panel.history.length > 5 && (
+                            <p className="text-xs text-gray-500 italic">
+                              ... y {panel.history.length - 5} versiones más
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                     {/* Lista de análisis */}
                     <AnalysisList

@@ -68,7 +68,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<ConfigurationPage />} />
+            <Route index element={<ConfigurationPage id={0} first_name={""} last_name={""} license={""} is_active={false} created_by={null} created_at={""} history={[]} />} />
           </Route>
           <Route
             path="/ingreso"

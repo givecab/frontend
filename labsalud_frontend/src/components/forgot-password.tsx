@@ -146,7 +146,7 @@ export default function ForgotPassword() {
                     setEmail(e.target.value)
                     if (error) setError("")
                   }}
-                  placeholder="tu@email.com"
+                  placeholder="vos@email.com"
                   className={`
                     w-full pl-10 pr-4 py-3 bg-gray-100 border rounded-lg text-gray-800 placeholder-gray-500 
                     focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200

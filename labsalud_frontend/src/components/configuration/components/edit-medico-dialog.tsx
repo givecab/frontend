@@ -16,9 +16,7 @@ interface Medico {
   license: string
   is_active: boolean
   created_at: string
-  updated_at: string
   created_by: any
-  updated_by: any[]
 }
 
 interface EditMedicoDialogProps {

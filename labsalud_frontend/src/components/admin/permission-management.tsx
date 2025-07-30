@@ -8,10 +8,14 @@ import { Input } from "@/components/ui/input"
 import { AlertCircle } from "lucide-react"
 import type { UIEvent, ChangeEvent } from "react"
 
-export function PermissionManagement() {
+interface PermissionManagementProps {
+  permission: Permission[]
+}
+
+export function PermissionManagement({ permission }: PermissionManagementProps) {
   const { apiRequest } = useApi()
 
-  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [permissions, setPermissions] = useState<Permission[]>(permission)
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)

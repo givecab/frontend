@@ -22,7 +22,6 @@ interface AnalysisItem {
   name: string
   code: string
   measure_unit: string
-  is_active: boolean
 }
 
 interface DeleteAnalysisDialogProps {

@@ -37,7 +37,6 @@ interface ProtocolFormProps {
 }
 
 export function ProtocolForm({
-  patient,
   medicos,
   obrasSociales,
   selectedAnalyses,
@@ -108,6 +107,7 @@ export function ProtocolForm({
                 value={oossNumber}
                 onChange={(e) => onOossNumberChange(e.target.value)}
                 className="h-10 w-full"
+                required
               />
             </div>
           </div>

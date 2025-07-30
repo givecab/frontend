@@ -25,6 +25,7 @@ interface EditAnalysisDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess: (updatedAnalysis: AnalysisItem) => void
   analysis: AnalysisItem | null
+  panelId?: number
 }
 
 export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, onOpenChange, onSuccess, analysis }) => {
