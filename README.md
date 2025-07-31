@@ -13,3 +13,4 @@ q pelotudo chatgpt
 culpa mia
 averrrr
 esperemos che
+ahora si tiene q funcionar
