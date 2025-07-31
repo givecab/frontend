@@ -9,3 +9,4 @@ tengo fe
 no paso nada
 q pajero
 averrrrr
+q pelotudo chatgpt
