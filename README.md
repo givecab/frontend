@@ -11,3 +11,4 @@ q pajero
 averrrrr
 q pelotudo chatgpt
 culpa mia
+averrrr
