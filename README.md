@@ -12,3 +12,4 @@ averrrrr
 q pelotudo chatgpt
 culpa mia
 averrrr
+esperemos che
