@@ -12,6 +12,7 @@ import ConfigurationPage from "./components/configuration/configuration-page"
 import IngresoPage from "./components/ingreso/ingreso-page"
 import { Toaster } from "sonner"
 import ProtocolosPage from "./components/protocolos/protocolos-page"
+import ResultadosPage from "./components/results/results-page"
 
 function App() {
   return (
@@ -89,6 +90,16 @@ function App() {
             }
           >
             <Route index element={<ProtocolosPage />} />
+          </Route>
+          <Route
+            path="/resultados"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<ResultadosPage />} />
           </Route>
         </Routes>
       </Router>

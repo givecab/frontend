@@ -29,7 +29,7 @@ export function PermissionManagement({ permission }: PermissionManagementProps) 
     setLoading(true)
     try {
       const res = await apiRequest(
-        `api/permissions/?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`
+        `api/users/permissions/?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`
       )
       if (res.ok) {
         const data = await res.json()

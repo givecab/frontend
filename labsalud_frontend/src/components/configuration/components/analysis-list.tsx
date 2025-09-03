@@ -34,26 +34,26 @@ interface AnalysisItem {
   name: string
   code: string
   measure_unit: string
-  formula: string
+  formula?: string
   panel: number
   created_by: {
     id: number
     username: string
-    photo: string
+    photo?: string
   } | null
   updated_by: Array<{
     id: number
     username: string
-    photo: string
+    photo?: string
   }> | null
-  created_at: string 
-  updated_at: string 
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface Panel {
   id: number
-  name: string 
-  code: number
+  name: string | null
+  code: number | null
 }
 
 interface AnalysisListProps {
@@ -66,6 +66,32 @@ interface AnalysisListProps {
 }
 
 const PAGE_LIMIT = 10
+
+const formatDate = (dateString: string | null): string => {
+  if (!dateString) return "Fecha no disponible"
+
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "Fecha inválida"
+
+    const now = new Date()
+    const diffInMs = now.getTime() - date.getTime()
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+    const diffInDays = Math.floor(diffInHours / 24)
+
+    if (diffInHours < 1) return "hace menos de 1 hora"
+    if (diffInHours < 24) return `hace ${diffInHours} hora${diffInHours > 1 ? "s" : ""}`
+    if (diffInDays < 7) return `hace ${diffInDays} día${diffInDays > 1 ? "s" : ""}`
+
+    return date.toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  } catch {
+    return "Fecha inválida"
+  }
+}
 
 const formatFullDate = (dateString: string | null): string => {
   if (!dateString) return "Fecha no disponible"
@@ -100,7 +126,7 @@ const UserAvatar = ({ user, date }: { user: any; date: string }) => {
           </TooltipTrigger>
           <TooltipContent>
             <p>Creado por el sistema</p>
-            <p className="text-xs text-gray-500">{new Date(date).toLocaleString("es-ES")}</p>
+            <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -120,7 +146,7 @@ const UserAvatar = ({ user, date }: { user: any; date: string }) => {
         </TooltipTrigger>
         <TooltipContent>
           <p>Creado por: {user.username}</p>
-          <p className="text-xs text-gray-500">{new Date(date).toLocaleString("es-ES")}</p>
+          <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -163,7 +189,7 @@ const UpdatedByAvatars = ({ updatedBy }: { updatedBy: AnalysisItem["updated_by"]
             </TooltipTrigger>
             <TooltipContent>
               <p>Modificado por: {user.username}</p>
-              <p className="text-xs text-gray-500">{new Date().toLocaleString("es-ES")}</p>
+              <p className="text-xs text-gray-500">{formatFullDate(new Date().toISOString())}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -221,10 +247,9 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
       const baseUrl = import.meta.env.VITE_API_BASE_URL
       let url = `${baseUrl}/api/analysis/panels/${panel.id}/analyses/?limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) url += `&search=${encodeURIComponent(search)}`
-      if (!showInactive) url += `&is_active=true`
       return url
     },
-    [panel.id, showInactive],
+    [panel.id],
   )
 
   const fetchAnalyses = useCallback(
@@ -317,9 +342,6 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
     setIsEditModalOpen(false)
     setIsDeleteModalOpen(false)
     setSelectedAnalysis(null)
-    if (error) {
-      error("Éxito", { description: "Operación completada correctamente." })
-    }
   }
 
   const handleDialogClose = (setter: React.Dispatch<React.SetStateAction<boolean>>) => {
@@ -365,7 +387,6 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
         <div className="text-center text-gray-400 py-4 text-sm">
           <PackageX className="mx-auto h-8 w-8 text-gray-300 mb-1" />
           Este panel no tiene determinaciones
-          {showInactive ? "" : " activas"}
           {searchTerm ? " que coincidan con la búsqueda." : "."}
         </div>
       )}
@@ -378,7 +399,9 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
             return (
               <div
                 key={analysis.id}
-                className={`border rounded-md transition-all duration-300 ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
+                className={`border rounded-md transition-all duration-300 bg-white border-gray-100 ${
+                  isExpanded ? "ring-2 ring-blue-200" : ""
+                }`}
               >
                 <div
                   className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -394,11 +417,9 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
                       <TestTube2 className="h-4 w-4 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800 flex items-center gap-2">
-                        {analysis.name}
-                      </p>
+                      <p className="text-sm font-medium text-gray-800 flex items-center gap-2">{analysis.name}</p>
                       <p className="text-xs text-gray-500">
-                        | Unidad de Medida: {analysis.measure_unit}
+                        Código: {analysis.code} | Unidad: {analysis.measure_unit}
                       </p>
                     </div>
                   </div>

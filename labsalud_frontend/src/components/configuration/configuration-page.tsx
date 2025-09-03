@@ -62,10 +62,10 @@ export interface AnalysisPanel {
   created_by: {
     id: number
     username: string
-    photo: string
+    photo?: string
   } | null
   created_at: string
-  history: HistoryEntry[]
+  history?: HistoryEntry[]
   analyses?: AnalysisItem[]
 }
 
@@ -75,17 +75,17 @@ export interface AnalysisItem {
   created_by: {
     id: number
     username: string
-    photo: string
+    photo?: string
   } | null
   updated_by: Array<{
     id: number
     username: string
-    photo: string
+    photo?: string
   }> | null
   code: string
   name: string
   measure_unit: string
-  formula: string
+  formula?: string
   created_at: string
   updated_at: string
 }

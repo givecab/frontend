@@ -22,29 +22,14 @@ import {
   PackageX,
   Plus,
   Settings,
-  History, 
+  History,
   Clock,
 } from "lucide-react"
 import { AnalysisList } from "./components/analysis-list"
 import { CreatePanelDialog } from "./components/create-panel-dialog"
 import { EditPanelDialog } from "./components/edit-panel-dialog"
 import { DeletePanelDialog } from "./components/delete-panel-dialog"
-import type { HistoryEntry } from "./configuration-page"
-
-interface Panel {
-  id: number
-  code: number
-  name: string
-  bio_unit: string
-  is_urgent: boolean
-  created_by: {
-      id: number
-      username: string
-      photo: string
-    } | null
-    created_at: string
-    history: HistoryEntry[]
-}
+import type { AnalysisPanel } from "./configuration-page"
 
 interface AnalisisManagementProps {
   canViewPanels: boolean
@@ -59,7 +44,7 @@ interface AnalisisManagementProps {
 const PAGE_LIMIT = 20
 
 const UserAvatar: React.FC<{
-  user: { id: number; username: string; photo: string } | null | undefined
+  user: { id: number; username: string; photo?: string } | null | undefined
   size?: "sm" | "md"
 }> = ({ user, size = "md" }) => {
   const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8"
@@ -96,7 +81,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
   const { apiRequest } = useApi()
   const toastActions = useToast()
 
-  const [panels, setPanels] = useState<Panel[]>([])
+  const [panels, setPanels] = useState<AnalysisPanel[]>([])
   const [totalPanels, setTotalPanels] = useState(0)
   const [panelsNextUrl, setPanelsNextUrl] = useState<string | null>(null)
   const [expandedPanels, setExpandedPanels] = useState<Set<number>>(new Set())
@@ -114,7 +99,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
   const [isCreatePanelModalOpen, setIsCreatePanelModalOpen] = useState(false)
   const [isEditPanelModalOpen, setIsEditPanelModalOpen] = useState(false)
   const [isDeletePanelModalOpen, setIsDeletePanelModalOpen] = useState(false)
-  const [selectedPanel, setSelectedPanel] = useState<Panel | null>(null)
+  const [selectedPanel, setSelectedPanel] = useState<AnalysisPanel | null>(null)
 
   const buildPanelsUrl = useCallback(
     (offset = 0, search = debouncedSearchTerm) => {
@@ -237,26 +222,31 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
     )
   }
 
+  // Funciones auxiliares con validaciones seguras
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    try {
+      return new Date(dateString).toLocaleDateString("es-ES", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    } catch {
+      return "Fecha inválida"
+    }
   }
 
-  const getUserDisplayName = (user: { id: number; username: string; photo: string } | null | undefined) => {
+  const getUserDisplayName = (user: { id: number; username: string; photo?: string } | null | undefined) => {
     if (!user || !user.username || user.username.trim() === "") {
       return "Sistema"
     }
     return user.username
   }
 
-  const getCreationInfo = (panelItem: Panel) => {
-    if (panelItem.history && panelItem.history.length > 0) {
+  const getCreationInfo = (panelItem: AnalysisPanel) => {
+    if (panelItem?.history && Array.isArray(panelItem.history) && panelItem.history.length > 0) {
       // La primera entrada del history es la creación (version 1)
       const creationEntry = panelItem.history.find((entry) => entry.version === 1)
       if (creationEntry) {
@@ -268,18 +258,18 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
     }
     // Fallback a los datos originales
     return {
-      user: panelItem.created_by,
-      date: panelItem.created_at,
+      user: panelItem?.created_by || null,
+      date: panelItem?.created_at || "",
     }
   }
 
-  const getLatestUpdate = (panelItem: Panel) => {
-    if (panelItem.history && panelItem.history.length > 1) {
+  const getLatestUpdate = (panelItem: AnalysisPanel) => {
+    if (panelItem?.history && Array.isArray(panelItem.history) && panelItem.history.length > 1) {
       // Ordenar por version descendente y tomar la más reciente
       const sortedHistory = [...panelItem.history].sort((a, b) => b.version - a.version)
       const latestEntry = sortedHistory[0]
 
-      if (latestEntry.version > 1) {
+      if (latestEntry && latestEntry.version > 1) {
         return {
           user: latestEntry.user,
           date: latestEntry.created_at,
@@ -289,9 +279,6 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
     }
     return null
   }
-
-  const creationInfo = getCreationInfo(panels[0])
-  const latestUpdate = getLatestUpdate(panels[0])
 
   return (
     <div className="space-y-4">
@@ -341,11 +328,15 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
         <div className="space-y-3">
           {panels.map((panel) => {
             const isExpanded = expandedPanels.has(panel.id)
+            const creationInfo = getCreationInfo(panel)
+            const latestUpdate = getLatestUpdate(panel)
 
             return (
               <div
                 key={panel.id}
-                className={`border rounded-lg bg-white shadow-sm transition-all duration-300 $ ${isExpanded ? "ring-2 ring-blue-200" : ""}`}
+                className={`border rounded-lg bg-white shadow-sm transition-all duration-300 ${
+                  isExpanded ? "ring-2 ring-blue-200" : ""
+                }`}
               >
                 {/* Header del Panel */}
                 <div
@@ -397,7 +388,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
                               </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="text-lg">
+                              <p className="text-sm">
                                 <strong>Creado por:</strong> {getUserDisplayName(creationInfo.user)}
                                 <br />
                                 <strong>Fecha:</strong> {formatDate(creationInfo.date)}
@@ -405,32 +396,26 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <div>
-                          <Tooltip>
-                            {latestUpdate ? (
+                        {latestUpdate && (
+                          <div>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="cursor-help">
-                                  <UserAvatar user={latestUpdate?.user} size="md" />
+                                  <UserAvatar user={latestUpdate.user} size="md" />
                                 </div>
                               </TooltipTrigger>
-                            ): null}
-                            <TooltipContent>
-                              <p className="text-sm">
-                                {latestUpdate ? (
-                                  <>
-                                    <strong>Modificado por:</strong> {getUserDisplayName(latestUpdate.user)}
-                                    <br />
-                                    <strong>Fecha:</strong> {formatDate(latestUpdate.date)}
-                                    <br />
-                                    <strong>Versión:</strong> {latestUpdate.version}
-                                  </>
-                                ) : (
-                                  <span>Sin modificaciones</span>
-                                )}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                              <TooltipContent>
+                                <p className="text-sm">
+                                  <strong>Modificado por:</strong> {getUserDisplayName(latestUpdate.user)}
+                                  <br />
+                                  <strong>Fecha:</strong> {formatDate(latestUpdate.date)}
+                                  <br />
+                                  <strong>Versión:</strong> {latestUpdate.version}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
                       </TooltipProvider>
 
                       {/* Botones de acción */}
@@ -471,64 +456,81 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
                 {isExpanded && (
                   <div className="border-t bg-gray-50">
                     {/* Información de auditoría del panel */}
-                    {latestUpdate ? (
-                    <div className="flex items-start space-x-3">
-                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">Última modificación</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <UserAvatar user={latestUpdate.user} />
-                          <div>
-                            <p className="text-sm text-gray-600">{getUserDisplayName(latestUpdate.user)}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatDate(latestUpdate.date)} • Versión {latestUpdate.version}
-                            </p>
+                    <div className="p-4 bg-blue-50 border-b">
+                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Información de Auditoría</h5>
+                      <div className="space-y-4">
+                        {/* Información de creación */}
+                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Clock className="h-4 w-4 text-blue-600" />
+                            <h6 className="text-xs font-semibold text-blue-800">Creación</h6>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <UserAvatar user={creationInfo.user} size="md" />
+                            <div>
+                              <p className="text-sm font-medium">Usuario: {getUserDisplayName(creationInfo.user)}</p>
+                              <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                                <Clock className="h-3 w-3" />
+                                {formatDate(creationInfo.date)}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start space-x-3">
-                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">Actualizaciones</p>
-                        <p className="text-sm text-gray-500 mt-1">Sin actualizaciones</p>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Historial completo si hay múltiples versiones */}
-                  {panel.history && panel.history.length >= 2 && (
-                    <div className="flex items-start space-x-3">
-                      <History className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">
-                          Historial completo ({panel.history.length} versiones)
-                        </p>
-                        <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
-                          {panel.history
-                            .sort((a, b) => b.version - a.version)
-                            .slice(0, 5) // Mostrar solo las últimas 5 versiones
-                            .map((entry) => (
-                              <div key={entry.version} className="flex items-center space-x-2 text-xs">
-                                <UserAvatar user={entry.user} size="sm" />
-                                <div className="flex-1">
-                                  <span className="text-gray-600">
-                                    {getUserDisplayName(entry.user)} • v{entry.version}
-                                  </span>
-                                  <span className="text-gray-500 ml-2">{formatDate(entry.created_at)}</span>
-                                </div>
+                        {/* Información de última modificación */}
+                        {latestUpdate && (
+                          <div className="bg-white p-3 rounded-md border border-green-200">
+                            <div className="flex items-center gap-3 mb-2">
+                              <History className="h-4 w-4 text-green-600" />
+                              <h6 className="text-xs font-semibold text-green-800">Última Modificación</h6>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <UserAvatar user={latestUpdate.user} size="md" />
+                              <div>
+                                <p className="text-sm font-medium">Usuario: {getUserDisplayName(latestUpdate.user)}</p>
+                                <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatDate(latestUpdate.date)} • Versión {latestUpdate.version}
+                                </p>
                               </div>
-                            ))}
-                          {panel.history.length > 5 && (
-                            <p className="text-xs text-gray-500 italic">
-                              ... y {panel.history.length - 5} versiones más
-                            </p>
-                          )}
-                        </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Historial completo si hay múltiples versiones */}
+                        {panel.history && Array.isArray(panel.history) && panel.history.length > 2 && (
+                          <div className="bg-white p-3 rounded-md border border-gray-200">
+                            <div className="flex items-center gap-3 mb-2">
+                              <History className="h-4 w-4 text-gray-600" />
+                              <h6 className="text-xs font-semibold text-gray-800">
+                                Historial completo ({panel.history.length} versiones)
+                              </h6>
+                            </div>
+                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                              {panel.history
+                                .sort((a, b) => b.version - a.version)
+                                .slice(0, 5) // Mostrar solo las últimas 5 versiones
+                                .map((entry) => (
+                                  <div key={entry.version} className="flex items-center space-x-2 text-xs">
+                                    <UserAvatar user={entry.user} size="sm" />
+                                    <div className="flex-1">
+                                      <span className="text-gray-600">
+                                        {getUserDisplayName(entry.user)} • v{entry.version}
+                                      </span>
+                                      <span className="text-gray-500 ml-2">{formatDate(entry.created_at)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              {panel.history.length > 5 && (
+                                <p className="text-xs text-gray-500 italic">
+                                  ... y {panel.history.length - 5} versiones más
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
 
                     {/* Lista de análisis */}
                     <AnalysisList

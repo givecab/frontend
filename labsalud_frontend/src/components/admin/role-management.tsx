@@ -69,7 +69,7 @@ export function RoleManagement({
     if (loadingPerms || !hasMorePerms) return
     setLoadingPerms(true)
     try {
-      const res = await apiRequest(`api/permissions/?limit=20&offset=${offset}`)
+      const res = await apiRequest(`api/users/permissions/?limit=20&offset=${offset}`)
       if (!res.ok) {
         setHasMorePerms(false)
         return
@@ -179,7 +179,7 @@ export function RoleManagement({
     }
     const id = toast.loading("Actualizando rol...")
     try {
-      const res = await apiRequest(`api/roles/${selectedRole.id}/`, {
+      const res = await apiRequest(`api/users/roles/${selectedRole.id}/`, {
         method: "PUT",
         body: { name: formData.name.trim(), permissions: formData.permissions },
       })
@@ -203,7 +203,7 @@ export function RoleManagement({
     if (!selectedRole?.id) return
     const id = toast.loading("Eliminando rol...")
     try {
-      const res = await apiRequest(`api/roles/${selectedRole.id}/`, { method: "DELETE" })
+      const res = await apiRequest(`api/users/roles/${selectedRole.id}/`, { method: "DELETE" })
       toast.dismiss(id)
       if (!res.ok) {
         toast.error("Error al eliminar rol")

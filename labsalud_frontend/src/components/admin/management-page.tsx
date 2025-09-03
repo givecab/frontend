@@ -54,7 +54,7 @@ export default function ManagementPage() {
         hasPermission("22") ||
         hasPermission("23")
       ) {
-        const usersResponse = await apiRequest("api/users/active/?is_staff=false")
+        const usersResponse = await apiRequest("api/users/users/active/?is_staff=false")
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
           if (usersData && Array.isArray(usersData.results)) {
@@ -73,7 +73,7 @@ export default function ManagementPage() {
         hasPermission("10") ||
         hasPermission("11")
       ) {
-        const rolesResponse = await apiRequest("api/roles/?limit=20&offset=0&search=")
+        const rolesResponse = await apiRequest("api/users/roles/?limit=20&offset=0&search=")
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json()
           if (rolesData && Array.isArray(rolesData.results)) {
@@ -89,7 +89,7 @@ export default function ManagementPage() {
       // Cargar permisos - permiso: 8 (paginado)
       if (hasPermission("8")) {
         const permissionsResponse = await apiRequest(
-          "api/permissions/?limit=20&offset=0&search="
+          "api/users/permissions/?limit=20&offset=0&search="
         )
         if (permissionsResponse.ok) {
           const permissionsData = await permissionsResponse.json()

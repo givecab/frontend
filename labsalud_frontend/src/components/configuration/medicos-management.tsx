@@ -35,10 +35,10 @@ interface Medico {
 interface HistoryEntry {
   version: number
   user: {
-  id: number
-  username: string
-  photo: string
-} | null
+    id: number
+    username: string
+    photo: string
+  } | null
   created_at: string
 }
 
@@ -298,7 +298,7 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
               {medicos.map((medico) => {
                 const creationInfo = getCreationInfo(medico)
                 const latestUpdate = getLatestUpdate(medico)
-                
+
                 return (
                   <tr
                     key={medico.id}
@@ -319,7 +319,7 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
                               </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="text-lg">
+                              <p className="text-md">
                                 <strong>Creado por:</strong> {getUserDisplayName(creationInfo.user)}
                                 <br />
                                 <strong>Fecha:</strong> {formatDate(creationInfo.date)}
@@ -339,7 +339,7 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
                                   <UserAvatar user={latestUpdate?.user} size="md" />
                                 </div>
                               </TooltipTrigger>
-                            ): null}
+                            ) : null}
                             <TooltipContent>
                               <p className="text-sm">
                                 {latestUpdate ? (

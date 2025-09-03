@@ -65,7 +65,7 @@ export default function IngresoPage() {
       const baseUrl = import.meta.env.VITE_API_BASE_URL
 
       const [medicosResponse, oossResponse] = await Promise.all([
-        apiRequest(`${baseUrl}/api/analysis/medicos/active/?limit=20&offset=0`),
+        apiRequest(`${baseUrl}/api/analysis/medicos/?limit=20&offset=0`),
         apiRequest(`${baseUrl}/api/analysis/ooss/?limit=20&offset=0&is_active=true`),
       ])
 
