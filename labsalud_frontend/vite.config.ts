@@ -3,12 +3,16 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  server: {
+    port: 80,
+    host: "0.0.0.0", // escucha en todas las interfaces IPv4
+    allowedHosts: ['labsalud.com.ar', 'www.labsalud.com.ar'],
   },
 })
