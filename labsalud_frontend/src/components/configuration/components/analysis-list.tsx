@@ -28,27 +28,7 @@ import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
 import { CreateAnalysisDialog } from "./create-analysis-dialog"
 import { EditAnalysisDialog } from "./edit-analysis-dialog"
 import { DeleteAnalysisDialog } from "./delete-analysis-dialog"
-
-interface AnalysisItem {
-  id: number
-  name: string
-  code: string
-  measure_unit: string
-  formula?: string
-  panel: number
-  created_by: {
-    id: number
-    username: string
-    photo?: string
-  } | null
-  updated_by: Array<{
-    id: number
-    username: string
-    photo?: string
-  }> | null
-  created_at: string | null
-  updated_at: string | null
-}
+import type { AnalysisItem } from "../configuration-page" // <--- Usa la interfaz compartida
 
 interface Panel {
   id: number
@@ -66,32 +46,6 @@ interface AnalysisListProps {
 }
 
 const PAGE_LIMIT = 10
-
-const formatDate = (dateString: string | null): string => {
-  if (!dateString) return "Fecha no disponible"
-
-  try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return "Fecha inválida"
-
-    const now = new Date()
-    const diffInMs = now.getTime() - date.getTime()
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
-    const diffInDays = Math.floor(diffInHours / 24)
-
-    if (diffInHours < 1) return "hace menos de 1 hora"
-    if (diffInHours < 24) return `hace ${diffInHours} hora${diffInHours > 1 ? "s" : ""}`
-    if (diffInDays < 7) return `hace ${diffInDays} día${diffInDays > 1 ? "s" : ""}`
-
-    return date.toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-  } catch {
-    return "Fecha inválida"
-  }
-}
 
 const formatFullDate = (dateString: string | null): string => {
   if (!dateString) return "Fecha no disponible"

@@ -86,8 +86,8 @@ export interface AnalysisItem {
   name: string
   measure_unit: string
   formula?: string
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 export default function ConfigurationPage(medico: Medico) {

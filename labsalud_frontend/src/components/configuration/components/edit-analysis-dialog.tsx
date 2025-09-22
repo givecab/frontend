@@ -24,7 +24,7 @@ interface EditAnalysisDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: (updatedAnalysis: AnalysisItem) => void
-  analysis: AnalysisItem | null
+  analysis: AnalysisItem 
   panelId?: number
 }
 
