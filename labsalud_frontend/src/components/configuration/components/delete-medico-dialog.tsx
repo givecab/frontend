@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface Medico {
   id: number
@@ -36,7 +37,7 @@ export function DeleteMedicoDialog({ isOpen, onOpenChange, medico, onSuccess }: 
   const handleDelete = async () => {
     try {
       setLoading(true)
-      const response = await apiRequest(`/api/analysis/medicos/${medico.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.MEDICO_DETAIL(medico.id), {
         method: "DELETE",
       })
 

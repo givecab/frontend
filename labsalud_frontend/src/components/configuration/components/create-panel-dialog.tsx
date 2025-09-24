@@ -20,6 +20,7 @@ import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import type { AnalysisPanel } from "../configuration-page"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface CreatePanelDialogProps {
   open: boolean
@@ -71,7 +72,7 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
         is_urgent: isUrgent,
         is_active: true, // Siempre activo al crear
       }
-      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/api/analysis/panels/", {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.PANELS, {
         method: "POST",
         body: panelData,
       })

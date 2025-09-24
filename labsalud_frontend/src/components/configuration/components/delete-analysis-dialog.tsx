@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Loader2, AlertTriangle, TestTube2 } from "lucide-react"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface AnalysisItem {
   id: number
@@ -44,8 +45,7 @@ export const DeleteAnalysisDialog: React.FC<DeleteAnalysisDialogProps> = ({
   const handleDelete = async () => {
     setIsDeleting(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/analyses/${analysis.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSIS_DETAIL(analysis.id), {
         method: "DELETE",
       })
 

@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface CreateObraSocialDialogProps {
   open: boolean
@@ -75,7 +76,7 @@ export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: Create
 
     try {
       setLoading(true)
-      const response = await apiRequest("/api/analysis/ooss/", {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS, {
         method: "POST",
         body: formData,
       })

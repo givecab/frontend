@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/hooks/use-api"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Search, AlertCircle, ShieldCheckIcon, Plus } from "lucide-react"
@@ -48,9 +49,7 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
 
   const buildUrl = useCallback(
     (offset = 0, search = debouncedSearchTerm) => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const endpoint = import.meta.env.VITE_OBRAS_SOCIALES_ACTIVE_ENDPOINT
-      let url = `${baseUrl}${endpoint}?limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) {
         url += `&search=${encodeURIComponent(search)}`
       }
@@ -158,19 +157,16 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
     )
 
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const endpoint = "/api/analysis/ooss/"
-
       let response: Response
       if (newStatus) {
         // Activar: PATCH con is_active: true
-        response = await apiRequest(`${baseUrl}${endpoint}${obraSocialToToggle.id}/`, {
+        response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS_DETAIL(obraSocialToToggle.id), {
           method: "PATCH",
           body: { is_active: true },
         })
       } else {
         // Desactivar: DELETE sin body
-        response = await apiRequest(`${baseUrl}${endpoint}${obraSocialToToggle.id}/`, {
+        response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS_DETAIL(obraSocialToToggle.id), {
           method: "DELETE",
         })
       }

@@ -20,6 +20,7 @@ import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import type { AnalysisPanel } from "../configuration-page"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface EditPanelDialogProps {
   open: boolean
@@ -76,7 +77,7 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
         return
       }
 
-      const response = await apiRequest(import.meta.env.VITE_API_BASE_URL + "/api/analysis/panels/" + `${panel.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.PANEL_DETAIL(panel.id), {
         method: "PATCH",
         body: panelUpdateData,
       })

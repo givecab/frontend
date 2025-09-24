@@ -19,12 +19,13 @@ import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import type { AnalysisItem } from "../configuration-page"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface EditAnalysisDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: (updatedAnalysis: AnalysisItem) => void
-  analysis: AnalysisItem 
+  analysis: AnalysisItem
   panelId?: number
 }
 
@@ -81,7 +82,7 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
         return
       }
 
-      const response = await apiRequest(`${import.meta.env.VITE_API_BASE_URL}/api/analysis/analyses/${analysis.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSIS_DETAIL(analysis.id), {
         method: "PATCH",
         body: analysisUpdateData,
       })

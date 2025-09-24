@@ -29,6 +29,7 @@ import { CreateAnalysisDialog } from "./create-analysis-dialog"
 import { EditAnalysisDialog } from "./edit-analysis-dialog"
 import { DeleteAnalysisDialog } from "./delete-analysis-dialog"
 import type { AnalysisItem } from "../configuration-page" // <--- Usa la interfaz compartida
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface Panel {
   id: number
@@ -198,8 +199,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
 
   const buildAnalysesUrl = useCallback(
     (offset = 0, search = "") => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      let url = `${baseUrl}/api/analysis/panels/${panel.id}/analyses/?limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${ANALYSIS_ENDPOINTS.PANEL_ANALYSES(panel.id)}?limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) url += `&search=${encodeURIComponent(search)}`
       return url
     },

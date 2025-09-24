@@ -66,7 +66,7 @@ export const ANALYSIS_ENDPOINTS = {
   // Insurance (OOSS)
   OOSS: buildApiUrl("/analysis/ooss/"),
   OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
-  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/active/"),
+  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?active=true"),
 
   // Protocols
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),

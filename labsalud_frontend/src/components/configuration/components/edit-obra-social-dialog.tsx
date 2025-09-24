@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface User {
   id: number
@@ -115,7 +116,7 @@ export function EditObraSocialDialog({ open, onOpenChange, obraSocial, onSuccess
 
     try {
       setLoading(true)
-      const response = await apiRequest(`/api/analysis/ooss/${obraSocial.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS_DETAIL(obraSocial.id), {
         method: "PATCH",
         body: changes,
       })

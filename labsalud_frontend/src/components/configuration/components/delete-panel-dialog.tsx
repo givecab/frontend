@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, AlertTriangle, TestTube } from "lucide-react"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface Panel {
   id: number
@@ -41,8 +42,7 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
   const handleDelete = async () => {
     setIsDeleting(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/panels/${panel.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.PANEL_DETAIL(panel.id), {
         method: "DELETE",
       })
 

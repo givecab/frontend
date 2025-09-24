@@ -9,6 +9,7 @@ import { Search, Plus, Eye, Pencil, Trash, Settings } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 import { toast } from "sonner"
 import { CreateMedicoDialog } from "./components/create-medico-dialog"
 import { EditMedicoDialog } from "./components/edit-medico-dialog"
@@ -106,7 +107,7 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
       search: searchTerm,
       is_active: "true",
     })
-    return `/api/analysis/medicos/?${params.toString()}`
+    return `${ANALYSIS_ENDPOINTS.MEDICOS}?${params.toString()}`
   }, [])
 
   const fetchMedicos = useCallback(

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface Medico {
   id: number
@@ -51,7 +52,7 @@ export const EditMedicoDialog: React.FC<EditMedicoDialogProps> = ({ isOpen, medi
     setIsLoading(true)
 
     try {
-      const response = await apiRequest(`/api/analysis/medicos/${medico.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.MEDICO_DETAIL(medico.id), {
         method: "PUT",
         body: formData,
       })

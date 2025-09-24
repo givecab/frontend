@@ -20,6 +20,7 @@ import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import type { AnalysisItem } from "../configuration-page"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface CreateAnalysisDialogProps {
   open: boolean
@@ -77,7 +78,7 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
         formula: formula || null,
         is_active: true, // Siempre activo al crear
       }
-      const response = await apiRequest(`${import.meta.env.VITE_API_BASE_URL}/api/analysis/analyses/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSES, {
         method: "POST",
         body: analysisData,
       })

@@ -6,6 +6,7 @@ import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
 import { useDebounce } from "@/hooks/use-debounce"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -103,8 +104,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
 
   const buildPanelsUrl = useCallback(
     (offset = 0, search = debouncedSearchTerm) => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      let url = `${baseUrl}/api/analysis/panels/?limit=${PAGE_LIMIT}&offset=${offset}&is_active=true`
+      let url = `${ANALYSIS_ENDPOINTS.PANELS}?limit=${PAGE_LIMIT}&offset=${offset}&is_active=true`
       if (search) url += `&search=${encodeURIComponent(search)}`
       return url
     },
