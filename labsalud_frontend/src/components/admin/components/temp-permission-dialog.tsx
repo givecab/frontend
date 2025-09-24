@@ -1,15 +1,11 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import type { User, Permission } from "@/types"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
+import { USER_ENDPOINTS } from "@/config/api"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -26,13 +22,7 @@ interface TempPermissionDialogProps {
   permissions?: Permission[]
 }
 
-export function TempPermissionDialog({
-  open,
-  onOpenChange,
-  user,
-  setUsers,
-  apiRequest,
-}: TempPermissionDialogProps) {
+export function TempPermissionDialog({ open, onOpenChange, user, setUsers, apiRequest }: TempPermissionDialogProps) {
   const { success, error: showError } = useToast()
 
   const [missingPerms, setMissingPerms] = useState<Permission[]>([])
@@ -51,10 +41,7 @@ export function TempPermissionDialog({
       setLoadingPerms(true)
       try {
         if (!user) return
-        const res = await apiRequest(
-          `/api/users/${user.id}/missing-permissions/`,
-          { method: "GET" }
-        )
+        const res = await apiRequest(USER_ENDPOINTS.USER_MISSING_PERMISSIONS(user.id), { method: "GET" })
         if (!cancelled && res.ok) {
           const data: Permission[] = await res.json()
           setMissingPerms(data)
@@ -92,19 +79,16 @@ export function TempPermissionDialog({
 
     setIsSubmitting(true)
     try {
-      const res = await apiRequest(
-        `/api/users/${user.id}/assign-temp-permission/`,
-        {
-          method: "POST",
-          body: {
-            permission_id: Number(permissionId),
-            duration_minutes: duration,
-          },
-        }
-      )
+      const res = await apiRequest(USER_ENDPOINTS.USER_ASSIGN_TEMP_PERMISSION(user.id), {
+        method: "POST",
+        body: {
+          permission_id: Number(permissionId),
+          duration_minutes: duration,
+        },
+      })
       if (res.ok) {
         const updatedUser = await res.json()
-        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u))
+        setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
         success("Permiso temporal asignado")
         onOpenChange(false)
       } else {
@@ -128,22 +112,17 @@ export function TempPermissionDialog({
           {loadingPerms ? (
             <p className="text-center">Cargando permisos…</p>
           ) : missingPerms.length === 0 ? (
-            <p className="text-center text-gray-500">
-              El usuario ya tiene todos los permisos disponibles.
-            </p>
+            <p className="text-center text-gray-500">El usuario ya tiene todos los permisos disponibles.</p>
           ) : (
             <>
               <div>
                 <Label>Permiso</Label>
-                <Select
-                  value={permissionId}
-                  onValueChange={setPermissionId}
-                >
+                <Select value={permissionId} onValueChange={setPermissionId}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecciona un permiso" />
                   </SelectTrigger>
                   <SelectContent>
-                    {missingPerms.map(perm => (
+                    {missingPerms.map((perm) => (
                       <SelectItem key={perm.id} value={perm.id.toString()}>
                         {perm.name}
                       </SelectItem>
@@ -153,12 +132,7 @@ export function TempPermissionDialog({
               </div>
               <div>
                 <Label>Duración (minutos)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={duration}
-                  onChange={e => setDuration(Number(e.target.value))}
-                />
+                <Input type="number" min={1} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
               </div>
             </>
           )}
@@ -169,10 +143,7 @@ export function TempPermissionDialog({
               Cancelar
             </Button>
           </DialogClose>
-          <Button
-            onClick={handleAssign}
-            disabled={isSubmitting || missingPerms.length === 0}
-          >
+          <Button onClick={handleAssign} disabled={isSubmitting || missingPerms.length === 0}>
             {isSubmitting ? "Asignando…" : "Asignar"}
           </Button>
         </DialogFooter>

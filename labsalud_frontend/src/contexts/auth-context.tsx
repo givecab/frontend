@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { useToast } from "@/hooks/use-toast"
 import { IdleWarningModal } from "@/components/idle-warning-modal"
 import useIdleTimeout from "@/hooks/use-idle-timeout"
+import { AUTH_ENDPOINTS } from "@/config/api"
 
 interface Permission {
   id: number
@@ -108,16 +109,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!refreshTokenValue) return false
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_AUTH_REFRESH_ENDPOINT}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ refresh: refreshTokenValue }),
+      const response = await fetch(AUTH_ENDPOINTS.TOKEN_REFRESH, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      )
+        body: JSON.stringify({ refresh: refreshTokenValue }),
+      })
 
       if (!response.ok) throw new Error()
 
@@ -135,8 +133,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async (username: string, password: string): Promise<boolean> => {
       setIsLoading(true)
       try {
-        const loginUrl = `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_AUTH_LOGIN_ENDPOINT}`
-        const response = await fetch(loginUrl, {
+        const response = await fetch(AUTH_ENDPOINTS.TOKEN, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

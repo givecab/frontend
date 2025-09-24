@@ -2,6 +2,7 @@
 
 import { useCallback } from "react"
 import { useLoading } from "@/hooks/use-loading"
+import { API_CONFIG, AUTH_ENDPOINTS } from "@/config/api"
 
 // JSDoc documentation for ApiRequestOptions and useApi hook
 /**
@@ -31,16 +32,13 @@ export const useApi = () => {
     if (!refreshTokenValue) return false
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_AUTH_REFRESH_ENDPOINT}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ refresh: refreshTokenValue }),
+      const response = await fetch(AUTH_ENDPOINTS.TOKEN_REFRESH, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      )
+        body: JSON.stringify({ refresh: refreshTokenValue }),
+      })
 
       if (!response.ok) return false
 
@@ -101,7 +99,7 @@ export const useApi = () => {
         method = "GET",
         body,
         headers = {},
-        timeout = Number(import.meta.env.VITE_API_TIMEOUT) || 30000, // Default 30 seconds
+        timeout = API_CONFIG.TIMEOUT,
       } = apiOptions
 
       const makeRequest = async (): Promise<Response> => {
@@ -127,8 +125,7 @@ export const useApi = () => {
         if (url.startsWith("http://") || url.startsWith("https://")) {
           finalUrl = url
         } else {
-          // Asegurar que la base URL termine con / y el endpoint no empiece con /
-          const baseUrl = import.meta.env.VITE_API_BASE_URL
+          const baseUrl = API_CONFIG.BASE_URL
           const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`
           const cleanUrl = url.startsWith("/") ? url.slice(1) : url
           finalUrl = `${cleanBaseUrl}${cleanUrl}`

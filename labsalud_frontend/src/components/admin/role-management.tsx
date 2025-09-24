@@ -1,9 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import type { UIEvent } from "react"
 import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
+import { USER_ENDPOINTS } from "@/config/api"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -14,14 +17,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table"
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -42,21 +38,15 @@ interface RoleManagementProps {
   refreshData: () => Promise<void>
 }
 
-export function RoleManagement({
-  roles,
-  setRoles,
-  refreshData,
-}: RoleManagementProps) {
+export function RoleManagement({ roles, setRoles, refreshData }: RoleManagementProps) {
   const { hasPermission } = useAuth()
   const { apiRequest } = useApi()
 
   // Permisos de UI
-  const canView = hasPermission("12")   // view_group
-  const canCreate = hasPermission("9")  // add_group
-  const canEdit = hasPermission("10")   // change_group
+  const canView = hasPermission("12") // view_group
+  const canCreate = hasPermission("9") // add_group
+  const canEdit = hasPermission("10") // change_group
   const canDelete = hasPermission("11") // delete_group
-
-  if (!canView) return null
 
   // Permisos paginados (scroll infinito)
   const [allPerms, setAllPerms] = useState<Permission[]>([])
@@ -69,15 +59,15 @@ export function RoleManagement({
     if (loadingPerms || !hasMorePerms) return
     setLoadingPerms(true)
     try {
-      const res = await apiRequest(`api/users/permissions/?limit=20&offset=${offset}`)
+      const res = await apiRequest(`${USER_ENDPOINTS.PERMISSIONS}?limit=20&offset=${offset}`)
       if (!res.ok) {
         setHasMorePerms(false)
         return
       }
       const data = await res.json()
       const batch: Permission[] = data.results || []
-      setAllPerms(prev => [...prev, ...batch])
-      setOffset(prev => prev + batch.length)
+      setAllPerms((prev) => [...prev, ...batch])
+      setOffset((prev) => prev + batch.length)
       if (!data.next || batch.length < 20) {
         setHasMorePerms(false)
       }
@@ -99,7 +89,7 @@ export function RoleManagement({
     }
   }
 
-  const validRoles = roles.filter(r => r.id)
+  const validRoles = roles.filter((r) => r.id)
 
   // Estado de diálogo y formulario
   const [selectedRole, setSelectedRole] = useState<RoleWithDetails | null>(null)
@@ -120,25 +110,23 @@ export function RoleManagement({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handlePermissionToggle = (permId: number, checked: boolean) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      permissions: checked
-        ? [...prev.permissions, permId]
-        : prev.permissions.filter(id => id !== permId),
+      permissions: checked ? [...prev.permissions, permId] : prev.permissions.filter((id) => id !== permId),
     }))
   }
 
   const handleSelectRole = (role: RoleWithDetails) => {
     setSelectedRole(role)
     const existing: number[] = Array.isArray(role.permission_details)
-      ? role.permission_details.map(p => p.id)
+      ? role.permission_details.map((p) => p.id)
       : Array.isArray(role.permissions)
-      ? role.permissions
-      : []
+        ? role.permissions
+        : []
     setFormData({ name: role.name, permissions: existing })
   }
 
@@ -149,7 +137,7 @@ export function RoleManagement({
     }
     const id = toast.loading("Creando rol...")
     try {
-      const res = await apiRequest("api/roles/", {
+      const res = await apiRequest(USER_ENDPOINTS.ROLES, {
         method: "POST",
         body: { name: formData.name.trim(), permissions: formData.permissions },
       })
@@ -160,7 +148,7 @@ export function RoleManagement({
         return
       }
       const newRole = await res.json()
-      setRoles(prev => [...prev, newRole])
+      setRoles((prev) => [...prev, newRole])
       await refreshData()
       toast.success("Rol creado")
       setIsCreating(false)
@@ -179,7 +167,7 @@ export function RoleManagement({
     }
     const id = toast.loading("Actualizando rol...")
     try {
-      const res = await apiRequest(`api/users/roles/${selectedRole.id}/`, {
+      const res = await apiRequest(USER_ENDPOINTS.ROLE_DETAIL(selectedRole.id), {
         method: "PUT",
         body: { name: formData.name.trim(), permissions: formData.permissions },
       })
@@ -203,13 +191,13 @@ export function RoleManagement({
     if (!selectedRole?.id) return
     const id = toast.loading("Eliminando rol...")
     try {
-      const res = await apiRequest(`api/users/roles/${selectedRole.id}/`, { method: "DELETE" })
+      const res = await apiRequest(USER_ENDPOINTS.ROLE_DETAIL(selectedRole.id), { method: "DELETE" })
       toast.dismiss(id)
       if (!res.ok) {
         toast.error("Error al eliminar rol")
         return
       }
-      setRoles(prev => prev.filter(r => r.id !== selectedRole.id))
+      setRoles((prev) => prev.filter((r) => r.id !== selectedRole.id))
       toast.success("Rol eliminado")
       setIsDeleting(false)
       resetForm()
@@ -219,6 +207,8 @@ export function RoleManagement({
     }
   }
 
+  if (!canView) return null
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -226,7 +216,7 @@ export function RoleManagement({
         {canCreate && (
           <Dialog
             open={isCreating}
-            onOpenChange={open => {
+            onOpenChange={(open) => {
               setIsCreating(open)
               if (!open) resetForm()
             }}
@@ -252,12 +242,12 @@ export function RoleManagement({
                     onScroll={onPermsScroll}
                     className="max-h-60 overflow-y-auto border rounded-md p-3"
                   >
-                    {allPerms.map(perm => (
+                    {allPerms.map((perm) => (
                       <div key={perm.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`perm-${perm.id}`}
                           checked={formData.permissions.includes(perm.id)}
-                          onCheckedChange={ch => handlePermissionToggle(perm.id, ch === true)}
+                          onCheckedChange={(ch) => handlePermissionToggle(perm.id, ch === true)}
                         />
                         <Label htmlFor={`perm-${perm.id}`} className="cursor-pointer text-sm">
                           {perm.name}
@@ -292,13 +282,13 @@ export function RoleManagement({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {validRoles.map(role => (
+            {validRoles.map((role) => (
               <TableRow key={role.id}>
                 <TableCell className="font-medium">{role.name}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {role.permission_details && role.permission_details.length > 0 ? (
-                      role.permission_details.slice(0, 3).map(p => (
+                      role.permission_details.slice(0, 3).map((p) => (
                         <Badge key={p.id} variant="secondary" className="text-xs">
                           {p.name}
                         </Badge>
@@ -318,7 +308,7 @@ export function RoleManagement({
                     {/* Ver */}
                     <Dialog
                       open={isViewing && selectedRole?.id === role.id}
-                      onOpenChange={open => {
+                      onOpenChange={(open) => {
                         setIsViewing(open)
                         if (!open) resetForm()
                       }}
@@ -349,7 +339,7 @@ export function RoleManagement({
                               <Label>Permisos</Label>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {selectedRole.permission_details && selectedRole.permission_details.length > 0 ? (
-                                  selectedRole.permission_details.map(p => (
+                                  selectedRole.permission_details.map((p) => (
                                     <Badge key={p.id} variant="secondary" className="text-xs">
                                       {p.name}
                                     </Badge>
@@ -373,7 +363,7 @@ export function RoleManagement({
                     {canEdit && (
                       <Dialog
                         open={isEditing && selectedRole?.id === role.id}
-                        onOpenChange={open => {
+                        onOpenChange={(open) => {
                           setIsEditing(open)
                           if (!open) resetForm()
                         }}
@@ -406,12 +396,12 @@ export function RoleManagement({
                                   onScroll={onPermsScroll}
                                   className="max-h-60 overflow-y-auto border rounded-md p-3"
                                 >
-                                  {allPerms.map(perm => (
+                                  {allPerms.map((perm) => (
                                     <div key={perm.id} className="flex items-center space-x-2">
                                       <Checkbox
                                         id={`perm-${perm.id}`}
                                         checked={formData.permissions.includes(perm.id)}
-                                        onCheckedChange={ch => handlePermissionToggle(perm.id, ch === true)}
+                                        onCheckedChange={(ch) => handlePermissionToggle(perm.id, ch === true)}
                                       />
                                       <Label htmlFor={`perm-${perm.id}`} className="cursor-pointer text-sm">
                                         {perm.name}
@@ -437,7 +427,7 @@ export function RoleManagement({
                     {canDelete && (
                       <Dialog
                         open={isDeleting && selectedRole?.id === role.id}
-                        onOpenChange={open => {
+                        onOpenChange={(open) => {
                           setIsDeleting(open)
                           if (!open) resetForm()
                         }}
@@ -446,7 +436,7 @@ export function RoleManagement({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-red-200 hover:bg-red-50"
+                            className="border-red-200 hover:bg-red-50 bg-transparent"
                             onClick={() => {
                               handleSelectRole(role)
                               setIsDeleting(true)
@@ -462,8 +452,7 @@ export function RoleManagement({
                             </DialogHeader>
                             <div className="py-4">
                               <p>
-                                ¿Estás seguro que deseas eliminar el rol{" "}
-                                <strong>{selectedRole.name}</strong>?
+                                ¿Estás seguro que deseas eliminar el rol <strong>{selectedRole.name}</strong>?
                               </p>
                             </div>
                             <DialogFooter>

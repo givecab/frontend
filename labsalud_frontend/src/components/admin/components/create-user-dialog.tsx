@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
+import { USER_ENDPOINTS } from "@/config/api"
 
 interface CreateUserDialogProps {
   open: boolean
@@ -97,7 +98,7 @@ export function CreateUserDialog({
     setIsSubmitting(true)
 
     try {
-      const response = await apiRequest(`${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}`, {
+      const response = await apiRequest(USER_ENDPOINTS.USERS, {
         method: "POST",
         body: userData,
       })

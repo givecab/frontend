@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useApi } from "@/hooks/use-api"
+import { USER_ENDPOINTS } from "@/config/api"
 import type { Permission } from "@/types"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
@@ -29,13 +30,13 @@ export function PermissionManagement({ permission }: PermissionManagementProps) 
     setLoading(true)
     try {
       const res = await apiRequest(
-        `api/users/permissions/?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`
+        `${USER_ENDPOINTS.PERMISSIONS}?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`,
       )
       if (res.ok) {
         const data = await res.json()
         const batch: Permission[] = data.results || []
-        setPermissions((prev) => reset ? batch : [...prev, ...batch])
-        setOffset((prev) => reset ? batch.length : prev + batch.length)
+        setPermissions((prev) => (reset ? batch : [...prev, ...batch]))
+        setOffset((prev) => (reset ? batch.length : prev + batch.length))
         setHasMore(!!data.next && batch.length === 20)
       } else {
         setHasMore(false)
@@ -105,7 +106,9 @@ export function PermissionManagement({ permission }: PermissionManagementProps) 
             ))}
             {(loading || searching) && (
               <TableRow>
-                <TableCell colSpan={3} className="text-center">Cargando permisos...</TableCell>
+                <TableCell colSpan={3} className="text-center">
+                  Cargando permisos...
+                </TableCell>
               </TableRow>
             )}
             {!hasMore && permissions.length === 0 && !loading && (

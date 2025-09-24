@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
+import { USER_ENDPOINTS } from "@/config/api"
 
 interface RoleAssignDialogProps {
   open: boolean
@@ -89,15 +90,12 @@ export function RoleAssignDialog({
     setIsSubmitting(true)
 
     try {
-      const response = await apiRequest(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}${user.id}/assign-role/`,
-        {
-          method: "PUT",
-          body: {
-            role_id: Number.parseInt(roleData.role_id),
-          },
+      const response = await apiRequest(USER_ENDPOINTS.USER_ASSIGN_ROLE(user.id), {
+        method: "PUT",
+        body: {
+          role_id: Number.parseInt(roleData.role_id),
         },
-      )
+      })
 
       if (response.ok) {
         const updatedUser = await response.json()

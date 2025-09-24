@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
+import { USER_ENDPOINTS } from "@/config/api"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
@@ -22,9 +23,7 @@ export default function ManagementPage() {
   // Verificar si el usuario tiene solo permiso de vista y ningún otro de gestión
   const hasOnlyViewPermission =
     hasPermission("24") &&
-    !["21", "22", "23", "9", "10", "11", "34", "35", "36"].some((permId) =>
-      hasPermission(permId),
-    )
+    !["21", "22", "23", "9", "10", "11", "34", "35", "36"].some((permId) => hasPermission(permId))
 
   const canAccessManagement =
     !hasOnlyViewPermission &&
@@ -32,13 +31,13 @@ export default function ManagementPage() {
       hasPermission("21") || // add_customuser
       hasPermission("22") || // change_customuser
       hasPermission("23") || // delete_customuser
-      hasPermission("9")  || // add_group
+      hasPermission("9") || // add_group
       hasPermission("10") || // change_group
       hasPermission("11") || // delete_group
       hasPermission("12") || // view_group
       hasPermission("34") || // assign_role
       hasPermission("35") || // remove_role
-      hasPermission("36"))   // assign_temp_permission
+      hasPermission("36")) // assign_temp_permission
 
   const refreshData = async () => {
     setIsLoading(true)
@@ -48,13 +47,8 @@ export default function ManagementPage() {
       console.log("Cargando datos de gestión...")
 
       // Cargar usuarios - permisos: 21, 22, 23, 24
-      if (
-        hasPermission("24") ||
-        hasPermission("21") ||
-        hasPermission("22") ||
-        hasPermission("23")
-      ) {
-        const usersResponse = await apiRequest("api/users/users/active/?is_staff=false")
+      if (hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) {
+        const usersResponse = await apiRequest(`${USER_ENDPOINTS.USERS}active/?is_staff=false`)
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
           if (usersData && Array.isArray(usersData.results)) {
@@ -67,13 +61,8 @@ export default function ManagementPage() {
       }
 
       // Cargar roles - permisos: 9, 10, 11, 12 (paginado)
-      if (
-        hasPermission("12") ||
-        hasPermission("9") ||
-        hasPermission("10") ||
-        hasPermission("11")
-      ) {
-        const rolesResponse = await apiRequest("api/users/roles/?limit=20&offset=0&search=")
+      if (hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) {
+        const rolesResponse = await apiRequest(`${USER_ENDPOINTS.ROLES}?limit=20&offset=0&search=`)
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json()
           if (rolesData && Array.isArray(rolesData.results)) {
@@ -88,9 +77,7 @@ export default function ManagementPage() {
 
       // Cargar permisos - permiso: 8 (paginado)
       if (hasPermission("8")) {
-        const permissionsResponse = await apiRequest(
-          "api/users/permissions/?limit=20&offset=0&search="
-        )
+        const permissionsResponse = await apiRequest(`${USER_ENDPOINTS.PERMISSIONS}?limit=20&offset=0&search=`)
         if (permissionsResponse.ok) {
           const permissionsData = await permissionsResponse.json()
           if (permissionsData && Array.isArray(permissionsData.results)) {
@@ -184,11 +171,7 @@ export default function ManagementPage() {
 
           {(hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) && (
             <TabsContent value="roles">
-              <RoleManagement
-                roles={roles}
-                setRoles={setRoles}
-                refreshData={refreshData}
-              />
+              <RoleManagement roles={roles} setRoles={setRoles} refreshData={refreshData} />
             </TabsContent>
           )}
 

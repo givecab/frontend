@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import type { User } from "@/types"
 import type { ApiRequestOptions } from "@/hooks/use-api"
+import { USER_ENDPOINTS } from "@/config/api"
 
 interface DeleteUserDialogProps {
   open: boolean
@@ -30,12 +31,9 @@ export function DeleteUserDialog({
     if (!user) return
 
     try {
-      const response = await apiRequest(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_USERS_ENDPOINT}${user.id}/`,
-        {
-          method: "DELETE",
-        },
-      )
+      const response = await apiRequest(USER_ENDPOINTS.USER_DETAIL(user.id), {
+        method: "DELETE",
+      })
 
       if (response.ok) {
         setUsers((prev) => prev.filter((u) => u.id !== user.id))
