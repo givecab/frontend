@@ -11,6 +11,7 @@ import { Plus, Search, Loader2, AlertCircle, X } from "lucide-react"
 import { PatientGrid } from "./components/patient-grid"
 import { CreatePatientDialog } from "./components/create-patient-dialog"
 import DeletePatientDialog from "./components/delete-patient-dialog"
+import { PATIENT_ENDPOINTS } from "@/config/api"
 
 // Interface para usuario como viene del endpoint
 export interface User {
@@ -82,8 +83,7 @@ export default function PatientsPage() {
 
   // Función para construir URL con parámetros
   const buildUrl = useCallback((search = "", offset = 0) => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL
-    const endpoint = import.meta.env.VITE_PATIENTS_ACTIVE_ENDPOINT
+    const baseUrl = PATIENT_ENDPOINTS.ACTIVE_PATIENTS
 
     const params = new URLSearchParams({
       limit: "20",
@@ -94,7 +94,7 @@ export default function PatientsPage() {
       params.append("search", search.trim())
     }
 
-    return `${baseUrl}${endpoint}?${params.toString()}`
+    return `${baseUrl}?${params.toString()}`
   }, [])
 
   // Función para filtrar pacientes localmente

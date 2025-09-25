@@ -24,7 +24,7 @@ import {
   User,
 } from "lucide-react"
 import { toast } from "sonner"
-// Remove the env import since we'll use import.meta.env directly
+import { PATIENT_ENDPOINTS, TOAST_DURATION } from "@/config/api"
 
 interface PatientCardProps {
   patient: Patient
@@ -211,7 +211,7 @@ export function PatientCard({
     if (!hasChanges()) {
       toast.info("Sin cambios", {
         description: "No se detectaron cambios para guardar.",
-        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
+        duration: TOAST_DURATION,
       })
       setIsEditing(false)
       return
@@ -221,7 +221,7 @@ export function PatientCard({
     if (!editData.dni.trim() || editData.dni.length < 7 || editData.dni.length > 8) {
       toast.error("Error de validación", {
         description: "El DNI debe tener entre 7 y 8 dígitos.",
-        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
+        duration: TOAST_DURATION,
       })
       return
     }
@@ -229,7 +229,7 @@ export function PatientCard({
     if (!editData.first_name.trim() || !editData.last_name.trim()) {
       toast.error("Error de validación", {
         description: "El nombre y apellido son obligatorios.",
-        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
+        duration: TOAST_DURATION,
       })
       return
     }
@@ -247,7 +247,7 @@ export function PatientCard({
         birth_date: formatDateForAPI(editData.birth_date),
       }
 
-      const response = await apiRequest(`${import.meta.env.VITE_PATIENTS_ENDPOINT}${patient.id}/`, {
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENT_DETAIL(patient.id), {
         method: "PATCH",
         body: dataToSend,
       })
@@ -259,7 +259,7 @@ export function PatientCard({
         updatePatient(updatedPatientData)
         toast.success("Paciente actualizado", {
           description: `Los datos de ${updatedPatientData.first_name} ${updatedPatientData.last_name} han sido actualizados.`,
-          duration: import.meta.env.VITE_TOAST_DURATION || 3000,
+          duration: TOAST_DURATION,
         })
         setIsEditing(false)
       } else {
@@ -268,14 +268,14 @@ export function PatientCard({
         console.error("Error - Respuesta del servidor:", errorData)
         toast.error("Error al actualizar", {
           description: errorData.detail || errorData.message || "Ha ocurrido un error al actualizar el paciente.",
-          duration: import.meta.env.VITE_TOAST_DURATION || 3000,
+          duration: TOAST_DURATION,
         })
       }
     } catch (error) {
       console.error("Error al actualizar paciente:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al actualizar el paciente.",
-        duration: import.meta.env.VITE_TOAST_DURATION || 3000,
+        duration: TOAST_DURATION,
       })
     }
   }
@@ -450,7 +450,12 @@ export function PatientCard({
                       <Check className="h-4 w-4 mr-2" />
                       Listo
                     </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancel} className="flex-1 sm:flex-none">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancel}
+                      className="flex-1 sm:flex-none bg-transparent"
+                    >
                       <X className="h-4 w-4 mr-2" />
                       Cancelar
                     </Button>

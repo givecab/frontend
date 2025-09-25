@@ -14,6 +14,7 @@ import { CreateObraSocialForm } from "./components/create-obra-social-form"
 import { ProtocolSuccess } from "./components/protocol-success"
 import { useApi } from "../../hooks/use-api"
 import useAuth from "../../contexts/auth-context"
+import { ANALYSIS_ENDPOINTS } from "../../config/api"
 import type { Patient, Medico, ObraSocial, AnalysisPanel } from "../../types"
 
 interface PaginatedResponse<T> {
@@ -62,11 +63,9 @@ export default function IngresoPage() {
   const loadInitialData = async () => {
     try {
       setIsLoading(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       const [medicosResponse, oossResponse] = await Promise.all([
-        apiRequest(`${baseUrl}/api/analysis/medicos/?limit=20&offset=0`),
-        apiRequest(`${baseUrl}/api/analysis/ooss/?limit=20&offset=0&is_active=true`),
+        apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS}?limit=20&offset=0`),
+        apiRequest(`${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}&limit=20&offset=0`),
       ])
 
       if (medicosResponse.ok) {
@@ -171,9 +170,6 @@ export default function IngresoPage() {
 
     try {
       setIsCreatingProtocol(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
-      // Paso 1: Crear el protocolo
       const protocolData = {
         patient: Number(currentPatient.id),
         medico: Number(selectedMedico.id),
@@ -185,7 +181,7 @@ export default function IngresoPage() {
 
       console.log("Creating protocol with data:", protocolData)
 
-      const protocolResponse = await apiRequest(`${baseUrl}/api/analysis/protocols/`, {
+      const protocolResponse = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOLS, {
         method: "POST",
         body: protocolData,
       })
@@ -196,7 +192,6 @@ export default function IngresoPage() {
         throw new Error(`Error creating protocol: ${JSON.stringify(errorData)}`)
       }
 
-      // Obtener la URL del header Location
       const locationHeader = protocolResponse.headers.get("Location")
       if (!locationHeader) {
         throw new Error("No se recibió el header Location del servidor")
@@ -204,7 +199,6 @@ export default function IngresoPage() {
 
       console.log("Protocol created, location header:", locationHeader)
 
-      // Paso 2: Generar análisis usando el endpoint /generate-analyses/
       const generateAnalysesUrl = `${locationHeader}generate-analyses/`
       const panelIds = selectedAnalyses.map((panel) => panel.id)
 
@@ -228,10 +222,8 @@ export default function IngresoPage() {
 
       console.log("Analyses generated successfully")
 
-      // Obtener los datos del protocolo creado
       const newProtocol = await protocolResponse.json()
 
-      // Esperar a que termine la animación del botón (3 segundos)
       await new Promise((resolve) => setTimeout(resolve, 3000))
 
       handleProtocolCreated(newProtocol)
@@ -272,7 +264,6 @@ export default function IngresoPage() {
   return (
     <div className="min-h-screen p-2 sm:p-4 lg:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header con contenedor */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6 lg:mb-8">
           <div className="text-center">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Ingreso de Protocolos</h1>
@@ -282,9 +273,7 @@ export default function IngresoPage() {
           </div>
         </div>
 
-        {/* Layout responsive: columnas en desktop, stack en móvil */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 justify-center">
-          {/* Panel Principal */}
           <div
             className={`
               w-full transition-all duration-500 ease-in-out
@@ -315,7 +304,6 @@ export default function IngresoPage() {
             />
           </div>
 
-          {/* Panel Derecho - En móvil aparece debajo, en desktop a la derecha */}
           <div
             className={`
               w-full transition-all duration-500 ease-in-out
@@ -353,7 +341,6 @@ export default function IngresoPage() {
           </div>
         </div>
 
-        {/* Botón de crear protocolo - Responsive */}
         {currentPatient && (
           <div className="mt-4 sm:mt-6 flex justify-center px-2 sm:px-0">
             <div
@@ -376,7 +363,6 @@ export default function IngresoPage() {
                   }
                 `}
               >
-                {/* Barra de progreso dentro del botón */}
                 {isCreatingProtocol && (
                   <div
                     className="absolute inset-0 bg-[#204983] transition-all duration-3000 ease-out"
@@ -387,7 +373,6 @@ export default function IngresoPage() {
                   />
                 )}
 
-                {/* Contenido del botón */}
                 <div className="relative z-10 flex items-center justify-center">
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   <span className="text-sm sm:text-base lg:text-lg">
@@ -399,7 +384,6 @@ export default function IngresoPage() {
           </div>
         )}
 
-        {/* Edit Patient Dialog */}
         <EditPatientDialog
           isOpen={showEditPatient}
           onClose={() => setShowEditPatient(false)}
@@ -407,7 +391,6 @@ export default function IngresoPage() {
           onPatientUpdated={handlePatientUpdated}
         />
 
-        {/* Protocol Success Modal */}
         {protocolCreated && (
           <ProtocolSuccess
             protocol={protocolCreated}

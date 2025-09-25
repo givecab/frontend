@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { PATIENT_ENDPOINTS, TOAST_DURATION } from "@/config/api"
 
 interface DeletePatientDialogProps {
   isOpen: boolean
@@ -35,12 +36,9 @@ export default function DeletePatientDialog({
     try {
       const loadingId = toast.loading("Eliminando paciente...")
 
-      const response = await apiRequest(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_PATIENTS_ENDPOINT}${patient.id}/`,
-        {
-          method: "DELETE",
-        },
-      )
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENT_DETAIL(patient.id), {
+        method: "DELETE",
+      })
 
       toast.dismiss(loadingId)
 
@@ -48,21 +46,21 @@ export default function DeletePatientDialog({
         setPatients((prev) => prev.filter((p) => p.id !== patient.id))
         toast.success("Paciente eliminado", {
           description: "El paciente ha sido eliminado exitosamente.",
-          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+          duration: TOAST_DURATION,
         })
         onClose()
       } else {
         const errorData = await response.json()
         toast.error("Error al eliminar paciente", {
           description: errorData.detail || "Ha ocurrido un error al eliminar el paciente.",
-          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+          duration: TOAST_DURATION,
         })
       }
     } catch (error) {
       console.error("Error al eliminar paciente:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al eliminar el paciente.",
-        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+        duration: TOAST_DURATION,
       })
     }
   }

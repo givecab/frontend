@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { Patient } from "../../../types"
+import { PATIENT_ENDPOINTS } from "../../../config/api"
 
 interface EditPatientDialogProps {
   isOpen: boolean
@@ -81,11 +82,9 @@ export function EditPatientDialog({ isOpen, onClose, patient, onPatientUpdated }
 
     try {
       setIsUpdating(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       console.log("Updating patient with data:", formData)
 
-      const response = await apiRequest(`${baseUrl}${import.meta.env.VITE_PATIENTS_ENDPOINT}${patient.id}/`, {
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENT_DETAIL(patient.id), {
         method: "PUT",
         body: formData,
       })

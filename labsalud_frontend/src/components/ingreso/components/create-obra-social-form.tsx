@@ -11,6 +11,7 @@ import { Label } from "../../ui/label"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { ObraSocial } from "../../../types"
+import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 
 interface CreateObraSocialFormProps {
   onObraSocialCreated: (obraSocial: ObraSocial) => void
@@ -43,11 +44,9 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
 
     try {
       setIsCreating(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       console.log("Creating obra social with data:", formData)
 
-      const response = await apiRequest(`${baseUrl}/api/analysis/ooss/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS, {
         method: "POST",
         body: formData,
       })

@@ -9,6 +9,7 @@ import { Search, TestTube, X } from "lucide-react"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { AnalysisPanel, Analysis } from "../../../types"
+import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 
 interface AnalysisSelectorProps {
   selectedAnalyses: Analysis[]
@@ -36,17 +37,15 @@ export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: Analysi
   const loadPanelsAndAnalyses = async () => {
     try {
       setIsLoading(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       // Cargar paneles
-      const panelsResponse = await apiRequest(`${baseUrl}/api/panels/`)
+      const panelsResponse = await apiRequest(ANALYSIS_ENDPOINTS.PANELS)
       if (panelsResponse.ok) {
         const panelsData: PaginatedResponse<AnalysisPanel> = await panelsResponse.json()
         setPanels(panelsData.results)
       }
 
       // Cargar análisis
-      const analysesResponse = await apiRequest(`${baseUrl}/api/analyses/`)
+      const analysesResponse = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSES)
       if (analysesResponse.ok) {
         const analysesData: PaginatedResponse<Analysis> = await analysesResponse.json()
         setAnalyses(analysesData.results)

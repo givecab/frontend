@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { User, Mail, Lock, Camera, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
+import { AUTH_ENDPOINTS, TOAST_DURATION } from "@/config/api"
 
 interface ProfileFormData {
   email: string
@@ -133,10 +134,7 @@ export default function ProfilePage() {
 
       // Solo hacer la petición si hay algo que actualizar
       if (formDataToSend.has("email") || formDataToSend.has("password") || formDataToSend.has("photo")) {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL
-        const endpoint = import.meta.env.VITE_AUTH_ME_ENDPOINT
-
-        const response = await apiRequest(`${baseUrl}${endpoint}`, {
+        const response = await apiRequest(AUTH_ENDPOINTS.ME, {
           method: "PATCH",
           body: formDataToSend,
         })
@@ -148,19 +146,21 @@ export default function ProfilePage() {
           const currentUserData = localStorage.getItem("user")
           if (currentUserData) {
             const currentUser = JSON.parse(currentUserData)
-            
+
             // Actualizar solo los campos que pueden haber cambiado
             const updatedUserData = {
               ...currentUser,
               email: updatedUser.email || currentUser.email,
-              photo: updatedUser.photo !== undefined ? updatedUser.photo : currentUser.photo
+              photo: updatedUser.photo !== undefined ? updatedUser.photo : currentUser.photo,
             }
 
             // Guardar el objeto usuario actualizado
             localStorage.setItem("user", JSON.stringify(updatedUserData))
           }
 
-          toast.success("Perfil actualizado correctamente")
+          toast.success("Perfil actualizado correctamente", {
+            duration: TOAST_DURATION,
+          })
 
           // Recargar la página para actualizar el contexto
           setTimeout(() => {
@@ -177,14 +177,20 @@ export default function ProfilePage() {
           setPhotoPreview(null)
         } else {
           const errorData = await response.json()
-          toast.error(errorData.message || "Error al actualizar el perfil")
+          toast.error(errorData.message || "Error al actualizar el perfil", {
+            duration: TOAST_DURATION,
+          })
         }
       } else {
-        toast.info("No hay cambios para guardar")
+        toast.info("No hay cambios para guardar", {
+          duration: TOAST_DURATION,
+        })
       }
     } catch (error) {
       console.error("Error al actualizar perfil:", error)
-      toast.error("Error de conexión. Intenta nuevamente.")
+      toast.error("Error de conexión. Intenta nuevamente.", {
+        duration: TOAST_DURATION,
+      })
     } finally {
       setIsSubmitting(false)
     }

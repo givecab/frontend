@@ -9,6 +9,7 @@ import { cn } from "../../../lib/utils"
 import { useApi } from "../../../hooks/use-api"
 import { useDebounce } from "../../../hooks/use-debounce"
 import type { Medico } from "../../../types"
+import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 
 interface MedicoComboboxProps {
   medicos: Medico[]
@@ -57,9 +58,8 @@ export function MedicoCombobox({
   const searchMedicos = async (term: string) => {
     try {
       setIsLoading(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
       const response = await apiRequest(
-        `${baseUrl}/api/analysis/medicos/active/?search=${encodeURIComponent(term)}&limit=50&offset=0`,
+        `${ANALYSIS_ENDPOINTS.MEDICOS_ACTIVE}?search=${encodeURIComponent(term)}&limit=50&offset=0`,
       )
 
       if (response.ok) {
@@ -80,8 +80,7 @@ export function MedicoCombobox({
 
     try {
       setIsLoading(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/medicos/active/?limit=20&offset=${offset}`)
+      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS_ACTIVE}?limit=20&offset=${offset}`)
 
       if (response.ok) {
         const data: PaginatedResponse<Medico> = await response.json()
@@ -134,7 +133,13 @@ export function MedicoCombobox({
                     onMedicoSelect(selectedMedico?.id === medico.id ? null : medico)
                     setOpen(false)
                   }}
-                  ref={index === allMedicos.length - 5 ? (el: HTMLDivElement | null) => { if (el) loadMoreMedicos(); } : undefined}
+                  ref={
+                    index === allMedicos.length - 5
+                      ? (el: HTMLDivElement | null) => {
+                          if (el) loadMoreMedicos()
+                        }
+                      : undefined
+                  }
                 >
                   <Check
                     className={cn("mr-2 h-4 w-4", selectedMedico?.id === medico.id ? "opacity-100" : "opacity-0")}

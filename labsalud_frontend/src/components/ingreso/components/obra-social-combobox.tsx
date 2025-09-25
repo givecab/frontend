@@ -9,6 +9,7 @@ import { cn } from "../../../lib/utils"
 import { useApi } from "../../../hooks/use-api"
 import { useDebounce } from "../../../hooks/use-debounce"
 import type { ObraSocial } from "../../../types"
+import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 
 interface ObraSocialComboboxProps {
   obrasSociales: ObraSocial[]
@@ -57,9 +58,8 @@ export function ObraSocialCombobox({
   const searchObrasSociales = async (term: string) => {
     try {
       setIsLoading(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
       const response = await apiRequest(
-        `${baseUrl}/api/analysis/ooss/?search=${encodeURIComponent(term)}&is_active=true&limit=50&offset=0`,
+        `${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?search=${encodeURIComponent(term)}&limit=50&offset=0`,
       )
 
       if (response.ok) {
@@ -80,8 +80,7 @@ export function ObraSocialCombobox({
 
     try {
       setIsLoading(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/ooss/?is_active=true&limit=20&offset=${offset}`)
+      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?limit=20&offset=${offset}`)
 
       if (response.ok) {
         const data: PaginatedResponse<ObraSocial> = await response.json()
@@ -146,7 +145,13 @@ export function ObraSocialCombobox({
                     onObraSocialSelect(selectedObraSocial?.id === obraSocial.id ? null : obraSocial)
                     setOpen(false)
                   }}
-                  ref={index === allObrasSociales.length - 5 ? (el: HTMLDivElement | null) => { if (el) loadMoreObrasSociales(); } : undefined}
+                  ref={
+                    index === allObrasSociales.length - 5
+                      ? (el: HTMLDivElement | null) => {
+                          if (el) loadMoreObrasSociales()
+                        }
+                      : undefined
+                  }
                 >
                   <Check
                     className={cn(

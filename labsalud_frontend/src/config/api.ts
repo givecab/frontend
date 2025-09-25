@@ -10,6 +10,12 @@ export const API_CONFIG = {
   TIMEOUT: 30000,
 } as const
 
+export const UI_CONFIG = {
+  TOAST_DURATION: 4000, // 4 seconds
+} as const
+
+export const TOAST_DURATION = UI_CONFIG.TOAST_DURATION
+
 // Helper function to build API URLs
 export const buildApiUrl = (endpoint: string): string => {
   const baseUrl = API_CONFIG.BASE_URL.replace(/\/$/, "") // Remove trailing slash
@@ -62,11 +68,12 @@ export const ANALYSIS_ENDPOINTS = {
   // Doctors
   MEDICOS: buildApiUrl("/analysis/medicos/"),
   MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/`),
+  MEDICOS_ACTIVE: buildApiUrl("/analysis/medicos/active/"),
 
   // Insurance (OOSS)
   OOSS: buildApiUrl("/analysis/ooss/"),
   OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
-  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?active=true"),
+  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?is_active=true"),
 
   // Protocols
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),

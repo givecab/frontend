@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { AlertCircle, CheckCircle } from "lucide-react"
+import { PATIENT_ENDPOINTS, TOAST_DURATION } from "@/config/api"
 
 interface CreatePatientDialogProps {
   isOpen: boolean
@@ -247,7 +248,7 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
     if (!isFormValid() || !formData.gender) {
       toast.error("Formulario inválido", {
         description: "Por favor, corrige los errores antes de continuar.",
-        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+        duration: TOAST_DURATION,
       })
       return
     }
@@ -260,13 +261,10 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
         birth_date: formData.birth_date,
       }
 
-      const response = await apiRequest(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_PATIENTS_ENDPOINT}`,
-        {
-          method: "POST",
-          body: dataToSend,
-        },
-      )
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENTS, {
+        method: "POST",
+        body: dataToSend,
+      })
 
       toast.dismiss(loadingId)
 
@@ -275,7 +273,7 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
         addPatient(newPatient)
         toast.success("Paciente creado", {
           description: `El paciente ${newPatient.first_name} ${newPatient.last_name} (DNI: ${newPatient.dni}) ha sido creado exitosamente.`,
-          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+          duration: TOAST_DURATION,
         })
         resetForm()
         onClose()
@@ -283,14 +281,14 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
         const errorData = await response.json()
         toast.error("Error al crear paciente", {
           description: errorData.detail || "Ha ocurrido un error al crear el paciente.",
-          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+          duration: TOAST_DURATION,
         })
       }
     } catch (error) {
       console.error("Error al crear paciente:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al crear el paciente.",
-        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+        duration: TOAST_DURATION,
       })
     }
   }

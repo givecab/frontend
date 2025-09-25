@@ -12,6 +12,7 @@ import { useDebounce } from "../../../hooks/use-debounce"
 import { useInfiniteScroll } from "../../../hooks/use-infinite-scroll"
 import { toast } from "sonner"
 import type { AnalysisPanel } from "../../../types"
+import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 
 interface AnalysisSearchProps {
   selectedAnalyses: AnalysisPanel[]
@@ -67,9 +68,8 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
         setIsLoadingMore(true)
       }
 
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
       const url = isNewSearch
-        ? `${baseUrl}/api/analysis/panels/?search=${encodeURIComponent(term.trim())}&is_active=true&limit=20&offset=0`
+        ? `${ANALYSIS_ENDPOINTS.PANELS}?search=${encodeURIComponent(term.trim())}&is_active=true&limit=20&offset=0`
         : nextUrl
 
       if (!url) return

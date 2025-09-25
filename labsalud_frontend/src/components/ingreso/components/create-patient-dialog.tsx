@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { Patient } from "../../../types"
+import { PATIENT_ENDPOINTS } from "../../../config/api"
 
 interface CreatePatientDialogProps {
   initialDni?: string
@@ -51,9 +52,7 @@ export function CreatePatientDialog({ initialDni = "", onPatientCreated, onCance
 
     try {
       setIsCreating(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
-      const response = await apiRequest(`${baseUrl}/api/patients/`, {
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENTS, {
         method: "POST",
         body: JSON.stringify(formData),
       })

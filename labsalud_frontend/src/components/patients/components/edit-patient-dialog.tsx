@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { AlertCircle, CheckCircle } from "lucide-react"
+import { PATIENT_ENDPOINTS, TOAST_DURATION } from "@/config/api"
 
 interface EditPatientDialogProps {
   isOpen: boolean
@@ -267,7 +268,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
     if (!isFormValid()) {
       toast.error("Formulario inválido", {
         description: "Por favor, corrige los errores antes de continuar.",
-        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+        duration: TOAST_DURATION,
       })
       return
     }
@@ -280,13 +281,10 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
         birth_date: formData.birth_date,
       }
 
-      const response = await apiRequest(
-        `${import.meta.env.VITE_API_BASE_URL}${import.meta.env.VITE_PATIENTS_ENDPOINT}${patient.id}/`,
-        {
-          method: "PATCH",
-          body: dataToSend,
-        },
-      )
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENT_DETAIL(patient.id), {
+        method: "PATCH",
+        body: dataToSend,
+      })
 
       toast.dismiss(loadingId)
 
@@ -295,21 +293,21 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
         setPatients((prev) => prev.map((p) => (p.id === updatedPatient.id ? updatedPatient : p)))
         toast.success("Paciente actualizado", {
           description: `El paciente ${updatedPatient.first_name} ${updatedPatient.last_name} (DNI: ${updatedPatient.dni}) ha sido actualizado exitosamente.`,
-          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+          duration: TOAST_DURATION,
         })
         onClose()
       } else {
         const errorData = await response.json()
         toast.error("Error al actualizar paciente", {
           description: errorData.detail || "Ha ocurrido un error al actualizar el paciente.",
-          duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+          duration: TOAST_DURATION,
         })
       }
     } catch (error) {
       console.error("Error al actualizar paciente:", error)
       toast.error("Error", {
         description: "Ha ocurrido un error al actualizar el paciente.",
-        duration: Number(import.meta.env.REACT_APP_TOAST_DURATION),
+        duration: TOAST_DURATION,
       })
     }
   }

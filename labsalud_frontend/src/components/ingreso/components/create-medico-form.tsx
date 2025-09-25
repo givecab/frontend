@@ -11,6 +11,7 @@ import { Label } from "../../ui/label"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { Medico } from "../../../types"
+import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 
 interface CreateMedicoFormProps {
   onMedicoCreated: (medico: Medico) => void
@@ -44,11 +45,9 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
 
     try {
       setIsCreating(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       console.log("Creating medico with data:", formData)
 
-      const response = await apiRequest(`${baseUrl}/api/analysis/medicos/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.MEDICOS, {
         method: "POST",
         body: formData,
       })

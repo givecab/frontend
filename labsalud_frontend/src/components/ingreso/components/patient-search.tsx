@@ -8,6 +8,7 @@ import { Input } from "../../ui/input"
 import { Button } from "../../ui/button"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
+import { PATIENT_ENDPOINTS } from "../../../config/api"
 import type { Patient } from "../../../types"
 
 interface PatientSearchProps {
@@ -29,11 +30,9 @@ export function PatientSearch({ onPatientFound, onPatientNotFound, onReset }: Pa
 
     try {
       setIsSearching(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       console.log("Searching patient with DNI:", searchDni)
 
-      const response = await apiRequest(`${baseUrl}${import.meta.env.VITE_PATIENTS_ENDPOINT}?dni=${searchDni.trim()}`)
+      const response = await apiRequest(`${PATIENT_ENDPOINTS.PATIENTS}?dni=${searchDni.trim()}`)
 
       if (response.ok) {
         const data = await response.json()

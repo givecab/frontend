@@ -122,7 +122,7 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
       if (filters.urgency !== "all") params.append("is_urgent", filters.urgency)
       if (filters.analysisType !== "all") params.append("analysis_type", filters.analysisType)
 
-      return `${baseUrl}/api/protocols/?${params.toString()}`
+      return `${baseUrl}/api/v1/analysis/protocols/?${params.toString()}`
     },
     [filters],
   )
