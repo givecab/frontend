@@ -49,7 +49,7 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
 
   const buildUrl = useCallback(
     (offset = 0, search = debouncedSearchTerm) => {
-      let url = `${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${ANALYSIS_ENDPOINTS.OOSS}?limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) {
         url += `&search=${encodeURIComponent(search)}`
       }

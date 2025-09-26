@@ -95,9 +95,6 @@ export const DeleteAnalysisDialog: React.FC<DeleteAnalysisDialogProps> = ({
                   <h4 className="font-medium text-red-900 mb-1">{analysis.name}</h4>
                   <div className="space-y-1 text-sm text-red-700">
                     <p>
-                      <span className="font-medium">Código:</span> {analysis.code}
-                    </p>
-                    <p>
                       <span className="font-medium">Unidad:</span> {analysis.measure_unit}
                     </p>
                   </div>

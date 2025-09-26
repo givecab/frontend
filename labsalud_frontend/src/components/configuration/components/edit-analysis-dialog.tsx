@@ -32,7 +32,6 @@ interface EditAnalysisDialogProps {
 export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, onOpenChange, onSuccess, analysis }) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
-  const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [measureUnit, setMeasureUnit] = useState("")
   const [formula, setFormula] = useState("")
@@ -41,7 +40,6 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
 
   useEffect(() => {
     if (analysis && open) {
-      setCode(analysis.code)
       setName(analysis.name)
       setMeasureUnit(analysis.measure_unit)
       setFormula(analysis.formula || "")
@@ -53,7 +51,6 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!name.trim()) newErrors.name = "El nombre es requerido."
-    if (!code.trim()) newErrors.code = "El código es requerido."
     if (!measureUnit.trim()) newErrors.measureUnit = "La unidad de medida es requerida."
 
     setErrors(newErrors)
@@ -69,7 +66,6 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
         Omit<AnalysisItem, "id" | "created_at" | "updated_at" | "created_by" | "updated_by" | "panel">
       > & { panel?: number } = {}
 
-      if (code !== analysis.code) analysisUpdateData.code = code
       if (name !== analysis.name) analysisUpdateData.name = name
       if (measureUnit !== analysis.measure_unit) analysisUpdateData.measure_unit = measureUnit
       if (formula !== (analysis.formula || "")) {
@@ -132,17 +128,6 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
           {errors.form && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{errors.form}</div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-analysis-code">Código *</Label>
-            <Input
-              id="edit-analysis-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Ingrese el código de la determinación"
-            />
-            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="edit-analysis-name">Nombre *</Label>

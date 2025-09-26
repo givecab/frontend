@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { Patient } from "../../../types"
+import { PATIENT_ENDPOINTS } from "../../../config/api"
 
 interface CreatePatientFormProps {
   initialDni: string
@@ -59,11 +60,9 @@ export function CreatePatientForm({ initialDni, onPatientCreated, onCancel }: Cr
 
     try {
       setIsCreating(true)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
       console.log("Creating patient with data:", formData)
 
-      const response = await apiRequest(`${baseUrl}${import.meta.env.VITE_PATIENTS_ENDPOINT}`, {
+      const response = await apiRequest(PATIENT_ENDPOINTS.PATIENTS, {
         method: "POST",
         body: formData,
       })

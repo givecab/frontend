@@ -59,7 +59,6 @@ export const ANALYSIS_ENDPOINTS = {
   // Panels
   PANELS: buildApiUrl("/analysis/panels/"),
   PANEL_DETAIL: (id: number) => buildApiUrl(`/analysis/panels/${id}/`),
-  PANEL_ANALYSES: (id: number) => buildApiUrl(`/analysis/panels/${id}/analyses/`),
 
   // Analyses
   ANALYSES: buildApiUrl("/analysis/analyses/"),
@@ -68,12 +67,10 @@ export const ANALYSIS_ENDPOINTS = {
   // Doctors
   MEDICOS: buildApiUrl("/analysis/medicos/"),
   MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/`),
-  MEDICOS_ACTIVE: buildApiUrl("/analysis/medicos/active/"),
 
   // Insurance (OOSS)
   OOSS: buildApiUrl("/analysis/ooss/"),
   OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
-  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?is_active=true"),
 
   // Protocols
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),

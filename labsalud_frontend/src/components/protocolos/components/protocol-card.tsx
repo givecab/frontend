@@ -40,6 +40,7 @@ import {
 } from "../../ui/alert-dialog"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
+import { ANALYSIS_ENDPOINTS, TOAST_DURATION } from "@/config/api"
 
 interface AnalysisItem {
   id: number
@@ -213,8 +214,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
 
     setLoadingDetail(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/protocols/${protocol.id}/`)
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id))
 
       if (response.ok) {
         const data: ProtocolDetail = await response.json()
@@ -224,7 +224,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
       }
     } catch (error) {
       console.error("Error fetching protocol detail:", error)
-      toast.error("Error al cargar los detalles del protocolo")
+      toast.error("Error al cargar los detalles del protocolo", { duration: TOAST_DURATION })
     } finally {
       setLoadingDetail(false)
     }
@@ -250,8 +250,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     if (panelHierarchy.length === 0) {
       setLoadingAnalyses(true)
       try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL
-        const response = await apiRequest(`${baseUrl}/api/analysis/protocols/${protocol.id}/hierarchy/`)
+        const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_HISTORY(protocol.id))
 
         if (response.ok) {
           const data: PanelHierarchy[] = await response.json()
@@ -261,7 +260,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
         }
       } catch (error) {
         console.error("Error fetching protocol hierarchy:", error)
-        toast.error("Error al cargar los análisis del protocolo")
+        toast.error("Error al cargar los análisis del protocolo", { duration: TOAST_DURATION })
         return
       } finally {
         setLoadingAnalyses(false)
@@ -273,24 +272,23 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
   const handleCancelProtocol = async () => {
     setIsCancelling(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/protocols/${protocol.id}/`, {
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: { state: "cancelado" },
+        body: JSON.stringify({ state: "cancelado" }),
       })
 
       if (response.ok) {
-        toast.success("Protocolo cancelado exitosamente")
+        toast.success("Protocolo cancelado exitosamente", { duration: TOAST_DURATION })
         onUpdate() // Actualizar la lista
       } else {
         throw new Error("Error cancelling protocol")
       }
     } catch (error) {
       console.error("Error cancelling protocol:", error)
-      toast.error("Error al cancelar el protocolo")
+      toast.error("Error al cancelar el protocolo", { duration: TOAST_DURATION })
     } finally {
       setIsCancelling(false)
     }
@@ -299,24 +297,23 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
   const handleMarkAsPaid = async () => {
     setIsMarkingPaid(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/protocols/${protocol.id}/pay/`, {
-        method: "POST",
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: { paid: true },
+        body: JSON.stringify({ paid: true }),
       })
 
       if (response.ok) {
-        toast.success("Protocolo marcado como pagado")
+        toast.success("Protocolo marcado como pagado", { duration: TOAST_DURATION })
         onUpdate() // Actualizar la lista
       } else {
         throw new Error("Error marking as paid")
       }
     } catch (error) {
       console.error("Error marking as paid:", error)
-      toast.error("Error al marcar como pagado")
+      toast.error("Error al marcar como pagado", { duration: TOAST_DURATION })
     } finally {
       setIsMarkingPaid(false)
     }

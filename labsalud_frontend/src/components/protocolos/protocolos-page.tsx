@@ -11,6 +11,7 @@ import { useApi } from "../../hooks/use-api"
 import { useInfiniteScroll } from "../../hooks/use-infinite-scroll"
 import { useDebounce } from "../../hooks/use-debounce"
 import { useNavigate } from "react-router-dom"
+import { ANALYSIS_ENDPOINTS } from "@/config/api"
 
 interface HistoryEntry {
   version: number
@@ -87,8 +88,7 @@ export default function ProtocolosPage() {
   // Función para cargar estadísticas por estado
   const fetchStateStats = useCallback(async () => {
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const response = await apiRequest(`${baseUrl}/api/analysis/protocols/stats/by-state/`)
+      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.PROTOCOLS}?stats=true`)
 
       if (response.ok) {
         const stateStats: StateStats = await response.json()
@@ -110,8 +110,7 @@ export default function ProtocolosPage() {
   // Función para construir URL con parámetros
   const buildUrl = useCallback(
     (search = "", offset = 0) => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const endpoint = "/api/analysis/protocols/"
+      const baseEndpoint = ANALYSIS_ENDPOINTS.PROTOCOLS
 
       const params = new URLSearchParams({
         limit: "20",
@@ -130,7 +129,7 @@ export default function ProtocolosPage() {
         params.append("paid", paidFilter === "paid" ? "true" : "false")
       }
 
-      return `${baseUrl}${endpoint}?${params.toString()}`
+      return `${baseEndpoint}?${params.toString()}`
     },
     [stateFilter, paidFilter],
   )
@@ -223,7 +222,7 @@ export default function ProtocolosPage() {
 
   // Efecto para cargar estadísticas al inicio y después de cada búsqueda
   useEffect(() => {
-    if(totalCount > 0) {
+    if (totalCount > 0) {
       fetchStateStats()
     }
   }, [totalCount, fetchStateStats])

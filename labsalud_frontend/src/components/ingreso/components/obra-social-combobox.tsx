@@ -59,7 +59,7 @@ export function ObraSocialCombobox({
     try {
       setIsLoading(true)
       const response = await apiRequest(
-        `${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?search=${encodeURIComponent(term)}&limit=50&offset=0`,
+        `${ANALYSIS_ENDPOINTS.OOSS}?search=${encodeURIComponent(term)}&limit=50&offset=0`,
       )
 
       if (response.ok) {
@@ -80,7 +80,7 @@ export function ObraSocialCombobox({
 
     try {
       setIsLoading(true)
-      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?limit=20&offset=${offset}`)
+      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.OOSS}?limit=20&offset=${offset}`)
 
       if (response.ok) {
         const data: PaginatedResponse<ObraSocial> = await response.json()

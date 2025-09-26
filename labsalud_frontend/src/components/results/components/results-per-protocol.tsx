@@ -26,6 +26,7 @@ import {
 import { useApi } from "../../../hooks/use-api"
 import { useInfiniteScroll } from "../../../hooks/use-infinite-scroll"
 import { toast } from "sonner"
+import { ANALYSIS_ENDPOINTS, TOAST_DURATION } from "../../../config/api"
 
 interface Protocol {
   id: number
@@ -109,20 +110,19 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
   // Construir URL con filtros para protocolos con protocol-analyses sin resultados
   const buildUrl = useCallback(
     (offset = 0) => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
       const params = new URLSearchParams({
         limit: "20",
         offset: offset.toString(),
-        include_unvalidated: "true", // Solo protocolos que tienen protocol-analyses sin resultados
       })
 
       if (filters.search) params.append("search", filters.search)
-      if (filters.date) params.append("date", filters.date)
+      if (filters.date) params.append("created_at__date", filters.date)
       if (filters.state !== "all") params.append("state", filters.state)
       if (filters.urgency !== "all") params.append("is_urgent", filters.urgency)
-      if (filters.analysisType !== "all") params.append("analysis_type", filters.analysisType)
+      if (filters.analysisType !== "all")
+        params.append("protocol_analyses__analysis__panel__name", filters.analysisType)
 
-      return `${baseUrl}/api/v1/analysis/protocols/?${params.toString()}`
+      return `${ANALYSIS_ENDPOINTS.PROTOCOLS}?${params.toString()}`
     },
     [filters],
   )
@@ -150,13 +150,15 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
             // Inicializar valores de resultados para todos los protocol-analyses (con y sin resultado)
             const initialValues: { [key: number]: { value: string; is_normal: boolean; observations: string } } = {}
             data.results.forEach((protocol) => {
-              protocol.protocol_analyses.forEach((pa) => {
-                initialValues[pa.id] = {
-                  value: pa.result?.value || "",
-                  is_normal: pa.result?.is_normal ?? true,
-                  observations: pa.result?.observations || "",
-                }
-              })
+              if (protocol.protocol_analyses) {
+                protocol.protocol_analyses.forEach((pa) => {
+                  initialValues[pa.id] = {
+                    value: pa.result?.value || "",
+                    is_normal: pa.result?.is_normal ?? true,
+                    observations: pa.result?.observations || "",
+                  }
+                })
+              }
             })
             setResultValues(initialValues)
           } else {
@@ -164,15 +166,17 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
             // Agregar valores de resultados para nuevos protocol-analyses sin resultado
             const newValues: { [key: number]: { value: string; is_normal: boolean; observations: string } } = {}
             data.results.forEach((protocol) => {
-              protocol.protocol_analyses.forEach((pa) => {
-                if (!pa.result) {
-                  newValues[pa.id] = {
-                    value: "",
-                    is_normal: true,
-                    observations: "",
+              if (protocol.protocol_analyses) {
+                protocol.protocol_analyses.forEach((pa) => {
+                  if (!pa.result) {
+                    newValues[pa.id] = {
+                      value: "",
+                      is_normal: true,
+                      observations: "",
+                    }
                   }
-                }
-              })
+                })
+              }
             })
             setResultValues((prev) => ({ ...prev, ...newValues }))
           }
@@ -190,7 +194,7 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
         }
       } catch (error) {
         console.error("Error fetching protocols:", error)
-        toast.error("Error al cargar los protocolos")
+        toast.error("Error al cargar los protocolos", { duration: TOAST_DURATION })
         if (reset) {
           setProtocols([])
           setResultValues({})
@@ -220,19 +224,16 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
     dependencies: [filters],
   })
 
-  // Crear o actualizar resultado para un protocol-analysis
   const saveResult = async (protocolAnalysisId: number) => {
     const resultData = resultValues[protocolAnalysisId]
     if (!resultData || !resultData.value.trim()) {
-      toast.error("El valor del resultado es requerido")
+      toast.error("El valor del resultado es requerido", { duration: TOAST_DURATION })
       return
     }
 
     setIsSaving(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-
-      // Buscar si ya existe un resultado
+      // Find existing result
       let existingResultId: number | null = null
       for (const protocol of protocols) {
         const pa = protocol.protocol_analyses.find((pa) => pa.id === protocolAnalysisId)
@@ -243,38 +244,50 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
       }
 
       const method = existingResultId ? "PUT" : "POST"
-      const url = existingResultId ? `${baseUrl}/api/results/${existingResultId}/` : `${baseUrl}/api/results/`
+      const url = existingResultId ? ANALYSIS_ENDPOINTS.RESULT_DETAIL(existingResultId) : ANALYSIS_ENDPOINTS.RESULTS
 
-      const body = existingResultId
+      const requestBody = existingResultId
         ? {
             value: resultData.value,
-            is_normal: resultData.is_normal,
-            observations: resultData.observations,
+            is_abnormal: !resultData.is_normal, // Convert is_normal to is_abnormal
+            note: resultData.observations, // Changed from notes to note
           }
         : {
-            protocol_analysis: protocolAnalysisId,
+            protocol_analysis: Number.parseInt(protocolAnalysisId.toString(), 10),
             value: resultData.value,
-            is_normal: resultData.is_normal,
-            observations: resultData.observations,
+            is_abnormal: !resultData.is_normal, // Convert is_normal to is_abnormal
+            note: resultData.observations, // Changed from notes to note
           }
+
+      console.log("[v0] Protocol POST request:", { method, url, body: requestBody })
 
       const response = await apiRequest(url, {
         method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(requestBody),
       })
 
+      console.log("[v0] Protocol response status:", response.status)
+
       if (response.ok) {
-        toast.success(existingResultId ? "Resultado actualizado correctamente" : "Resultado guardado correctamente")
+        toast.success(existingResultId ? "Resultado actualizado correctamente" : "Resultado guardado correctamente", {
+          duration: TOAST_DURATION,
+        })
         await fetchProtocols(true)
         onStatsUpdate()
       } else {
         const errorData = await response.json()
-        toast.error(errorData.detail || "Error al guardar el resultado")
+        console.error("[v0] Protocol error response:", errorData)
+        toast.error(errorData.detail || errorData.non_field_errors?.[0] || "Error al guardar el resultado", {
+          duration: TOAST_DURATION,
+        })
       }
     } catch (error) {
-      console.error("Error saving result:", error)
-      toast.error("Error al guardar el resultado")
+      console.error("[v0] Protocol error saving result:", error)
+      toast.error("Error al guardar el resultado", { duration: TOAST_DURATION })
     } finally {
       setIsSaving(false)
     }
@@ -451,161 +464,248 @@ export function ResultadosPorProtocolo({ filters, onStatsUpdate }: ResultadosPor
                         Protocol-Analyses del Protocolo
                       </h5>
 
-                      {protocol.protocol_analyses.map((pa) => (
-                        <Card
-                          key={pa.id}
-                          className={`${
-                            pa.result
-                              ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
-                              : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
-                          }`}
-                        >
-                          <CardContent className="p-4">
-                            <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-center">
-                              {/* Info del Análisis */}
-                              <div className="lg:col-span-2">
-                                <p className="font-semibold text-gray-900">{pa.analysis.name}</p>
-                                <p className="text-sm text-gray-600">{pa.analysis.panel.name}</p>
-                                <p className="text-xs text-gray-500">Unidad: {pa.analysis.measure_unit}</p>
-                              </div>
+                      {protocol.protocol_analyses && protocol.protocol_analyses.length > 0 ? (
+                        protocol.protocol_analyses.map((pa) => (
+                          <Card
+                            key={pa.id}
+                            className={`${
+                              pa.result
+                                ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
+                                : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
+                            }`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-center">
+                                {/* Info del Análisis */}
+                                <div className="lg:col-span-2">
+                                  <p className="font-semibold text-gray-900">{pa.analysis.name}</p>
+                                  <p className="text-sm text-gray-600">{pa.analysis.panel.name}</p>
+                                  <p className="text-xs text-gray-500">Unidad: {pa.analysis.measure_unit}</p>
+                                </div>
 
-                              {/* Input de Valor o Resultado Existente */}
-                              <div>
-                                <label className="text-xs text-gray-600 block mb-1">
-                                  Resultado ({pa.analysis.measure_unit})
-                                </label>
-                                {pa.result ? (
-                                  <div className="p-2 bg-green-100 rounded text-center font-medium text-green-800">
-                                    {pa.result.value}
-                                  </div>
-                                ) : (
-                                  <Input
-                                    placeholder="Valor"
-                                    value={resultValues[pa.id]?.value || ""}
-                                    onChange={(e) => updateResultValue(pa.id, "value", e.target.value)}
-                                    className="text-center bg-white"
-                                  />
-                                )}
-                              </div>
+                                {/* Input de Valor o Resultado Existente */}
+                                <div>
+                                  <label className="text-xs text-gray-600 block mb-1">
+                                    Resultado ({pa.analysis.measure_unit})
+                                  </label>
+                                  {pa.result ? (
+                                    <Input
+                                      value={resultValues[pa.id]?.value || pa.result.value}
+                                      onChange={(e) => updateResultValue(pa.id, "value", e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" && resultValues[pa.id]?.value?.trim()) {
+                                          e.preventDefault()
+                                          saveResult(pa.id)
+                                          // Focus next input after a short delay
+                                          setTimeout(() => {
+                                            const currentIndex = protocol.protocol_analyses.findIndex(
+                                              (analysis) => analysis.id === pa.id,
+                                            )
+                                            const nextAnalysis = protocol.protocol_analyses[currentIndex + 1]
+                                            if (nextAnalysis) {
+                                              const nextInput = document.querySelector(
+                                                `input[data-analysis-id="${nextAnalysis.id}"]`,
+                                              ) as HTMLInputElement
+                                              if (nextInput) {
+                                                nextInput.focus()
+                                              }
+                                            }
+                                          }, 100)
+                                        }
+                                      }}
+                                      data-analysis-id={pa.id}
+                                      className="text-center bg-white border-green-300"
+                                    />
+                                  ) : (
+                                    <Input
+                                      placeholder="Valor"
+                                      value={resultValues[pa.id]?.value || ""}
+                                      onChange={(e) => updateResultValue(pa.id, "value", e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" && resultValues[pa.id]?.value?.trim()) {
+                                          e.preventDefault()
+                                          saveResult(pa.id)
+                                          // Focus next input after a short delay
+                                          setTimeout(() => {
+                                            const currentIndex = protocol.protocol_analyses.findIndex(
+                                              (analysis) => analysis.id === pa.id,
+                                            )
+                                            const nextAnalysis = protocol.protocol_analyses[currentIndex + 1]
+                                            if (nextAnalysis && !nextAnalysis.result) {
+                                              const nextInput = document.querySelector(
+                                                `input[data-analysis-id="${nextAnalysis.id}"]`,
+                                              ) as HTMLInputElement
+                                              if (nextInput) {
+                                                nextInput.focus()
+                                              }
+                                            }
+                                          }, 100)
+                                        }
+                                      }}
+                                      data-analysis-id={pa.id}
+                                      className="text-center bg-white"
+                                    />
+                                  )}
+                                </div>
 
-                              {/* Estado Normal/Anormal */}
-                              <div>
-                                <label className="text-xs text-gray-600 block mb-1">Estado</label>
-                                {pa.result ? (
-                                  <div
-                                    className={`p-2 rounded text-center text-xs font-medium ${
-                                      pa.result.is_normal ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                                    }`}
-                                  >
-                                    {pa.result.is_normal ? "Normal" : "Anormal"}
-                                  </div>
-                                ) : (
-                                  <Select
-                                    value={resultValues[pa.id]?.is_normal ? "normal" : "abnormal"}
-                                    onValueChange={(value) => updateResultValue(pa.id, "is_normal", value === "normal")}
-                                  >
-                                    <SelectTrigger className="bg-white">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="normal">
-                                        <div className="flex items-center gap-1">
-                                          <CheckCircle2 className="h-3 w-3 text-green-600" />
-                                          Normal
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="abnormal">
-                                        <div className="flex items-center gap-1">
-                                          <XCircle className="h-3 w-3 text-red-600" />
-                                          Anormal
-                                        </div>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              </div>
+                                {/* Estado Normal/Anormal */}
+                                <div>
+                                  <label className="text-xs text-gray-600 block mb-1">Estado</label>
+                                  {pa.result ? (
+                                    <Select
+                                      value={
+                                        resultValues[pa.id]?.is_normal !== undefined
+                                          ? resultValues[pa.id].is_normal
+                                            ? "normal"
+                                            : "abnormal"
+                                          : pa.result.is_normal
+                                            ? "normal"
+                                            : "abnormal"
+                                      }
+                                      onValueChange={(value) =>
+                                        updateResultValue(pa.id, "is_normal", value === "normal")
+                                      }
+                                    >
+                                      <SelectTrigger className="bg-white border-green-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="normal">
+                                          <div className="flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                            Normal
+                                          </div>
+                                        </SelectItem>
+                                        <SelectItem value="abnormal">
+                                          <div className="flex items-center gap-1">
+                                            <XCircle className="h-3 w-3 text-red-600" />
+                                            Anormal
+                                          </div>
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Select
+                                      value={resultValues[pa.id]?.is_normal ? "normal" : "abnormal"}
+                                      onValueChange={(value) =>
+                                        updateResultValue(pa.id, "is_normal", value === "normal")
+                                      }
+                                    >
+                                      <SelectTrigger className="bg-white">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="normal">
+                                          <div className="flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                            Normal
+                                          </div>
+                                        </SelectItem>
+                                        <SelectItem value="abnormal">
+                                          <div className="flex items-center gap-1">
+                                            <XCircle className="h-3 w-3 text-red-600" />
+                                            Anormal
+                                          </div>
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                </div>
 
-                              {/* Observaciones */}
-                              <div>
-                                <label className="text-xs text-gray-600 block mb-1">Observaciones</label>
-                                {pa.result ? (
-                                  <div className="p-2 bg-gray-100 rounded text-xs min-h-[60px]">
-                                    {pa.result.observations || "Sin observaciones"}
-                                  </div>
-                                ) : (
-                                  <Textarea
-                                    placeholder="Notas..."
-                                    value={resultValues[pa.id]?.observations || ""}
-                                    onChange={(e) => updateResultValue(pa.id, "observations", e.target.value)}
-                                    className="min-h-[60px] bg-white text-xs"
-                                  />
-                                )}
-                              </div>
+                                {/* Observaciones */}
+                                <div>
+                                  <label className="text-xs text-gray-600 block mb-1">Observaciones</label>
+                                  {pa.result ? (
+                                    <Textarea
+                                      value={
+                                        resultValues[pa.id]?.observations !== undefined
+                                          ? resultValues[pa.id].observations
+                                          : pa.result.observations
+                                      }
+                                      onChange={(e) => updateResultValue(pa.id, "observations", e.target.value)}
+                                      className="min-h-[60px] bg-white text-xs border-green-300"
+                                    />
+                                  ) : (
+                                    <Textarea
+                                      placeholder="Notas..."
+                                      value={resultValues[pa.id]?.observations || ""}
+                                      onChange={(e) => updateResultValue(pa.id, "observations", e.target.value)}
+                                      className="min-h-[60px] bg-white text-xs"
+                                    />
+                                  )}
+                                </div>
 
-                              {/* Botones de Acción o Estado */}
-                              <div className="flex flex-col gap-2">
-                                {pa.result?.validated_at ? (
-                                  <Badge variant="default" className="bg-green-600 text-white text-xs justify-center">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    Validado
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => saveResult(pa.id)}
-                                    disabled={isSaving || !resultValues[pa.id]?.value?.trim()}
-                                    className="bg-[#204983] hover:bg-[#204983]/90 text-xs"
-                                  >
-                                    {isSaving ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Save className="h-3 w-3" />
-                                    )}
-                                    <span className="ml-1">{pa.result ? "Actualizar" : "Guardar"}</span>
-                                  </Button>
-                                )}
+                                {/* Botones de Acción o Estado */}
+                                <div className="flex flex-col gap-2">
+                                  {pa.result?.validated_at ? (
+                                    <Badge variant="default" className="bg-green-600 text-white text-xs justify-center">
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                      Validado
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => saveResult(pa.id)}
+                                      disabled={isSaving || !resultValues[pa.id]?.value?.trim()}
+                                      className="bg-[#204983] hover:bg-[#204983]/90 text-xs"
+                                    >
+                                      {isSaving ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Save className="h-3 w-3" />
+                                      )}
+                                      <span className="ml-1">{pa.result ? "Actualizar" : "Guardar"}</span>
+                                    </Button>
+                                  )}
 
-                                {pa.result && !pa.result.validated_at && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs bg-orange-50 border-orange-300 text-orange-700 justify-center"
-                                  >
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    Sin Validar
-                                  </Badge>
-                                )}
+                                  {pa.result && !pa.result.validated_at && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-orange-50 border-orange-300 text-orange-700 justify-center"
+                                    >
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      Sin Validar
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <TestTube2 className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                          <p>No hay protocol-analyses para este protocolo</p>
+                          <p className="text-sm">Los análisis se cargarán cuando estén disponibles</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
 
-          {/* Infinite Scroll Sentinel */}
-          {hasMore && (
-            <div ref={sentinelRef} className="flex justify-center py-6">
-              {isLoadingMore && (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 text-[#204983] animate-spin" />
-                  <span className="text-gray-600">Cargando más protocolos...</span>
-                </div>
-              )}
+      {/* Infinite Scroll Sentinel */}
+      {hasMore && (
+        <div ref={sentinelRef} className="flex justify-center py-6">
+          {isLoadingMore && (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 text-[#204983] animate-spin" />
+              <span className="text-gray-600">Cargando más protocolos...</span>
             </div>
           )}
+        </div>
+      )}
 
-          {!hasMore && protocols.length > 0 && (
-            <div className="text-center py-6">
-              <div className="flex items-center justify-center gap-2 text-gray-500">
-                <CheckCircle2 className="h-5 w-5" />
-                <p>Todos los protocolos han sido cargados</p>
-              </div>
-            </div>
-          )}
+      {!hasMore && protocols.length > 0 && (
+        <div className="text-center py-6">
+          <div className="flex items-center justify-center gap-2 text-gray-500">
+            <CheckCircle2 className="h-5 w-5" />
+            <p>Todos los protocolos han sido cargados</p>
+          </div>
         </div>
       )}
     </div>

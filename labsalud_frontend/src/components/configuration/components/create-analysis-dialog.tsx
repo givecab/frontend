@@ -37,7 +37,6 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
 }) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
-  const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [measureUnit, setMeasureUnit] = useState("")
   const [formula, setFormula] = useState("")
@@ -46,7 +45,6 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
 
   useEffect(() => {
     if (open) {
-      setCode("")
       setName("")
       setMeasureUnit("")
       setFormula("")
@@ -58,7 +56,6 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!name.trim()) newErrors.name = "El nombre es requerido."
-    if (!code.trim()) newErrors.code = "El código es requerido."
     if (!measureUnit.trim()) newErrors.measureUnit = "La unidad de medida es requerida."
 
     setErrors(newErrors)
@@ -72,7 +69,6 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
     try {
       const analysisData = {
         panel: panelId,
-        code,
         name,
         measure_unit: measureUnit,
         formula: formula || null,
@@ -126,17 +122,6 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
           {errors.form && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{errors.form}</div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="analysis-code">Código *</Label>
-            <Input
-              id="analysis-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Ingrese el código de la determinación"
-            />
-            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="analysis-name">Nombre *</Label>

@@ -144,7 +144,10 @@ const UpdatedByAvatars = ({ updatedBy }: { updatedBy: AnalysisItem["updated_by"]
             </TooltipTrigger>
             <TooltipContent>
               <p>Modificado por: {user.username}</p>
-              <p className="text-xs text-gray-500">{formatFullDate(new Date().toISOString())}</p>
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <Clock className="h-2 w-2" />
+                {formatFullDate(new Date().toISOString())}
+              </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -199,7 +202,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
 
   const buildAnalysesUrl = useCallback(
     (offset = 0, search = "") => {
-      let url = `${ANALYSIS_ENDPOINTS.PANEL_ANALYSES(panel.id)}?limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${ANALYSIS_ENDPOINTS.ANALYSES}?panel=${panel.id}&limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) url += `&search=${encodeURIComponent(search)}`
       return url
     },
@@ -372,9 +375,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800 flex items-center gap-2">{analysis.name}</p>
-                      <p className="text-xs text-gray-500">
-                        Código: {analysis.code} | Unidad: {analysis.measure_unit}
-                      </p>
+                      <p className="text-xs text-gray-500">Unidad: {analysis.measure_unit}</p>
                     </div>
                   </div>
 
