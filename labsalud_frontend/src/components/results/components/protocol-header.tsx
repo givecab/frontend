@@ -48,6 +48,22 @@ interface ProtocolHeaderProps {
 }
 
 export function ProtocolHeader({ protocol, pendingCount, totalCount, isExpanded, onToggle }: ProtocolHeaderProps) {
+  const patientName = protocol?.patient
+    ? `${protocol.patient.first_name || "N/A"} ${protocol.patient.last_name || "N/A"}`
+    : "N/A"
+  const patientDni = protocol?.patient?.dni || "N/A"
+  const oossName = protocol?.ooss?.name || "N/A"
+  const protocolState = protocol?.state?.replace("_", " ") || "N/A"
+  const createdDate = protocol?.created_at ? new Date(protocol.created_at).toLocaleDateString() : "N/A"
+
+  if (!protocol) {
+    return (
+      <div className="p-4 bg-gray-100 border-b">
+        <div className="text-gray-500">Cargando información del protocolo...</div>
+      </div>
+    )
+  }
+
   return (
     <div
       className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 cursor-pointer hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 border-b"
@@ -64,11 +80,9 @@ export function ProtocolHeader({ protocol, pendingCount, totalCount, isExpanded,
               <h4 className="font-bold text-gray-900 text-lg">Protocolo #{protocol.id}</h4>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <User className="h-3 w-3" />
-                <span>
-                  {protocol.patient?.first_name || "N/A"} {protocol.patient?.last_name || "N/A"}
-                </span>
+                <span>{patientName}</span>
                 <span className="text-gray-400">•</span>
-                <span>DNI: {protocol.patient?.dni || "N/A"}</span>
+                <span>DNI: {patientDni}</span>
               </div>
             </div>
           </div>
@@ -77,11 +91,11 @@ export function ProtocolHeader({ protocol, pendingCount, totalCount, isExpanded,
           <div className="hidden md:flex items-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              <span>{new Date(protocol.created_at).toLocaleDateString()}</span>
+              <span>{createdDate}</span>
             </div>
             <div className="flex items-center gap-1">
               <Building2 className="h-3 w-3" />
-              <span>{protocol.ooss.name}</span>
+              <span>{oossName}</span>
             </div>
           </div>
 
@@ -107,7 +121,7 @@ export function ProtocolHeader({ protocol, pendingCount, totalCount, isExpanded,
                     : "bg-blue-100 text-blue-800"
               }`}
             >
-              {protocol.state?.replace("_", " ") || "N/A"}
+              {protocolState}
             </Badge>
           </div>
         </div>

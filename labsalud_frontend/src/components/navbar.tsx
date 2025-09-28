@@ -62,6 +62,17 @@ export const Navbar: React.FC = () => {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
+    if (!isMobileMenuOpen) {
+      setIsUserMenuOpen(false)
+    }
+  }
+
+  const handleUserMenuToggle = (isOpen: boolean) => {
+    setIsUserMenuOpen(isOpen)
+    // Close mobile menu when opening user menu
+    if (isOpen) {
+      setIsMobileMenuOpen(false)
+    }
   }
 
   return (
@@ -116,7 +127,7 @@ export const Navbar: React.FC = () => {
 
                 {/* User Dropdown - Pegado a la derecha */}
                 <div className="flex-shrink-0 relative">
-                  <UserDropdown onMenuToggle={setIsUserMenuOpen} />
+                  <UserDropdown onMenuToggle={handleUserMenuToggle} />
                 </div>
               </div>
             </div>
@@ -147,7 +158,7 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center justify-between">
               {/* Left - User Avatar */}
               <div className="flex-shrink-0">
-                <UserDropdown isMobile={true} onMenuToggle={setIsUserMenuOpen} />
+                <UserDropdown isMobile={true} onMenuToggle={handleUserMenuToggle} />
               </div>
 
               {/* Center - Logo */}

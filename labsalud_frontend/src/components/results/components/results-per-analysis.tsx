@@ -17,6 +17,7 @@ interface Panel {
   id: number
   name: string
   bio_unit: string
+  code?: string
 }
 
 interface Analysis {
@@ -62,17 +63,18 @@ interface Protocol {
   is_urgent: boolean
 }
 
-interface ProtocolAnalysisRaw {
+interface ProtocolAnalysisFromAPI {
   id: number
-  protocol: number
-  analysis: number
-  created_at: string
-  created_by: {
-    id: number
-    username: string
-  }
-  history: any[]
-  is_active: boolean
+  analysis: Analysis
+}
+
+interface ProtocolWithAnalysesFromAPI {
+  protocol: Protocol
+  protocol_analyses: ProtocolAnalysisFromAPI[]
+}
+
+interface APIResponseByPanelProtocols {
+  protocols: ProtocolWithAnalysesFromAPI[]
 }
 
 interface ProtocolAnalysisEnriched {
@@ -166,18 +168,27 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
 
       setIsLoadingHistory(true)
       try {
-        const response = await apiRequest(
-          `${ANALYSIS_ENDPOINTS.RESULTS}?protocol_analysis__protocol__patient=${patientId}&protocol_analysis__analysis=${analysisId}&ordering=-created_at&limit=10`,
-        )
+        const params = new URLSearchParams()
+        params.append("patient_id", patientId.toString())
+        params.append("analysis_id", analysisId.toString())
+
+        const response = await apiRequest(`${ANALYSIS_ENDPOINTS.RESULTS_BY_PATIENT_ANALYSIS}?${params.toString()}`)
+
         if (response.ok) {
           const data = await response.json()
-          console.log("[v0] Historical results fetched:", data)
+          console.log("[v0] Historical results raw response:", data)
+
+          const resultsArray = Array.isArray(data) ? data : data.results || []
+          console.log("[v0] Historical results processed:", resultsArray)
+
           setHistoricalResults((prev) => ({
             ...prev,
-            [key]: data.results || [],
+            [key]: resultsArray,
           }))
         } else {
           console.error("[v0] Error fetching historical results:", response.status)
+          const errorText = await response.text()
+          console.error("[v0] Error details:", errorText)
         }
       } catch (error) {
         console.error("Error fetching historical results:", error)
@@ -198,22 +209,13 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
     fetchHistoricalResults(patientId, analysisId)
   }
 
-  const enrichProtocolAnalyses = useCallback(
-    async (rawProtocolAnalyses: ProtocolAnalysisRaw[]): Promise<ProtocolAnalysisEnriched[]> => {
+  const enrichProtocolAnalysesWithResults = useCallback(
+    async (protocolAnalyses: ProtocolAnalysisEnriched[]): Promise<ProtocolAnalysisEnriched[]> => {
       const enriched: ProtocolAnalysisEnriched[] = []
 
-      for (const rawPA of rawProtocolAnalyses) {
+      for (const pa of protocolAnalyses) {
         try {
-          const [protocolResponse, analysisResponse, resultsResponse] = await Promise.all([
-            apiRequest(`${ANALYSIS_ENDPOINTS.PROTOCOLS}${rawPA.protocol}/`),
-            apiRequest(`${ANALYSIS_ENDPOINTS.ANALYSES}${rawPA.analysis}/`),
-            apiRequest(`${ANALYSIS_ENDPOINTS.RESULTS}?protocol_analysis=${rawPA.id}`),
-          ])
-
-          if (!protocolResponse.ok || !analysisResponse.ok) continue
-
-          const protocol = await protocolResponse.json()
-          const analysis = await analysisResponse.json()
+          const resultsResponse = await apiRequest(`${ANALYSIS_ENDPOINTS.RESULTS}?protocol_analysis=${pa.id}`)
 
           let result = undefined
           if (resultsResponse.ok) {
@@ -224,14 +226,12 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
           }
 
           enriched.push({
-            id: rawPA.id,
-            protocol,
-            analysis,
+            ...pa,
             result,
-            created_at: rawPA.created_at,
           })
         } catch (error) {
-          console.error(`Error enriching protocol analysis ${rawPA.id}:`, error)
+          console.error(`Error enriching protocol analysis ${pa.id}:`, error)
+          enriched.push(pa) // Add without result if error
         }
       }
 
@@ -287,29 +287,112 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
     }
   }, [apiRequest])
 
+  const handlePanelSelect = (panel: Panel) => {
+    console.log("[v0] Panel selected:", panel)
+    setSelectedPanel(panel)
+    // Clear any existing protocol analyses data to force fresh fetch
+    setProtocolsWithPanelAnalyses([])
+    setResultValues({})
+  }
+
+  const handleEnterSave = async (protocolAnalysisId: number, protocolGroup: ProtocolWithPanelAnalyses) => {
+    await saveResult(protocolAnalysisId)
+
+    // Find current analysis index
+    const currentIndex = protocolGroup.panelAnalyses.findIndex((pa) => pa.id === protocolAnalysisId)
+
+    // Find next available input (not calculated and no result)
+    for (let i = currentIndex + 1; i < protocolGroup.panelAnalyses.length; i++) {
+      const nextAnalysis = protocolGroup.panelAnalyses[i]
+      if (!nextAnalysis.result && !isCalculatedAnalysis(nextAnalysis.analysis.name)) {
+        // Focus the next input
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[data-analysis-id="${nextAnalysis.id}"]`) as HTMLInputElement
+          if (nextInput) {
+            nextInput.focus()
+          }
+        }, 100)
+        break
+      }
+    }
+  }
+
   const fetchProtocolAnalysesByPanel = useCallback(
     async (panelId: number) => {
       setIsLoadingProtocols(true)
       try {
         const params = new URLSearchParams()
-        params.append("analysis__panel", panelId.toString())
+        params.append("panel_id", panelId.toString())
 
-        if (filters.search) params.append("protocol__patient__first_name__icontains", filters.search)
-        if (filters.date) params.append("protocol__created_at__date", filters.date)
-        if (filters.state !== "all") params.append("protocol__state", filters.state)
-        if (filters.urgency !== "all")
-          params.append("protocol__is_urgent", filters.urgency === "true" ? "true" : "false")
+        const url = `${ANALYSIS_ENDPOINTS.RESULTS_BY_PANEL_PROTOCOLS}?${params.toString()}`
 
-        const protocolAnalysesUrl = `${ANALYSIS_ENDPOINTS.PROTOCOL_ANALYSES}?${params.toString()}`
-        const protocolAnalysesResponse = await apiRequest(protocolAnalysesUrl)
+        console.log("[v0] Fetching protocols by panel using correct endpoint:", url)
+        console.log("[v0] Panel ID:", panelId)
 
-        if (protocolAnalysesResponse.ok) {
-          const protocolAnalysesData = await protocolAnalysesResponse.json()
-          const enrichedData = await enrichProtocolAnalyses(protocolAnalysesData.results || [])
+        const response = await apiRequest(url)
 
+        if (response.ok) {
+          const data: APIResponseByPanelProtocols = await response.json()
+          console.log("[v0] API response from by-panel-protocols:", data)
+
+          const enrichedProtocols: ProtocolWithAnalysesFromAPI[] = []
+
+          for (const protocolWithAnalyses of data.protocols) {
+            try {
+              // Fetch complete protocol data
+              const protocolDetailResponse = await apiRequest(
+                ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocolWithAnalyses.protocol.id),
+              )
+
+              if (protocolDetailResponse.ok) {
+                const completeProtocol = await protocolDetailResponse.json()
+                console.log("[v0] Complete protocol data:", completeProtocol)
+
+                enrichedProtocols.push({
+                  protocol: completeProtocol, // Use complete protocol data with full medico, ooss, patient info
+                  protocol_analyses: protocolWithAnalyses.protocol_analyses,
+                })
+              } else {
+                console.warn(
+                  "[v0] Failed to fetch complete protocol data for protocol",
+                  protocolWithAnalyses.protocol.id,
+                )
+                // Fallback to original data if detail fetch fails
+                enrichedProtocols.push(protocolWithAnalyses)
+              }
+            } catch (error) {
+              console.error("[v0] Error fetching complete protocol data:", error)
+              // Fallback to original data if error occurs
+              enrichedProtocols.push(protocolWithAnalyses)
+            }
+          }
+
+          const allProtocolAnalyses: ProtocolAnalysisEnriched[] = []
+
+          enrichedProtocols.forEach((protocolWithAnalyses) => {
+            protocolWithAnalyses.protocol_analyses.forEach((protocolAnalysis) => {
+              allProtocolAnalyses.push({
+                id: protocolAnalysis.id,
+                protocol: protocolWithAnalyses.protocol, // Now contains complete protocol data
+                analysis: protocolAnalysis.analysis,
+                created_at: new Date().toISOString(),
+              })
+            })
+          })
+
+          console.log("[v0] Transformed protocol analyses with complete data:", allProtocolAnalyses)
+
+          // Enrich with results
+          const enrichedData = await enrichProtocolAnalysesWithResults(allProtocolAnalyses)
+          console.log("[v0] Enriched with results:", enrichedData)
+
+          // Group by protocol
           const groupedProtocols = groupProtocolAnalysesByProtocol(enrichedData)
+          console.log("[v0] Grouped protocols:", groupedProtocols)
+
           setProtocolsWithPanelAnalyses(groupedProtocols)
 
+          // Initialize result values
           const initialValues: { [key: number]: { value: string; is_abnormal: boolean; note: string } } = {}
           enrichedData.forEach((pa: ProtocolAnalysisEnriched) => {
             initialValues[pa.id] = {
@@ -320,17 +403,21 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
           })
           setResultValues(initialValues)
         } else {
+          console.error("[v0] Error fetching protocols by panel:", response.status)
+          const errorText = await response.text()
+          console.error("[v0] Error details:", errorText)
           setProtocolsWithPanelAnalyses([])
           setResultValues({})
+          toast.error("Error al cargar los protocolos del panel", { duration: TOAST_DURATION })
         }
       } catch (error) {
-        console.error("Error fetching protocol analyses:", error)
-        toast.error("Error al cargar los análisis de protocolo", { duration: TOAST_DURATION })
+        console.error("Error fetching protocols by panel:", error)
+        toast.error("Error al cargar los protocolos del panel", { duration: TOAST_DURATION })
       } finally {
         setIsLoadingProtocols(false)
       }
     },
-    [apiRequest, filters, enrichProtocolAnalyses],
+    [apiRequest, enrichProtocolAnalysesWithResults],
   )
 
   const saveResult = async (protocolAnalysisId: number) => {
@@ -475,7 +562,7 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
           panels={panels}
           selectedPanel={selectedPanel}
           isLoading={isLoadingPanels}
-          onPanelSelect={setSelectedPanel}
+          onPanelSelect={handlePanelSelect}
         />
       </div>
 
@@ -487,6 +574,9 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
                 <div className="flex items-center gap-2">
                   <Target className="h-5 w-5 text-[#204983]" />
                   <span>Panel: {selectedPanel.name}</span>
+                  {selectedPanel.code && (
+                    <span className="text-sm font-mono text-[#204983]/70">({selectedPanel.code})</span>
+                  )}
                 </div>
                 <Badge variant="outline" className="text-[#204983] border-[#204983]/30">
                   {protocolsWithPanelAnalyses.length} protocolos
@@ -522,20 +612,42 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
                       <div className="p-6 bg-white">
                         {/* Protocol Info */}
                         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium text-gray-700">Paciente:</span>
+                              <p className="text-gray-900">
+                                {protocolGroup.protocol?.patient?.first_name || "N/A"}{" "}
+                                {protocolGroup.protocol?.patient?.last_name || "N/A"}
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                DNI: {protocolGroup.protocol?.patient?.dni || "N/A"}
+                              </p>
+                            </div>
                             <div>
                               <span className="font-medium text-gray-700">Médico Solicitante:</span>
                               <p className="text-gray-900">
-                                {protocolGroup.protocol.medico.first_name} {protocolGroup.protocol.medico.last_name}
+                                Dr. {protocolGroup.protocol?.medico?.first_name || "N/A"}{" "}
+                                {protocolGroup.protocol?.medico?.last_name || "N/A"}
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Mat: {protocolGroup.protocol?.medico?.license || "N/A"}
                               </p>
                             </div>
                             <div>
                               <span className="font-medium text-gray-700">Obra Social:</span>
-                              <p className="text-gray-900">{protocolGroup.protocol.ooss.name}</p>
+                              <p className="text-gray-900">{protocolGroup.protocol?.ooss?.name || "N/A"}</p>
+                              <p className="text-xs text-gray-600">
+                                Nº: {protocolGroup.protocol?.ooss_number || "N/A"}
+                              </p>
                             </div>
                             <div>
                               <span className="font-medium text-gray-700">Estado:</span>
-                              <p className="text-gray-900">{protocolGroup.protocol.state.replace("_", " ")}</p>
+                              <p className="text-gray-900">
+                                {protocolGroup.protocol?.state?.replace("_", " ") || "N/A"}
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                {protocolGroup.protocol?.is_urgent ? "URGENTE" : "Normal"}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -587,7 +699,7 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
                                               id: pa.result.id,
                                               value: pa.result.value,
                                               is_abnormal: pa.result.is_abnormal,
-                                              note: pa.result.notes, // Map notes to note
+                                              note: pa.result.notes,
                                               validated_at: pa.result.validated_at,
                                             }
                                           : undefined
@@ -603,8 +715,8 @@ export function ResultadosPorAnalisis({ filters, onStatsUpdate }: ResultadosPorA
                                       onShowHistory={() =>
                                         handleShowHistory(pa.protocol.patient.id, pa.analysis.id, pa.id)
                                       }
-                                      onEnterSave={() => saveResult(pa.id)}
-                                      nextInputRef={getNextInputRef}
+                                      onEnterSave={() => handleEnterSave(pa.id, protocolGroup)}
+                                      protocolAnalysisId={pa.id}
                                     />
 
                                     {isActive && (

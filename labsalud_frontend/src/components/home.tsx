@@ -23,10 +23,10 @@ interface Stats {
 }
 
 export default function Home() {
-  const { user } = useAuth()  
+  const { user } = useAuth()
   const { apiRequest } = useApi()
   const { error: showErrorToast } = useToast()
-  
+
   const [stats, setStats] = useState<Stats>({
     analysisToday: 0,
     patientsToday: 0,
@@ -40,49 +40,42 @@ export default function Home() {
   const getActivePermissions = (): Permission[] => {
     if (!user || !user.temp_permissions) return []
     const now = new Date()
-    return user.temp_permissions.filter((perm: Permission) => 
-      perm.expires_at && new Date(perm.expires_at) > now
-    )
+    return user.temp_permissions.filter((perm: Permission) => perm.expires_at && new Date(perm.expires_at) > now)
   }
 
   const fetchStats = async () => {
     try {
       setLoading(true)
-      
+
       // Llamadas paralelas a todos los endpoints
-      const [
-        analysisResponse,
-        completedResponse,
-        avgTimeResponse,
-        patientsResponse,
-        growthResponse
-      ] = await Promise.all([
-        apiRequest('/api/analysis/protocols/stats/created-today/'),
-        apiRequest('/api/analysis/protocols/stats/analyses-completed-month/'),
-        apiRequest('/api/analysis/protocols/stats/avg-result-load-time/'),
-        apiRequest('/api/analysis/protocols/stats/panels-today/'),
-        apiRequest('/api/analysis/protocols/stats/patient-growth/')
-      ])
+      const [analysisResponse, completedResponse, avgTimeResponse, patientsResponse, growthResponse] =
+        await Promise.all([
+          apiRequest("/api/analysis/protocols/stats/created-today/"),
+          apiRequest("/api/analysis/protocols/stats/analyses-completed-month/"),
+          apiRequest("/api/analysis/protocols/stats/avg-result-load-time/"),
+          apiRequest("/api/analysis/protocols/stats/panels-today/"),
+          apiRequest("/api/analysis/protocols/stats/patient-growth/"),
+        ])
 
       const [analysisData, completedData, avgTimeData, patientsData, growthData] = await Promise.all([
         analysisResponse.json(),
         completedResponse.json(),
         avgTimeResponse.json(),
         patientsResponse.json(),
-        growthResponse.json()
+        growthResponse.json(),
       ])
 
-      setStats(prevStats => ({
+      setStats((prevStats) => ({
         ...prevStats,
         analysisToday: analysisData.created_today || 0,
         completedAnalysis: completedData.results_validated_this_month || 0,
         averageProcessingTime: avgTimeData.avg_result_load_time ? Math.round(avgTimeData.avg_result_load_time) : 0,
-        patientsToday: patientsData.panels_today || 0,
+        patientsToday: typeof patientsData.panels_today === "number" ? patientsData.panels_today : 0,
         monthlyGrowth: growthData.growth_percent !== null ? Number(growthData.growth_percent.toFixed(1)) : 0,
       }))
     } catch (error) {
-      console.error('Error fetching stats:', error)
-      showErrorToast('Error al cargar las estadísticas')
+      console.error("Error fetching stats:", error)
+      showErrorToast("Error al cargar las estadísticas")
     } finally {
       setLoading(false)
     }
@@ -129,7 +122,9 @@ export default function Home() {
                 <span className="text-sm font-medium text-green-800">{perm.name}</span>
                 <div className="flex items-center space-x-1 text-xs text-green-600">
                   <Clock className="w-3 h-3" />
-                  <span>Expira: {perm.expires_at ? new Date(perm.expires_at).toLocaleString("es-ES") : 'Sin fecha'}</span>
+                  <span>
+                    Expira: {perm.expires_at ? new Date(perm.expires_at).toLocaleString("es-ES") : "Sin fecha"}
+                  </span>
                 </div>
               </div>
             ))}
@@ -217,7 +212,7 @@ export default function Home() {
             {loading ? (
               <div className="animate-pulse bg-emerald-200 h-8 w-16 rounded"></div>
             ) : (
-              `${stats.monthlyGrowth >= 0 ? '+' : ''}${stats.monthlyGrowth}%`
+              `${stats.monthlyGrowth >= 0 ? "+" : ""}${stats.monthlyGrowth}%`
             )}
           </h3>
           <p className="text-emerald-600 text-sm">vs. mes anterior</p>

@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { Input } from "../../ui/input"
 import { Textarea } from "../../ui/textarea"
 import { Button } from "../../ui/button"
@@ -39,7 +41,8 @@ interface AnalysisInputProps {
   onFocus: () => void
   onShowHistory: () => void
   onEnterSave?: () => void
-  nextInputRef?: () => HTMLInputElement | null
+  nextInputRef?: React.RefObject<HTMLInputElement> // Declare nextInputRef type
+  protocolAnalysisId: number // Added protocolAnalysisId for data attribute
 }
 
 export function AnalysisInput({
@@ -54,6 +57,7 @@ export function AnalysisInput({
   onShowHistory,
   onEnterSave,
   nextInputRef,
+  protocolAnalysisId,
 }: AnalysisInputProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-center">
@@ -79,6 +83,7 @@ export function AnalysisInput({
               value={resultValue.value}
               onChange={(e) => onValueChange("value", e.target.value)}
               onFocus={onFocus}
+              data-analysis-id={protocolAnalysisId} // Added data attribute for proper navigation
               onKeyDown={(e) => {
                 if (e.key === "Enter" && resultValue.value?.trim()) {
                   e.preventDefault()
@@ -89,9 +94,8 @@ export function AnalysisInput({
                   }
                   // Focus next input after saving
                   setTimeout(() => {
-                    const nextInput = nextInputRef?.()
-                    if (nextInput) {
-                      nextInput.focus()
+                    if (nextInputRef?.current) {
+                      nextInputRef.current.focus()
                     }
                   }, 100)
                 }
@@ -120,6 +124,7 @@ export function AnalysisInput({
               value={resultValue.value}
               onChange={(e) => onValueChange("value", e.target.value)}
               onFocus={onFocus}
+              data-analysis-id={protocolAnalysisId} // Added data attribute for proper navigation
               onKeyDown={(e) => {
                 if (e.key === "Enter" && resultValue.value?.trim()) {
                   e.preventDefault()
@@ -128,16 +133,10 @@ export function AnalysisInput({
                   } else {
                     onSave()
                   }
-                  // Focus next input after saving
-                  setTimeout(() => {
-                    const nextInput = nextInputRef?.()
-                    if (nextInput) {
-                      nextInput.focus()
-                    }
-                  }, 100)
                 }
               }}
               className="text-center bg-white"
+              ref={nextInputRef} // Assign ref to Input
             />
             <Button
               size="sm"

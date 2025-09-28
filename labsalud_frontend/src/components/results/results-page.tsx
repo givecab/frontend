@@ -89,7 +89,9 @@ export default function ResultadosPage() {
         const analysesResponse = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSES)
         if (analysesResponse.ok) {
           const analysesData = await analysesResponse.json()
-          const types = [...new Set(analysesData.results?.map((a: any) => a.panel?.name).filter(Boolean) || [])] as string[]
+          const types = [
+            ...new Set(analysesData.results?.map((a: any) => a.panel?.name).filter(Boolean) || []),
+          ] as string[]
           setAnalysisTypes(types)
         }
       } else {
@@ -146,6 +148,14 @@ export default function ResultadosPage() {
     setStateFilter("all")
     setUrgencyFilter("all")
     setAnalysisTypeFilter("all")
+  }
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    if (value === "analisis") {
+      // Clear analysis type filter to prevent conflicts with panel selection
+      setAnalysisTypeFilter("all")
+    }
   }
 
   if (isLoading) {
@@ -336,32 +346,43 @@ export default function ResultadosPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    <FlaskConical className="h-4 w-4 text-[#204983]" />
-                    Tipo de Análisis
-                  </label>
-                  <Select value={analysisTypeFilter} onValueChange={setAnalysisTypeFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los Tipos</SelectItem>
-                      {analysisTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {activeTab === "protocolo" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                      <FlaskConical className="h-4 w-4 text-[#204983]" />
+                      Tipo de Análisis
+                    </label>
+                    <Select value={analysisTypeFilter} onValueChange={setAnalysisTypeFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los Tipos</SelectItem>
+                        {analysisTypes.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
+
+              {activeTab === "analisis" && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Modo Por Análisis:</strong> Selecciona un panel específico arriba para ver solo los análisis
+                    de ese panel. Los filtros de tipo de análisis no aplican en este modo.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Metodología de Trabajo */}
           <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               {/* Header de Tabs con Descripción */}
               <div className="border-b px-4 md:px-6 pt-4 md:pt-6 pb-4">
                 <div className="mb-4">

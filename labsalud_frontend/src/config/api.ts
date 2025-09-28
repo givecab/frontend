@@ -71,11 +71,12 @@ export const ANALYSIS_ENDPOINTS = {
   // Insurance (OOSS)
   OOSS: buildApiUrl("/analysis/ooss/"),
   OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
+  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?active=true"),
 
   // Protocols
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),
   PROTOCOL_DETAIL: (id: number) => buildApiUrl(`/analysis/protocols/${id}/`),
-  PROTOCOL_HISTORY: (id: number) => buildApiUrl(`/analysis/protocols/${id}/history/`),
+  PROTOCOL_HIERARCHY: (id: number) => buildApiUrl(`/analysis/protocols/${id}/hierarchy/`),
 
   // Protocol Analyses
   PROTOCOL_ANALYSES: buildApiUrl("/analysis/protocol-analyses/"),
@@ -84,6 +85,8 @@ export const ANALYSIS_ENDPOINTS = {
   // Results
   RESULTS: buildApiUrl("/analysis/results/"),
   RESULT_DETAIL: (id: number) => buildApiUrl(`/analysis/results/${id}/`),
+  RESULTS_BY_PATIENT_ANALYSIS: buildApiUrl("/analysis/results/by-patient-analysis/"),
+  RESULTS_BY_PANEL_PROTOCOLS: buildApiUrl("/analysis/results/by-panel-protocols/"),
 } as const
 
 // Core endpoints

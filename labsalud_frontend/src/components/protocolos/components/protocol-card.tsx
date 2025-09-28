@@ -159,22 +159,22 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
 
   const getStateLabel = (state: string) => {
     const stateLabels = {
-      carga_pendiente: "Carga Pendiente",
-      carga_completa: "Carga Completa",
-      validacion_pendiente: "Validación Pendiente",
-      finalizado: "Finalizado",
-      cancelado: "Cancelado",
+      pending_entry: "Pendiente de Carga",
+      entry_complete: "Carga Completa",
+      pending_validation: "Pendiente de Validación",
+      completed: "Completado",
+      cancelled: "Cancelado",
     }
     return stateLabels[state as keyof typeof stateLabels] || state
   }
 
   const getStateColor = (state: string) => {
     const stateColors = {
-      carga_pendiente: "bg-yellow-100 text-yellow-800",
-      carga_completa: "bg-blue-100 text-blue-800",
-      validacion_pendiente: "bg-orange-100 text-orange-800",
-      finalizado: "bg-green-100 text-green-800",
-      cancelado: "bg-red-100 text-red-800",
+      pending_entry: "bg-yellow-100 text-yellow-800",
+      entry_complete: "bg-blue-100 text-blue-800",
+      pending_validation: "bg-orange-100 text-orange-800",
+      completed: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
     }
     return stateColors[state as keyof typeof stateColors] || "bg-gray-100 text-gray-800"
   }
@@ -250,10 +250,14 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     if (panelHierarchy.length === 0) {
       setLoadingAnalyses(true)
       try {
-        const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_HISTORY(protocol.id))
+        const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_HIERARCHY(protocol.id))
 
         if (response.ok) {
           const data: PanelHierarchy[] = await response.json()
+          console.log("[v0] Protocol hierarchy response:", data)
+          console.log("[v0] Response type:", typeof data)
+          console.log("[v0] Is array:", Array.isArray(data))
+
           setPanelHierarchy(data)
         } else {
           throw new Error("Error fetching protocol hierarchy")
@@ -274,10 +278,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     try {
       const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ state: "cancelado" }),
+        body: { state: "cancelled" },
       })
 
       if (response.ok) {
@@ -299,10 +300,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     try {
       const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ paid: true }),
+        body: { paid: true },
       })
 
       if (response.ok) {
@@ -384,14 +382,18 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
   const latestUpdate = getLatestUpdate()
 
   // Verificar si el protocolo puede ser cancelado
-  const canBeCancelled = protocol.state !== "cancelado" && protocol.state !== "finalizado"
+  const canBeCancelled =
+    protocol.state !== "cancelled" &&
+    protocol.state !== "completed" &&
+    protocol.state !== "cancelado" &&
+    protocol.state !== "finalizado"
 
   return (
     <>
       <Card
         className={`transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer bg-white ${
           isExpanded ? "ring-2 ring-[#204983] ring-opacity-20" : ""
-        } border-l-4 ${protocol.state === "cancelado" ? "border-l-red-500" : "border-l-[#204983]"}`}
+        } border-l-4 ${protocol.state === "cancelled" || protocol.state === "cancelado" ? "border-l-red-500" : "border-l-[#204983]"}`}
         onClick={handleCardClick}
       >
         <CardContent className="p-4 pb-3">
@@ -400,12 +402,12 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
               <div className="flex items-center space-x-3">
                 <div
                   className={`flex-shrink-0 p-2 rounded-full ${
-                    protocol.state === "cancelado" ? "bg-red-500" : "bg-[#204983]"
+                    protocol.state === "cancelled" || protocol.state === "cancelado" ? "bg-red-500" : "bg-[#204983]"
                   }`}
                 >
                   <div className="h-5 w-5 bg-white rounded-sm flex items-center justify-center">
                     <span
-                      className={`text-xs font-bold ${protocol.state === "cancelado" ? "text-red-500" : "text-[#204983]"}`}
+                      className={`text-xs font-bold ${protocol.state === "cancelled" || protocol.state === "cancelado" ? "text-red-500" : "text-[#204983]"}`}
                     >
                       P
                     </span>
@@ -417,7 +419,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
                       Protocolo #{protocol.id}
                     </h3>
                     {/* Botón marcar como pagado en el header */}
-                    {!protocol.paid && protocol.state !== "cancelado" && (
+                    {!protocol.paid && protocol.state !== "cancelled" && protocol.state !== "cancelado" && (
                       <Button
                         size="sm"
                         onClick={handleMarkAsPaid}

@@ -38,7 +38,7 @@ interface AuthContextType {
   isInitialized: boolean
   isLoading: boolean
   login: (username: string, password: string) => Promise<boolean>
-  logout: () => void
+  logout: (showToast?: boolean) => void
   hasPermission: (permission: number | string) => boolean
   isInGroup: (groupName: string) => boolean
   refreshUser: () => Promise<void>
@@ -62,26 +62,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Configuración del tiempo de inactividad (en milisegundos)
   const [idleConfig] = useState({
-    idleTime: 5 * 60 * 1000, // 10 segundos
-    warningTime: 30 * 1000, // 5 segundos
+    idleTime: 5 * 60 * 1000, // 5 minutes
+    warningTime: 30 * 1000, // 30 seconds
   })
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("user")
-    setToken(null)
-    setUser(null)
-    setIsAuthenticated(false)
-    success("Sesión cerrada", {
-      description: "Has cerrado sesión exitosamente",
-    })
-  }, [success])
+  const logout = useCallback(
+    (showToast = true) => {
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("refresh_token")
+      localStorage.removeItem("user")
+      setToken(null)
+      setUser(null)
+      setIsAuthenticated(false)
 
-  const { showWarning, timeLeft, extendSession } = useIdleTimeout({
-    onIdle: logout,
+      // Only show toast if explicitly requested (manual logout)
+      if (showToast) {
+        success("Sesión cerrada", {
+          description: "Has cerrado sesión exitosamente",
+        })
+      }
+    },
+    [success],
+  )
+
+  const { showWarning, timeLeft, extendSession, resetIdleTimeout } = useIdleTimeout({
+    onIdle: () => logout(false), // Don't show toast for idle logout
     idleTime: idleConfig.idleTime,
     warningTime: idleConfig.warningTime,
+    enabled: isAuthenticated, // Only active when authenticated
   })
 
   const hasPermission = useCallback(
@@ -124,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(data.access)
       return true
     } catch {
-      logout()
+      logout(false)
       return false
     }
   }, [logout])
@@ -154,9 +162,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem("access_token", data.access)
         localStorage.setItem("refresh_token", data.refresh)
         localStorage.setItem("user", JSON.stringify(data.user))
+        localStorage.setItem("last_username", username)
         setToken(data.access)
         setUser(data.user)
         setIsAuthenticated(true)
+
+        if (resetIdleTimeout) {
+          resetIdleTimeout()
+        }
 
         success("Inicio de sesión exitoso", {
           description: "Bienvenido de vuelta",
@@ -171,7 +184,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setIsLoading(false)
       }
     },
-    [success, error],
+    [success, error, resetIdleTimeout],
   )
 
   const refreshUser = useCallback(async () => {
@@ -191,7 +204,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(parsedUser)
       setIsAuthenticated(true)
     } catch {
-      logout()
+      logout(false)
     } finally {
       initializationRef.current = true
       setIsInitialized(true)

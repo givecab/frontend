@@ -60,7 +60,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
   }
 
   const handleLogout = () => {
-    logout()
+    logout(true)
     setIsOpen(false)
   }
 
@@ -107,24 +107,11 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
         {/* User Info */}
         <div className="px-4 py-4 border-b border-gray-100">
           {isMobile && (
-            <div className="flex items-center space-x-3 mb-3">
-              {user.photo ? (
-                <img
-                  src={user.photo || "/placeholder.svg"}
-                  alt={`${user.username} avatar`}
-                  className="w-12 h-12 rounded-full object-cover border border-gray-300"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-[#204983] flex items-center justify-center">
-                  <User className="w-7 h-7 text-white" />
-                </div>
-              )}
-              <div>
-                <p className="text-lg font-medium text-gray-900">
-                  {user.first_name} {user.last_name}
-                </p>
-                <p className="text-sm text-gray-500">{user.username}</p>
-              </div>
+            <div className="mb-3">
+              <p className="text-lg font-medium text-gray-900">
+                {user.first_name} {user.last_name}
+              </p>
+              <p className="text-sm text-gray-500">{user.username}</p>
             </div>
           )}
           {!isMobile && (

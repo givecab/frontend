@@ -6,119 +6,140 @@ interface IdleTimeoutProps {
   onIdle: () => void
   idleTime: number
   warningTime: number
+  enabled?: boolean
 }
 
-export function useIdleTimeout({ onIdle, idleTime, warningTime }: IdleTimeoutProps) {
+export function useIdleTimeout({ onIdle, idleTime, warningTime, enabled = true }: IdleTimeoutProps) {
   const [showWarning, setShowWarning] = useState(false)
   const [timeLeft, setTimeLeft] = useState(Math.ceil(warningTime / 1000))
 
-  // Referencias para el temporizador único y estado
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  // Referencias para el temporizador y estado
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const warningTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isWarningActiveRef = useRef(false)
-  const warningEndTimeRef = useRef<number>(0)
   const lastActivityRef = useRef<number>(Date.now())
 
-  // Función para limpiar el temporizador
-  const clearTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
+  const clearAllTimers = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
+    if (warningTimerRef.current) {
+      clearInterval(warningTimerRef.current)
+      warningTimerRef.current = null
     }
   }, [])
 
-  // Función para actualizar el contador de advertencia
-  const updateCounter = useCallback(() => {
-    if (!isWarningActiveRef.current) return
-
-    const now = Date.now()
-    const remaining = Math.max(0, warningEndTimeRef.current - now)
-    const secondsLeft = Math.ceil(remaining / 1000)
-
-    setTimeLeft(secondsLeft)
-
-    if (remaining <= 0) {
-      // Tiempo agotado, cerrar sesión
-      isWarningActiveRef.current = false
-      setShowWarning(false)
-      onIdle()
-    } else {
-      // Programar la siguiente actualización
-      timerRef.current = setTimeout(updateCounter, 1000)
-    }
-  }, [onIdle])
-
-  // Función para iniciar la fase de advertencia
   const startWarning = useCallback(() => {
+    console.log("[v0] Starting warning phase")
     isWarningActiveRef.current = true
-    warningEndTimeRef.current = Date.now() + warningTime
     setShowWarning(true)
-    setTimeLeft(Math.ceil(warningTime / 1000))
 
-    // Iniciar el contador
-    clearTimer()
-    timerRef.current = setTimeout(updateCounter, 1000)
-  }, [warningTime, clearTimer, updateCounter])
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current)
+      warningTimerRef.current = null
+    }
 
-  // Función para resetear el temporizador de inactividad
-  const resetTimer = useCallback(() => {
-    // No resetear si estamos en modo advertencia
-    if (isWarningActiveRef.current) return
+    const initialSeconds = Math.ceil(warningTime / 1000)
+    setTimeLeft(initialSeconds)
 
-    clearTimer()
+    warningTimerRef.current = setInterval(() => {
+      setTimeLeft((prevTime) => {
+        const newTime = prevTime - 1
+        console.log("[v0] Counter updated:", newTime)
 
-    // Configurar el temporizador para que dispare la advertencia
+        if (newTime <= 0) {
+          console.log("[v0] Time expired, logging out")
+          isWarningActiveRef.current = false
+          setShowWarning(false)
+          if (warningTimerRef.current) {
+            clearInterval(warningTimerRef.current)
+            warningTimerRef.current = null
+          }
+          onIdle()
+          return 0
+        }
+        return newTime
+      })
+    }, 1000)
+  }, [warningTime, onIdle])
+
+  const resetIdleTimer = useCallback(() => {
+    if (isWarningActiveRef.current) {
+      return // No resetear durante la advertencia
+    }
+
+    clearAllTimers()
+    lastActivityRef.current = Date.now()
+
     const timeUntilWarning = idleTime - warningTime
-    timerRef.current = setTimeout(startWarning, timeUntilWarning)
-  }, [idleTime, warningTime, clearTimer, startWarning])
+    console.log("[v0] Setting idle timer for", timeUntilWarning, "ms")
 
-  // Manejador de actividad con throttling
+    idleTimerRef.current = setTimeout(() => {
+      console.log("[v0] Idle timer executed, starting warning")
+      startWarning()
+    }, timeUntilWarning)
+  }, [idleTime, warningTime, clearAllTimers, startWarning])
+
   const handleActivity = useCallback(() => {
     const now = Date.now()
 
-    // Throttling: solo procesar si ha pasado al menos 1 segundo desde la última actividad
-    if (now - lastActivityRef.current < 1000) return
-
-    lastActivityRef.current = now
-
-    // Solo resetear si no estamos en modo advertencia
-    if (!isWarningActiveRef.current) {
-      resetTimer()
+    // Throttling simple: solo cada 2 segundos
+    if (now - lastActivityRef.current < 2000) {
+      return
     }
-  }, [resetTimer])
 
-  // Función para extender la sesión
+    console.log("[v0] Activity detected")
+
+    if (!isWarningActiveRef.current) {
+      resetIdleTimer()
+    }
+  }, [resetIdleTimer])
+
   const extendSession = useCallback(() => {
+    console.log("[v0] Extending session")
     isWarningActiveRef.current = false
     setShowWarning(false)
-    warningEndTimeRef.current = 0
-    lastActivityRef.current = Date.now()
+    clearAllTimers()
+    resetIdleTimer()
+  }, [clearAllTimers, resetIdleTimer])
 
-    clearTimer()
-    resetTimer()
-  }, [clearTimer, resetTimer])
+  const resetIdleTimeout = useCallback(() => {
+    console.log("[v0] Full reset of idle timeout")
+    isWarningActiveRef.current = false
+    setShowWarning(false)
+    setTimeLeft(Math.ceil(warningTime / 1000))
+    clearAllTimers()
+    resetIdleTimer()
+  }, [clearAllTimers, resetIdleTimer, warningTime])
 
-  // Configurar eventos y temporizador inicial
   useEffect(() => {
-    const events = ["mousemove", "mousedown", "keypress", "keydown", "scroll", "touchstart", "click"]
+    if (!enabled) {
+      console.log("[v0] Idle timeout disabled")
+      return
+    }
 
-    // Agregar event listeners
+    const events = ["mousemove", "mousedown", "keypress", "scroll", "click"]
+
+    console.log("[v0] Setting up idle timeout")
+
     events.forEach((event) => {
       document.addEventListener(event, handleActivity, { passive: true })
     })
 
-    // Iniciar el temporizador
-    resetTimer()
+    // Iniciar el timer inmediatamente
+    resetIdleTimer()
 
-    // Limpiar al desmontar
     return () => {
-      clearTimer()
+      console.log("[v0] Cleaning up idle timeout")
+      clearAllTimers()
       events.forEach((event) => {
         document.removeEventListener(event, handleActivity)
       })
     }
-  }, [handleActivity, resetTimer, clearTimer])
+  }, [enabled]) // Added enabled to dependencies
 
-  return { showWarning, timeLeft, extendSession }
+  return { showWarning, timeLeft, extendSession, resetIdleTimeout }
 }
 
 export default useIdleTimeout

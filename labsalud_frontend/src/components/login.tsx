@@ -21,6 +21,13 @@ export default function Login() {
     }
   }, [user, navigate])
 
+  useEffect(() => {
+    const lastUsername = localStorage.getItem("last_username")
+    if (lastUsername && !username) {
+      setUsername(lastUsername)
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 

@@ -65,7 +65,7 @@ export default function IngresoPage() {
       setIsLoading(true)
       const [medicosResponse, oossResponse] = await Promise.all([
         apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS}?limit=20&offset=0`),
-        apiRequest(`${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}&limit=20&offset=0`),
+        apiRequest(`${ANALYSIS_ENDPOINTS.OOSS_ACTIVE}?limit=20&offset=0`),
       ])
 
       if (medicosResponse.ok) {
