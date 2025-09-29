@@ -137,7 +137,7 @@ export function ProtocolForm({
                 <SelectContent>
                   <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="physical">Retiro físico</SelectItem>
+                  <SelectItem value="in_person">Retiro físico</SelectItem>
                 </SelectContent>
               </Select>
             </div>

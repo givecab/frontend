@@ -59,7 +59,7 @@ export function MedicoCombobox({
     try {
       setIsLoading(true)
       const response = await apiRequest(
-        `${ANALYSIS_ENDPOINTS.MEDICOS_ACTIVE}?search=${encodeURIComponent(term)}&limit=50&offset=0`,
+        `${ANALYSIS_ENDPOINTS.MEDICOS}?search=${encodeURIComponent(term)}&limit=50&offset=0&active=true`,
       )
 
       if (response.ok) {
@@ -80,7 +80,7 @@ export function MedicoCombobox({
 
     try {
       setIsLoading(true)
-      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS_ACTIVE}?limit=20&offset=${offset}`)
+      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS}?limit=20&offset=${offset}&active=true`)
 
       if (response.ok) {
         const data: PaginatedResponse<Medico> = await response.json()

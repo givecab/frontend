@@ -66,12 +66,12 @@ export const ANALYSIS_ENDPOINTS = {
 
   // Doctors
   MEDICOS: buildApiUrl("/analysis/medicos/"),
-  MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/`),
+  MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/?is_active=true`),
 
   // Insurance (OOSS)
   OOSS: buildApiUrl("/analysis/ooss/"),
   OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
-  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?active=true"),
+  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?is_active=true"),
 
   // Protocols
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),

@@ -95,11 +95,11 @@ export default function ProtocolosPage() {
 
         setStats({
           total: totalCount,
-          pending: stateStats.carga_pendiente || 0,
-          completed: stateStats.carga_completa || 0,
-          validated: stateStats.validacion_pendiente || 0,
-          finalized: stateStats.finalizado || 0,
-          cancelled: stateStats.cancelado || 0,
+          pending: stateStats.pending_entry || 0,
+          completed: stateStats.entry_complete || 0,
+          validated: stateStats.pending_validation || 0,
+          finalized: stateStats.completed || 0,
+          cancelled: stateStats.cancelled || 0,
         })
       }
     } catch (error) {
@@ -403,11 +403,11 @@ export default function ProtocolosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="carga_pendiente">Carga Pendiente</SelectItem>
-                <SelectItem value="carga_completa">Carga Completa</SelectItem>
-                <SelectItem value="validacion_pendiente">Validación Pendiente</SelectItem>
-                <SelectItem value="finalizado">Finalizado</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
+                <SelectItem value="pending_entry">Carga Pendiente</SelectItem>
+                <SelectItem value="entry_complete">Carga Completa</SelectItem>
+                <SelectItem value="pending_validation">Validación Pendiente</SelectItem>
+                <SelectItem value="completed">Finalizado</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
               </SelectContent>
             </Select>
 

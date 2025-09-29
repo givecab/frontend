@@ -26,7 +26,6 @@ import { Badge } from "../../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -183,7 +182,7 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     const methodLabels = {
       email: "Email",
       whatsapp: "WhatsApp",
-      physical: "Retiro físico",
+      in_person: "Retiro físico",
     }
     return methodLabels[method as keyof typeof methodLabels] || method
   }
@@ -196,15 +195,6 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    })
-  }
-
-  const formatDateShort = (dateString?: string) => {
-    if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
     })
   }
 
@@ -772,45 +762,6 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
                       </div>
                     </div>
                   </div>
-
-                  {/* Tabla de Análisis */}
-                  {panel.analyses && panel.analyses.length > 0 && (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Nombre</TableHead>
-                          <TableHead>Creado por</TableHead>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {panel.analyses.map((analysisItem) => (
-                          <TableRow key={analysisItem.id}>
-                            <TableCell className="font-mono text-sm">{analysisItem.analysis.code}</TableCell>
-                            <TableCell>
-                              <span>{analysisItem.analysis.name}</span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <UserAvatar user={analysisItem.created_by} size="sm" />
-                                <span className="text-sm">{getUserDisplayName(analysisItem.created_by)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-gray-600 text-sm">
-                              {formatDateShort(analysisItem.created_at)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button size="sm" variant="ghost">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
                 </div>
               ))}
             </div>
