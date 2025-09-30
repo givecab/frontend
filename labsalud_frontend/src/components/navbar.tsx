@@ -56,7 +56,7 @@ export const Navbar: React.FC = () => {
     {
       path: "/validacion",
       label: "Validación",
-      condition: isInGroup("Biochemist") || hasPermission("validation_access"),
+      condition: isInGroup("Bioquimica") || hasPermission("validation_access"),
     },
   ]
 

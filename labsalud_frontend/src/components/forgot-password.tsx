@@ -4,6 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Mail, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react"
+import { AUTH_ENDPOINTS, getAuthHeaders } from "../config/api"
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("")
@@ -35,14 +36,9 @@ export default function ForgotPassword() {
     }
 
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL
-      const endpoint = import.meta.env.VITE_PASSWORD_RESET_ENDPOINT
-
-      const response = await fetch(`${baseUrl}${endpoint}`, {
+      const response = await fetch(AUTH_ENDPOINTS.PASSWORD_RESET, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ email }),
       })
 

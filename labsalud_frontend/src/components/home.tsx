@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
-import { User, Shield, Clock, TestTube, Users, TrendingUp, Calendar, CheckCircle } from "lucide-react"
+import { User, Shield, Clock, TestTube, Users, TrendingUp, Calendar, CheckCircle, AlertCircle } from "lucide-react"
 
 interface Permission {
   id: number
@@ -19,21 +19,54 @@ interface Stats {
   pendingResults: number
   completedAnalysis: number
   monthlyGrowth: number
-  averageProcessingTime: number
+  averageProcessingTime: string
+  pendingEntryProtocols: number
+}
+
+const parseTimeToHours = (timeString: string): string => {
+  if (!timeString || timeString === "0 min") return "0 h"
+
+  try {
+    // Format: "D days, H:MM:SS.microseconds" or "H:MM:SS.microseconds"
+    let totalHours = 0
+
+    // Check if there are days
+    const daysMatch = timeString.match(/(\d+)\s+days?/)
+    if (daysMatch) {
+      totalHours += Number.parseInt(daysMatch[1]) * 24
+    }
+
+    // Extract time part (H:MM:SS)
+    const timeMatch = timeString.match(/(\d+):(\d+):(\d+)/)
+    if (timeMatch) {
+      const hours = Number.parseInt(timeMatch[1])
+      const minutes = Number.parseInt(timeMatch[2])
+      const seconds = Number.parseInt(timeMatch[3])
+
+      totalHours += hours + minutes / 60 + seconds / 3600
+    }
+
+    // Round to 1 decimal place
+    return `${totalHours.toFixed(1)} h`
+  } catch (error) {
+    console.error("Error parsing time:", error)
+    return timeString
+  }
 }
 
 export default function Home() {
-  const { user } = useAuth()
+  const { user, hasPermission, isInGroup } = useAuth()
   const { apiRequest } = useApi()
   const { error: showErrorToast } = useToast()
 
   const [stats, setStats] = useState<Stats>({
     analysisToday: 0,
     patientsToday: 0,
-    pendingResults: 23, // Mantener valor fijo hasta que haya endpoint
+    pendingResults: 0,
     completedAnalysis: 0,
     monthlyGrowth: 0,
-    averageProcessingTime: 0,
+    averageProcessingTime: "0 min",
+    pendingEntryProtocols: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -47,32 +80,18 @@ export default function Home() {
     try {
       setLoading(true)
 
-      // Llamadas paralelas a todos los endpoints
-      const [analysisResponse, completedResponse, avgTimeResponse, patientsResponse, growthResponse] =
-        await Promise.all([
-          apiRequest("/api/analysis/protocols/stats/created-today/"),
-          apiRequest("/api/analysis/protocols/stats/analyses-completed-month/"),
-          apiRequest("/api/analysis/protocols/stats/avg-result-load-time/"),
-          apiRequest("/api/analysis/protocols/stats/panels-today/"),
-          apiRequest("/api/analysis/protocols/stats/patient-growth/"),
-        ])
+      const response = await apiRequest("/api/v1/analysis/protocols/general-stats/")
+      const data = await response.json()
 
-      const [analysisData, completedData, avgTimeData, patientsData, growthData] = await Promise.all([
-        analysisResponse.json(),
-        completedResponse.json(),
-        avgTimeResponse.json(),
-        patientsResponse.json(),
-        growthResponse.json(),
-      ])
-
-      setStats((prevStats) => ({
-        ...prevStats,
-        analysisToday: analysisData.created_today || 0,
-        completedAnalysis: completedData.results_validated_this_month || 0,
-        averageProcessingTime: avgTimeData.avg_result_load_time ? Math.round(avgTimeData.avg_result_load_time) : 0,
-        patientsToday: typeof patientsData.panels_today === "number" ? patientsData.panels_today : 0,
-        monthlyGrowth: growthData.growth_percent !== null ? Number(growthData.growth_percent.toFixed(1)) : 0,
-      }))
+      setStats({
+        analysisToday: data.analysis_made_today || 0,
+        completedAnalysis: data.analysis_completed_month || 0,
+        patientsToday: data.patients_treated_today || 0,
+        pendingResults: data.pending_validated_results || 0,
+        pendingEntryProtocols: data.pending_entry_protocols || 0,
+        monthlyGrowth: data.growth_patients_percent !== null ? Number(data.growth_patients_percent.toFixed(1)) : 0,
+        averageProcessingTime: parseTimeToHours(data.avg_result_load_time || "0 min"),
+      })
     } catch (error) {
       console.error("Error fetching stats:", error)
       showErrorToast("Error al cargar las estadísticas")
@@ -85,8 +104,10 @@ export default function Home() {
     fetchStats()
   }, [])
 
+  const canSeeValidationStats = isInGroup("Bioquimica") || hasPermission("validation_access")
+
   return (
-    <div className="max-w-6xl mx-auto py-6">
+    <div className="max-w-7xl mx-auto py-6">
       {/* Welcome Section */}
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6 mb-6">
         <div className="flex items-center space-x-4 mb-6">
@@ -133,7 +154,7 @@ export default function Home() {
       )}
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Análisis de Hoy */}
         <div className="bg-blue-50/80 backdrop-blur-sm p-6 rounded-lg border border-blue-200">
           <div className="flex items-center justify-between mb-4">
@@ -168,18 +189,6 @@ export default function Home() {
             )}
           </h3>
           <p className="text-green-600 text-sm">Pacientes atendidos</p>
-        </div>
-
-        {/* Resultados Pendientes */}
-        <div className="bg-orange-50/80 backdrop-blur-sm p-6 rounded-lg border border-orange-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Clock className="w-6 h-6 text-orange-600" />
-            </div>
-            <span className="text-xs text-orange-500 font-medium">PENDIENTE</span>
-          </div>
-          <h3 className="text-2xl font-bold text-orange-800 mb-1">{stats.pendingResults.toLocaleString()}</h3>
-          <p className="text-orange-600 text-sm">Resultados por validar</p>
         </div>
 
         {/* Análisis Completados (Mes) */}
@@ -230,11 +239,49 @@ export default function Home() {
             {loading ? (
               <div className="animate-pulse bg-indigo-200 h-8 w-20 rounded"></div>
             ) : (
-              `${stats.averageProcessingTime} min`
+              stats.averageProcessingTime
             )}
           </h3>
-          <p className="text-indigo-600 text-sm">Tiempo de procesamiento</p>
+          <p className="text-indigo-600 text-sm">Tiempo de carga de resultados</p>
         </div>
+
+        {/* Protocolos por Ingresar */}
+        <div className="bg-amber-50/80 backdrop-blur-sm p-6 rounded-lg border border-amber-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <AlertCircle className="w-6 h-6 text-amber-600" />
+            </div>
+            <span className="text-xs text-amber-500 font-medium">PENDIENTE</span>
+          </div>
+          <h3 className="text-2xl font-bold text-amber-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-amber-200 h-8 w-16 rounded"></div>
+            ) : (
+              stats.pendingEntryProtocols.toLocaleString()
+            )}
+          </h3>
+          <p className="text-amber-600 text-sm">Resultados por cargar</p>
+        </div>
+
+        {/* Resultados Pendientes - Only visible with validation permission */}
+        {canSeeValidationStats && (
+          <div className="bg-orange-50/80 backdrop-blur-sm p-6 rounded-lg border border-orange-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Clock className="w-6 h-6 text-orange-600" />
+              </div>
+              <span className="text-xs text-orange-500 font-medium">PENDIENTE</span>
+            </div>
+            <h3 className="text-2xl font-bold text-orange-800 mb-1">
+              {loading ? (
+                <div className="animate-pulse bg-orange-200 h-8 w-16 rounded"></div>
+              ) : (
+                stats.pendingResults.toLocaleString()
+              )}
+            </h3>
+            <p className="text-orange-600 text-sm">Resultados por validar</p>
+          </div>
+        )}
       </div>
     </div>
   )

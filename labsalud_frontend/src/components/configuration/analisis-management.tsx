@@ -25,11 +25,13 @@ import {
   Settings,
   History,
   Clock,
+  Download,
 } from "lucide-react"
 import { AnalysisList } from "./components/analysis-list"
 import { CreatePanelDialog } from "./components/create-panel-dialog"
 import { EditPanelDialog } from "./components/edit-panel-dialog"
 import { DeletePanelDialog } from "./components/delete-panel-dialog"
+import { ImportDataDialog } from "./components/import-data-dialog"
 import type { AnalysisPanel } from "./configuration-page"
 
 interface AnalisisManagementProps {
@@ -100,6 +102,7 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
   const [isCreatePanelModalOpen, setIsCreatePanelModalOpen] = useState(false)
   const [isEditPanelModalOpen, setIsEditPanelModalOpen] = useState(false)
   const [isDeletePanelModalOpen, setIsDeletePanelModalOpen] = useState(false)
+  const [isImportDataModalOpen, setIsImportDataModalOpen] = useState(false)
   const [selectedPanel, setSelectedPanel] = useState<AnalysisPanel | null>(null)
 
   const buildPanelsUrl = useCallback(
@@ -197,6 +200,11 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
     toastActions.success("Éxito", { description: "Panel creado correctamente." })
   }
 
+  const handleImportDataSuccess = () => {
+    setIsImportDataModalOpen(false)
+    setRefreshKey((prev) => prev + 1)
+  }
+
   const handleEditPanelSuccess = () => {
     setIsEditPanelModalOpen(false)
     setSelectedPanel(null)
@@ -282,27 +290,42 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <TestTube className="h-5 w-5" />
-          Paneles de Análisis ({totalPanels})
-        </h3>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <TestTube className="h-5 w-5" />
+            Paneles de Análisis ({totalPanels})
+          </h3>
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Buscar panel..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-9 w-full"
               disabled={!canViewPanels}
             />
           </div>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
           {canCreatePanels && (
-            <Button className="bg-[#204983] hover:bg-[#1a3d6f]" onClick={() => setIsCreatePanelModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Panel
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white bg-transparent w-full sm:w-auto"
+                onClick={() => setIsImportDataModalOpen(true)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Importar Datos
+              </Button>
+              <Button
+                className="bg-[#204983] hover:bg-[#1a3d6f] w-full sm:w-auto"
+                onClick={() => setIsCreatePanelModalOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Panel
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -583,6 +606,14 @@ export const AnalisisManagement: React.FC<AnalisisManagementProps> = ({
           onOpenChange={setIsDeletePanelModalOpen}
           onSuccess={handleDeletePanelSuccess}
           panel={selectedPanel}
+        />
+      )}
+
+      {isImportDataModalOpen && (
+        <ImportDataDialog
+          open={isImportDataModalOpen}
+          onOpenChange={setIsImportDataModalOpen}
+          onSuccess={handleImportDataSuccess}
         />
       )}
     </div>

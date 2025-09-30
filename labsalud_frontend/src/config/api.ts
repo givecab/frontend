@@ -59,6 +59,8 @@ export const ANALYSIS_ENDPOINTS = {
   // Panels
   PANELS: buildApiUrl("/analysis/panels/"),
   PANEL_DETAIL: (id: number) => buildApiUrl(`/analysis/panels/${id}/`),
+  IMPORT_PANELS: buildApiUrl("/analysis/panels/import/"),
+  IMPORT_ANALYSES: buildApiUrl("/analysis/analyses/import/"),
 
   // Analyses
   ANALYSES: buildApiUrl("/analysis/analyses/"),
@@ -66,17 +68,18 @@ export const ANALYSIS_ENDPOINTS = {
 
   // Doctors
   MEDICOS: buildApiUrl("/analysis/medicos/"),
-  MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/?is_active=true`),
+  MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/`),
 
   // Insurance (OOSS)
   OOSS: buildApiUrl("/analysis/ooss/"),
   OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
-  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?is_active=true"),
+  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?active=true"),
 
   // Protocols
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),
   PROTOCOL_DETAIL: (id: number) => buildApiUrl(`/analysis/protocols/${id}/`),
   PROTOCOL_HIERARCHY: (id: number) => buildApiUrl(`/analysis/protocols/${id}/hierarchy/`),
+  ACTIVE_PROTOCOLS: buildApiUrl("/analysis/results/protocols-summary/"),
 
   // Protocol Analyses
   PROTOCOL_ANALYSES: buildApiUrl("/analysis/protocol-analyses/"),
@@ -87,6 +90,10 @@ export const ANALYSIS_ENDPOINTS = {
   RESULT_DETAIL: (id: number) => buildApiUrl(`/analysis/results/${id}/`),
   RESULTS_BY_PATIENT_ANALYSIS: buildApiUrl("/analysis/results/by-patient-analysis/"),
   RESULTS_BY_PANEL_PROTOCOLS: buildApiUrl("/analysis/results/by-panel-protocols/"),
+
+  ACTIVE_PANELS: buildApiUrl("/analysis/results/active-panels/"),
+  PROTOCOLS_BY_PANEL: (panelId: number) => buildApiUrl(`/analysis/results/protocols-by-panel/${panelId}/`),
+  PROTOCOL_RESULTS: (protocolId: number) => buildApiUrl(`/analysis/results/protocol-results/${protocolId}/`),
 } as const
 
 // Core endpoints
