@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import useAuth from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
-import { ProtocolAccordionView } from "../results/components/protocol-accordion-view"
+import { ValidationProtocolList } from "./components/validation-protocol-list"
 
 export default function ValidacionPage() {
   const { hasPermission } = useAuth()
@@ -71,7 +71,7 @@ export default function ValidacionPage() {
           </TabsList>
 
           <TabsContent value="por-protocolo" className="mt-4">
-            <ProtocolAccordionView filterByState="pending_validation" />
+            <ValidationProtocolList />
           </TabsContent>
         </Tabs>
       </div>

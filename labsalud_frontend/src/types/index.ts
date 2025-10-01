@@ -149,10 +149,22 @@ export interface Protocol extends BaseEntity {
   ooss: number
   medico: number
   contact_method?: "email" | "whatsapp" | "call"
-  state?: "carga_pendiente" | "carga_completa" | "validacion_pendiente" | "finalizado"
+  state?: "pending_entry" | "pending_validation" | "completed" | "cancelled"
   paid?: boolean
   is_active?: boolean
   protocol_analyses?: ProtocolAnalysis[]
+}
+
+export interface ProtocolSummary {
+  id: number
+  patient_first_name: string
+  patient_last_name: string
+  patient_dni: string
+  ooss: string
+  created_at: string
+  state: "pending_entry" | "entry_complete" | "pending_validation" | "review" | "completed" | "cancelled"
+  loaded_results_count: number
+  total_analyses_count: number
 }
 
 export interface ProtocolAnalysis extends BaseEntity {

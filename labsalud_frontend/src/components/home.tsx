@@ -80,7 +80,7 @@ export default function Home() {
     try {
       setLoading(true)
 
-      const response = await apiRequest("/api/v1/analysis/protocols/general-stats/")
+      const response = await apiRequest("/api/v1/analysis/stats/general-stats/")
       const data = await response.json()
 
       setStats({

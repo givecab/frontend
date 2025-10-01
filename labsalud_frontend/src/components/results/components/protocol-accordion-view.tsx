@@ -48,6 +48,7 @@ interface ProtocolAnalysisResult {
   created_at?: string
   created_by?: UserInfo
   is_abnormal?: boolean
+  is_valid?: boolean
   notes?: string
   previous_results?: PreviousResult[]
 }
@@ -70,6 +71,7 @@ const getStateLabel = (state: string): string => {
     pending_entry: "Carga Pendiente",
     entry_complete: "Carga Completa",
     pending_validation: "Validación Pendiente",
+    review: "En Revisión",
     completed: "Finalizado",
     cancelled: "Cancelado",
   }
@@ -84,6 +86,8 @@ const getStateBadgeVariant = (state: string): "default" | "secondary" | "destruc
       return "outline"
     case "pending_validation":
       return "outline"
+    case "review":
+      return "destructive"
     case "completed":
       return "default"
     case "cancelled":
@@ -99,6 +103,8 @@ const getStateBadgeClasses = (state: string): string => {
       return "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200"
     case "pending_validation":
       return "bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200"
+    case "review":
+      return "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
     case "completed":
       return "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
     case "cancelled":
@@ -142,7 +148,7 @@ export function ProtocolAccordionView() {
         params.append("state", stateFilter)
       }
 
-      return `${ANALYSIS_ENDPOINTS.ACTIVE_PROTOCOLS}?${params.toString()}`
+      return `${ANALYSIS_ENDPOINTS.PROTOCOLS_SUMMARY}?${params.toString()}`
     },
     [stateFilter],
   )
@@ -289,6 +295,7 @@ export function ProtocolAccordionView() {
           success(hasExistingResult ? "Resultado actualizado correctamente" : "Resultado guardado correctamente")
 
           const updatedData = await response.json()
+
           setProtocolResults((prev) => {
             const currentResults = prev[protocolId] || []
             const updatedResults = currentResults.map((item) =>
@@ -299,9 +306,13 @@ export function ProtocolAccordionView() {
                     value: updatedData.value,
                     is_abnormal: updatedData.is_abnormal,
                     notes: updatedData.notes,
-                    created_at: updatedData.created_at,
-                    created_by: updatedData.created_by,
+                    created_at: updatedData.created_at || item.created_at,
+                    created_by: updatedData.created_by || item.created_by,
                     previous_results: updatedData.previous_results || item.previous_results,
+                    // Reset is_valid to undefined so it can be validated again
+                    is_valid: undefined,
+                    validated_at: undefined,
+                    validated_by: undefined,
                   }
                 : item,
             )
@@ -316,6 +327,31 @@ export function ProtocolAccordionView() {
               note: updatedData.notes || "",
             },
           }))
+
+          setProtocols((prev) =>
+            prev.map((protocol) => {
+              if (protocol.id === protocolId && protocol.state === "review") {
+                // Check if there are any remaining invalid results
+                const currentResults = protocolResults[protocolId] || []
+                const hasInvalidResults = currentResults.some(
+                  (r) => r.protocol_analysis_id !== protocolAnalysisId && r.is_valid === false,
+                )
+
+                // If no more invalid results, change state back to entry_complete or pending_validation
+                if (!hasInvalidResults) {
+                  const allResultsLoaded = currentResults.every(
+                    (r) => r.protocol_analysis_id === protocolAnalysisId || r.value,
+                  )
+                  return {
+                    ...protocol,
+                    state: allResultsLoaded ? "entry_complete" : "pending_entry",
+                    loaded_results_count: (protocol.loaded_results_count || 0) + (hasExistingResult ? 0 : 1),
+                  }
+                }
+              }
+              return protocol
+            }),
+          )
         } else {
           const errorData = await response.json()
           showError(errorData.message || "Error al guardar el resultado")
@@ -327,7 +363,7 @@ export function ProtocolAccordionView() {
         setSavingStates((prev) => ({ ...prev, [key]: false }))
       }
     },
-    [resultValues, showError, success, apiRequest],
+    [resultValues, showError, success, apiRequest, protocolResults],
   )
 
   const loadMore = useCallback(() => {
@@ -405,6 +441,7 @@ export function ProtocolAccordionView() {
               <SelectItem value="pending_entry">Carga Pendiente</SelectItem>
               <SelectItem value="entry_complete">Carga Completa</SelectItem>
               <SelectItem value="pending_validation">Validación Pendiente</SelectItem>
+              <SelectItem value="review">En Revisión</SelectItem>
               <SelectItem value="completed">Finalizado</SelectItem>
               <SelectItem value="cancelled">Cancelado</SelectItem>
             </SelectContent>
@@ -485,6 +522,7 @@ export function ProtocolAccordionView() {
                             measureUnit={item.analysis_measure_unit}
                             hasExistingResult={hasExistingResult}
                             isValidated={!!item.validated_at}
+                            isValid={item.is_valid}
                             validatedBy={item.validated_by}
                             validatedAt={item.validated_at}
                             createdBy={item.created_by}

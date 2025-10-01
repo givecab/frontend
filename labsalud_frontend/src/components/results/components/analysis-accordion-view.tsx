@@ -11,6 +11,7 @@ import { ANALYSIS_ENDPOINTS } from "../../../config/api"
 import { AnalysisInput } from "./analysis-input"
 import { useToast } from "../../../hooks/use-toast"
 import { useInfiniteScroll } from "../../../hooks/use-infinite-scroll"
+import type { PaginatedResponse, ResultValue } from "../../../types" // Importing undeclared variables
 
 interface Panel {
   id: number
@@ -53,64 +54,9 @@ interface ProtocolAnalysisResult {
   created_at?: string
   created_by?: UserInfo
   is_abnormal?: boolean
+  is_valid?: boolean
   notes?: string
   previous_results?: PreviousResult[]
-}
-
-interface ResultValue {
-  value: string
-  is_abnormal: boolean
-  note: string
-}
-
-interface PaginatedResponse<T> {
-  count: number
-  next: string | null
-  previous: string | null
-  results: T[]
-}
-
-const getStateLabel = (state: string): string => {
-  const stateMap: Record<string, string> = {
-    pending_entry: "Carga Pendiente",
-    entry_complete: "Carga Completa",
-    pending_validation: "Validación Pendiente",
-    completed: "Finalizado",
-    cancelled: "Cancelado",
-  }
-  return stateMap[state] || state
-}
-
-const getStateBadgeVariant = (state: string): "default" | "secondary" | "destructive" | "outline" => {
-  switch (state) {
-    case "pending_entry":
-      return "secondary" // naranja
-    case "entry_complete":
-      return "outline"
-    case "pending_validation":
-      return "outline" // amarillo
-    case "completed":
-      return "default" // verde
-    case "cancelled":
-      return "destructive"
-    default:
-      return "secondary"
-  }
-}
-
-const getStateBadgeClasses = (state: string): string => {
-  switch (state) {
-    case "pending_entry":
-      return "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200"
-    case "pending_validation":
-      return "bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200"
-    case "completed":
-      return "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-    case "cancelled":
-      return "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-  }
 }
 
 export function AnalysisAccordionView() {
@@ -286,6 +232,7 @@ export function AnalysisAccordionView() {
               value: item.value || "",
               is_abnormal: item.is_abnormal || false,
               note: item.notes || "",
+              is_valid: item.is_valid,
             }
           })
           setResultValues((prev) => ({ ...prev, ...initialValues }))
@@ -303,7 +250,12 @@ export function AnalysisAccordionView() {
   )
 
   const handleValueChange = useCallback(
-    (protocolId: number, protocolAnalysisId: number, field: "value" | "is_abnormal" | "note", value: any) => {
+    (
+      protocolId: number,
+      protocolAnalysisId: number,
+      field: "value" | "is_abnormal" | "note" | "is_valid",
+      value: any,
+    ) => {
       const key = `${protocolId}-${protocolAnalysisId}`
       setResultValues((prev) => ({
         ...prev,
@@ -338,12 +290,14 @@ export function AnalysisAccordionView() {
               value: resultValue.value,
               is_abnormal: resultValue.is_abnormal,
               notes: resultValue.note,
+              is_valid: resultValue.is_valid,
             }
           : {
               protocol_analysis: protocolAnalysisId,
               value: resultValue.value,
               is_abnormal: resultValue.is_abnormal,
               notes: resultValue.note,
+              is_valid: resultValue.is_valid,
             }
 
         const response = await apiRequest(endpoint, {
@@ -368,6 +322,7 @@ export function AnalysisAccordionView() {
                     created_at: updatedData.created_at,
                     created_by: updatedData.created_by,
                     previous_results: updatedData.previous_results || item.previous_results,
+                    is_valid: updatedData.is_valid,
                   }
                 : item,
             )
@@ -380,6 +335,7 @@ export function AnalysisAccordionView() {
               value: updatedData.value,
               is_abnormal: updatedData.is_abnormal,
               note: updatedData.notes || "",
+              is_valid: updatedData.is_valid,
             },
           }))
         } else {
@@ -629,12 +585,15 @@ export function AnalysisAccordionView() {
                             measureUnit={item.analysis_measure_unit!}
                             hasExistingResult={hasExistingResult}
                             isValidated={!!item.validated_at}
+                            isValid={item.is_valid}
                             validatedBy={item.validated_by}
                             validatedAt={item.validated_at}
                             createdBy={item.created_by}
                             createdAt={item.created_at}
                             previousResults={item.previous_results || []}
-                            resultValue={resultValues[key] || { value: "", is_abnormal: false, note: "" }}
+                            resultValue={
+                              resultValues[key] || { value: "", is_abnormal: false, note: "", is_valid: false }
+                            }
                             isSaving={savingStates[key] || false}
                             onValueChange={(field, value) =>
                               handleValueChange(protocol.id, item.protocol_analysis_id!, field, value)
@@ -684,4 +643,47 @@ export function AnalysisAccordionView() {
       )}
     </div>
   )
+}
+
+const getStateLabel = (state: string): string => {
+  const stateMap: Record<string, string> = {
+    pending_entry: "Carga Pendiente",
+    entry_complete: "Carga Completa",
+    pending_validation: "Validación Pendiente",
+    completed: "Finalizado",
+    cancelled: "Cancelado",
+  }
+  return stateMap[state] || state
+}
+
+const getStateBadgeVariant = (state: string): "default" | "secondary" | "destructive" | "outline" => {
+  switch (state) {
+    case "pending_entry":
+      return "secondary" // naranja
+    case "entry_complete":
+      return "outline"
+    case "pending_validation":
+      return "outline" // amarillo
+    case "completed":
+      return "default" // verde
+    case "cancelled":
+      return "destructive"
+    default:
+      return "secondary"
+  }
+}
+
+const getStateBadgeClasses = (state: string): string => {
+  switch (state) {
+    case "pending_entry":
+      return "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200"
+    case "pending_validation":
+      return "bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200"
+    case "completed":
+      return "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
+    case "cancelled":
+      return "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
+    default:
+      return "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+  }
 }

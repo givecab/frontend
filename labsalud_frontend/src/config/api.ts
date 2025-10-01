@@ -79,7 +79,7 @@ export const ANALYSIS_ENDPOINTS = {
   PROTOCOLS: buildApiUrl("/analysis/protocols/"),
   PROTOCOL_DETAIL: (id: number) => buildApiUrl(`/analysis/protocols/${id}/`),
   PROTOCOL_HIERARCHY: (id: number) => buildApiUrl(`/analysis/protocols/${id}/hierarchy/`),
-  ACTIVE_PROTOCOLS: buildApiUrl("/analysis/results/protocols-summary/"),
+  ACTIVE_PROTOCOLS: buildApiUrl("/analysis/protocols/active/"),
 
   // Protocol Analyses
   PROTOCOL_ANALYSES: buildApiUrl("/analysis/protocol-analyses/"),
@@ -91,9 +91,15 @@ export const ANALYSIS_ENDPOINTS = {
   RESULTS_BY_PATIENT_ANALYSIS: buildApiUrl("/analysis/results/by-patient-analysis/"),
   RESULTS_BY_PANEL_PROTOCOLS: buildApiUrl("/analysis/results/by-panel-protocols/"),
 
+  PROTOCOLS_SUMMARY: buildApiUrl("/analysis/results/protocols-summary/"),
+
   ACTIVE_PANELS: buildApiUrl("/analysis/results/active-panels/"),
   PROTOCOLS_BY_PANEL: (panelId: number) => buildApiUrl(`/analysis/results/protocols-by-panel/${panelId}/`),
   PROTOCOL_RESULTS: (protocolId: number) => buildApiUrl(`/analysis/results/protocol-results/${protocolId}/`),
+
+  PROTOCOL_VALIDATION_RESULTS: (protocolId: number) =>
+    buildApiUrl(`/analysis/results/protocol-validation-results/${protocolId}/`),
+  VALIDATE_RESULT: (resultId: number) => buildApiUrl(`/analysis/results/${resultId}/validate/`),
 } as const
 
 // Core endpoints
