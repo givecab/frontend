@@ -5,7 +5,7 @@
 
 // Base configuration
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || "http://192.168.1.8:8000",
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || "http://192.168.1.88:8001",
   API_VERSION: "v1",
   TIMEOUT: 30000,
 } as const
@@ -61,6 +61,7 @@ export const ANALYSIS_ENDPOINTS = {
   PANEL_DETAIL: (id: number) => buildApiUrl(`/analysis/panels/${id}/`),
   IMPORT_PANELS: buildApiUrl("/analysis/panels/import/"),
   IMPORT_ANALYSES: buildApiUrl("/analysis/analyses/import/"),
+  IMPORT_XLSX: buildApiUrl("/analysis/panels/import-xlsx/"),
 
   // Analyses
   ANALYSES: buildApiUrl("/analysis/analyses/"),

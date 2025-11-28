@@ -122,18 +122,6 @@ export function ObraSocialCombobox({
             <CommandEmpty>
               <div className="text-center py-4">
                 <p className="text-sm text-gray-500 mb-2">No se encontraron obras sociales</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onShowCreateObraSocial()
-                    setOpen(false)
-                  }}
-                  className="border-[#204983] text-[#204983] hover:bg-[#204983] hover:text-white"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Crear obra social
-                </Button>
               </div>
             </CommandEmpty>
             <CommandGroup>

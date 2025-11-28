@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useApi } from "@/hooks/use-api"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { ANALYSIS_ENDPOINTS } from "@/config/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,8 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react"
-import * as XLSX from "xlsx"
+import { Loader2, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Info } from "lucide-react"
 
 interface ImportDataDialogProps {
   open: boolean
@@ -27,24 +25,16 @@ interface ImportDataDialogProps {
   onSuccess: () => void
 }
 
-interface ImportResult {
-  panels?: { success: boolean; count?: number; error?: string }
-  analyses?: { success: boolean; count?: number; error?: string }
-}
-
 export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDialogProps) {
   const { apiRequest } = useApi()
-  const { toast } = useToast()
 
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      // Validar que sea un archivo Excel
       const validTypes = [
         "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -56,53 +46,7 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
       }
       setFile(selectedFile)
       setError(null)
-      setImportResult(null)
     }
-  }
-
-  const parseExcelFile = (file: File): Promise<{ panels: any[]; analyses: any[] }> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-
-      reader.onload = (e) => {
-        try {
-          const data = e.target?.result
-          const workbook = XLSX.read(data, { type: "binary" })
-
-          // Buscar las hojas de paneles y análisis
-          const panelsSheet = workbook.Sheets["Paneles"] || workbook.Sheets["paneles"] || workbook.Sheets["PANELES"]
-          const analysesSheet =
-            workbook.Sheets["Análisis"] ||
-            workbook.Sheets["Analisis"] ||
-            workbook.Sheets["análisis"] ||
-            workbook.Sheets["analisis"] ||
-            workbook.Sheets["ANÁLISIS"] ||
-            workbook.Sheets["ANALISIS"]
-
-          if (!panelsSheet && !analysesSheet) {
-            reject(
-              new Error(
-                'El archivo debe contener al menos una hoja llamada "Paneles" o "Análisis" (o variantes sin acentos/mayúsculas)',
-              ),
-            )
-            return
-          }
-
-          const panels = panelsSheet ? XLSX.utils.sheet_to_json(panelsSheet) : []
-          const analyses = analysesSheet ? XLSX.utils.sheet_to_json(analysesSheet) : []
-
-          resolve({ panels, analyses })
-        } catch (err) {
-          reject(new Error("Error al leer el archivo Excel: " + (err as Error).message))
-        }
-      }
-
-      reader.onerror = () => {
-        reject(new Error("Error al leer el archivo"))
-      }
-
-      reader.readAsBinaryString(file)
-    })
   }
 
   const handleImport = async () => {
@@ -113,100 +57,34 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
 
     setIsLoading(true)
     setError(null)
-    setImportResult(null)
 
     try {
-      // Parsear el archivo Excel
-      const { panels, analyses } = await parseExcelFile(file)
+      const formData = new FormData()
+      formData.append("file", file)
 
-      const result: ImportResult = {}
+      const response = await apiRequest(ANALYSIS_ENDPOINTS.IMPORT_XLSX, {
+        method: "POST",
+        body: formData,
+        // Don't set Content-Type header, let browser set it with boundary for multipart/form-data
+      })
 
-      // Importar paneles si existen
-      if (panels.length > 0) {
-        try {
-          const panelsResponse = await apiRequest(ANALYSIS_ENDPOINTS.IMPORT_PANELS, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(panels),
-          })
-
-          if (panelsResponse.ok) {
-            const data = await panelsResponse.json()
-            result.panels = { success: true, count: data.imported_count || panels.length }
-          } else {
-            const errorData = await panelsResponse.json()
-            result.panels = {
-              success: false,
-              error: errorData.detail || errorData.error || "Error al importar paneles",
-            }
-          }
-        } catch (err) {
-          result.panels = { success: false, error: "Error de conexión al importar paneles" }
-        }
-      }
-
-      // Importar análisis si existen
-      if (analyses.length > 0) {
-        try {
-          const analysesResponse = await apiRequest(ANALYSIS_ENDPOINTS.IMPORT_ANALYSES, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(analyses),
-          })
-
-          if (analysesResponse.ok) {
-            const data = await analysesResponse.json()
-            result.analyses = { success: true, count: data.imported_count || analyses.length }
-          } else {
-            const errorData = await analysesResponse.json()
-            result.analyses = {
-              success: false,
-              error: errorData.detail || errorData.error || "Error al importar análisis",
-            }
-          }
-        } catch (err) {
-          result.analyses = { success: false, error: "Error de conexión al importar análisis" }
-        }
-      }
-
-      setImportResult(result)
-
-      // Mostrar toast según el resultado
-      const hasSuccess = result.panels?.success || result.analyses?.success
-      const hasError = result.panels?.success === false || result.analyses?.success === false
-
-      if (hasSuccess && !hasError) {
-        toast({
-          title: "Importación exitosa",
-          description: "Los datos se importaron correctamente",
-        })
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(data.message || "Los datos se importaron correctamente")
+        onOpenChange(false)
         setTimeout(() => {
-          onSuccess()
-        }, 1500)
-      } else if (hasSuccess && hasError) {
-        toast({
-          title: "Importación parcial",
-          description: "Algunos datos se importaron correctamente, pero hubo errores",
-          variant: "default",
-        })
+          window.location.reload()
+        }, 500)
       } else {
-        toast({
-          title: "Error en la importación",
-          description: "No se pudieron importar los datos",
-          variant: "destructive",
-        })
+        const errorData = await response.json()
+        const errorMessage = errorData.detail || errorData.error || "Error al importar el catálogo"
+        setError(errorMessage)
+        toast.error(errorMessage)
       }
     } catch (err) {
-      setError((err as Error).message)
-      toast({
-        title: "Error",
-        description: (err as Error).message,
-        variant: "destructive",
-      })
+      const errorMessage = (err as Error).message || "Error de conexión al importar el catálogo"
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -216,26 +94,69 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
     if (!isLoading) {
       setFile(null)
       setError(null)
-      setImportResult(null)
       onOpenChange(false)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
-            Importar Paneles y Análisis
+            Importar Catálogo de Paneles y Análisis
           </DialogTitle>
           <DialogDescription>
-            Selecciona un archivo Excel (.xls o .xlsx) que contenga las hojas "Paneles" y/o "Análisis" con los datos a
-            importar.
+            Selecciona un archivo Excel (.xls o .xlsx) con el formato correcto para importar paneles y análisis.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <Alert className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-sm text-blue-900">
+              <strong className="block mb-2">Formato requerido del archivo Excel:</strong>
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold">Tabla 1: "paneles"</p>
+                  <p className="text-xs mt-1">Debe contener las siguientes columnas:</p>
+                  <ul className="list-disc list-inside text-xs mt-1 ml-2 space-y-0.5">
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">id</code> - Identificador único del panel
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">codigo</code> - Código del panel
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">nombre</code> - Nombre del panel
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">urgencia</code> - Indica si es urgente (true/false)
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">ub</code> - Unidad bioquímica
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold">Tabla 2: "analisis"</p>
+                  <p className="text-xs mt-1">Debe contener las siguientes columnas:</p>
+                  <ul className="list-disc list-inside text-xs mt-1 ml-2 space-y-0.5">
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">nombre</code> - Nombre del análisis
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">unidad_medida</code> - Unidad de medida
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">panelid</code> - ID del panel al que pertenece
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+
           <div className="space-y-2">
             <Label htmlFor="file">Archivo Excel</Label>
             <Input
@@ -247,7 +168,7 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
             />
             {file && (
               <p className="text-sm text-gray-600 flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4" />
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
                 {file.name}
               </p>
             )}
@@ -259,52 +180,6 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
-          {importResult && (
-            <div className="space-y-2">
-              {importResult.panels && (
-                <Alert variant={importResult.panels.success ? "default" : "destructive"}>
-                  {importResult.panels.success ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4" />
-                  )}
-                  <AlertDescription>
-                    {importResult.panels.success
-                      ? `✓ Paneles importados: ${importResult.panels.count}`
-                      : `✗ Error en paneles: ${importResult.panels.error}`}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {importResult.analyses && (
-                <Alert variant={importResult.analyses.success ? "default" : "destructive"}>
-                  {importResult.analyses.success ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4" />
-                  )}
-                  <AlertDescription>
-                    {importResult.analyses.success
-                      ? `✓ Análisis importados: ${importResult.analyses.count}`
-                      : `✗ Error en análisis: ${importResult.analyses.error}`}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
-
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              <strong>Formato esperado:</strong>
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Hoja "Paneles": columnas según el modelo de Panel</li>
-                <li>Hoja "Análisis": columnas según el modelo de Análisis</li>
-                <li>Ambas hojas son opcionales, pero debe existir al menos una</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
         </div>
 
         <DialogFooter>

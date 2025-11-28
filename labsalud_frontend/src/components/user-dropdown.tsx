@@ -44,19 +44,11 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
   }, [])
 
   useEffect(() => {
-    if (onMenuToggle) {
-      onMenuToggle(isOpen)
-    }
-  }, [isOpen, onMenuToggle])
+    onMenuToggle?.(isOpen)
+  }, [isOpen]) // Removemos onMenuToggle de las dependencias
 
   const handleToggle = () => {
-    const newIsOpen = !isOpen
-    setIsOpen(newIsOpen)
-
-    // Notificar al componente padre sobre el cambio de estado
-    if (onMenuToggle) {
-      onMenuToggle(newIsOpen)
-    }
+    setIsOpen(!isOpen)
   }
 
   const handleLogout = () => {

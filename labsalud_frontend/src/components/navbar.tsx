@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { Menu, X } from "lucide-react"
 import useAuth from "@/contexts/auth-context"
@@ -67,13 +67,13 @@ export const Navbar: React.FC = () => {
     }
   }
 
-  const handleUserMenuToggle = (isOpen: boolean) => {
+  const handleUserMenuToggle = useCallback((isOpen: boolean) => {
     setIsUserMenuOpen(isOpen)
     // Close mobile menu when opening user menu
     if (isOpen) {
       setIsMobileMenuOpen(false)
     }
-  }
+  }, [])
 
   return (
     <>
@@ -101,9 +101,9 @@ export const Navbar: React.FC = () => {
               <div className="flex-shrink-0 mx-8">
                 <Link to="/" className="flex items-center">
                   <img
-                    src="/logo.png"
+                    src="/logo_icono.svg"
                     alt="Logo"
-                    className="h-12 w-auto object-contain"
+                    className="h-9 w-auto object-contain"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement
                       target.src = "/placeholder.svg?height=48&width=160&text=LOGO"
@@ -127,7 +127,7 @@ export const Navbar: React.FC = () => {
 
                 {/* User Dropdown - Pegado a la derecha */}
                 <div className="flex-shrink-0 relative">
-                  <UserDropdown onMenuToggle={handleUserMenuToggle} />
+                  <UserDropdown onMenuToggle={handleUserMenuToggle}/>
                 </div>
               </div>
             </div>
@@ -165,7 +165,7 @@ export const Navbar: React.FC = () => {
               <div className="flex-shrink-0">
                 <Link to="/" className="flex items-center">
                   <img
-                    src="/logo.png"
+                    src="/logo_icono.svg"
                     alt="Logo"
                     className="h-8 w-auto object-contain"
                     onError={(e) => {
