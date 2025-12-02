@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import type { Patient } from "../patients-page"
+import type { Patient } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,7 +26,7 @@ interface ValidationState {
   last_name: { isValid: boolean; message: string }
   email: { isValid: boolean; message: string }
   phone_mobile: { isValid: boolean; message: string }
-  phone_landline: { isValid: boolean; message: string }
+  alt_phone: { isValid: boolean; message: string }
   birth_date: { isValid: boolean; message: string }
 }
 
@@ -38,7 +38,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
     birth_date: "",
     gender: "",
     phone_mobile: "",
-    phone_landline: "",
+    alt_phone: "",
     email: "",
     country: "",
     province: "",
@@ -52,7 +52,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
     last_name: { isValid: true, message: "" },
     email: { isValid: true, message: "" },
     phone_mobile: { isValid: true, message: "" },
-    phone_landline: { isValid: true, message: "" },
+    alt_phone: { isValid: true, message: "" },
     birth_date: { isValid: true, message: "" },
   })
 
@@ -147,8 +147,8 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
       case "phone_mobile":
         result = validatePhone(value, "El teléfono móvil")
         break
-      case "phone_landline":
-        result = validatePhone(value, "El teléfono fijo")
+      case "alt_phone":
+        result = validatePhone(value, "El teléfono alternativo")
         break
       case "birth_date":
         result = validateBirthDate(value)
@@ -188,7 +188,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
         birth_date: formatDateForInput(patient.birth_date),
         gender: patient.gender,
         phone_mobile: patient.phone_mobile,
-        phone_landline: patient.phone_landline,
+        alt_phone: patient.alt_phone,
         email: patient.email,
         country: patient.country,
         province: patient.province,
@@ -246,7 +246,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
       return fieldValidation.isValid
     })
 
-    const optionalFieldsValid = ["email", "phone_mobile", "phone_landline"].every((field) => {
+    const optionalFieldsValid = ["email", "phone_mobile", "alt_phone"].every((field) => {
       const fieldValidation = validation[field as keyof ValidationState]
       return fieldValidation.isValid
     })
@@ -414,6 +414,8 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
                 <SelectContent>
                   <SelectItem value="M">Masculino</SelectItem>
                   <SelectItem value="F">Femenino</SelectItem>
+                  <SelectItem value="O">Otro</SelectItem>
+                  <SelectItem value="N">No especificar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -434,16 +436,16 @@ export function EditPatientDialog({ isOpen, onClose, patient, setPatients, apiRe
               {renderFieldMessage("phone_mobile")}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone_landline">Teléfono fijo</Label>
+              <Label htmlFor="edit-alt_phone">Teléfono alternativo</Label>
               <Input
-                id="edit-phone_landline"
-                name="phone_landline"
-                value={formData.phone_landline}
+                id="edit-alt_phone"
+                name="alt_phone"
+                value={formData.alt_phone}
                 onChange={handleInputChange}
-                placeholder="Teléfono fijo"
-                className={getFieldStyle("phone_landline")}
+                placeholder="Teléfono alternativo"
+                className={getFieldStyle("alt_phone")}
               />
-              {renderFieldMessage("phone_landline")}
+              {renderFieldMessage("alt_phone")}
             </div>
           </div>
 

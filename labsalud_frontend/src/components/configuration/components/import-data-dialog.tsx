@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -62,7 +62,7 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
       const formData = new FormData()
       formData.append("file", file)
 
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.IMPORT_XLSX, {
+      const response = await apiRequest(CATALOG_ENDPOINTS.IMPORT_XLSX, {
         method: "POST",
         body: formData,
         // Don't set Content-Type header, let browser set it with boundary for multipart/form-data

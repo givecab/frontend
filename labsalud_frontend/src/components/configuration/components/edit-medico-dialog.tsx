@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface Medico {
   id: number
@@ -52,8 +52,8 @@ export const EditMedicoDialog: React.FC<EditMedicoDialogProps> = ({ isOpen, medi
     setIsLoading(true)
 
     try {
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.MEDICO_DETAIL(medico.id), {
-        method: "PUT",
+      const response = await apiRequest(MEDICAL_ENDPOINTS.DOCTOR_DETAIL(medico.id), {
+        method: "PATCH",
         body: formData,
       })
 
@@ -62,6 +62,7 @@ export const EditMedicoDialog: React.FC<EditMedicoDialogProps> = ({ isOpen, medi
         throw new Error(errorData.detail || "Error al actualizar el médico")
       }
 
+      error("Médico actualizado", { description: "Los cambios se guardaron correctamente" })
       onSuccess()
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error desconocido"

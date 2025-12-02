@@ -11,47 +11,73 @@ import { useApi } from "../../../hooks/use-api"
 import { useDebounce } from "../../../hooks/use-debounce"
 import { useInfiniteScroll } from "../../../hooks/use-infinite-scroll"
 import { toast } from "sonner"
-import type { AnalysisPanel } from "../../../types"
-import { ANALYSIS_ENDPOINTS } from "../../../config/api"
+import type { Analysis, SelectedAnalysis } from "../../../types"
+import { CATALOG_ENDPOINTS } from "../../../config/api"
+
+const BIOCHEMICAL_ACT_CODE = 660001
+const SPECIAL_BIOCHEMICAL_ACT_CODE = 661001
+const THRESHOLD_CODE = 661001
 
 interface AnalysisSearchProps {
-  selectedAnalyses: AnalysisPanel[]
-  onAnalysisChange: (analyses: AnalysisPanel[]) => void
+  selectedAnalyses: SelectedAnalysis[]
+  onAnalysisChange: (analyses: SelectedAnalysis[]) => void
 }
 
 interface PaginatedResponse<T> {
-  count: number
   next: string | null
-  previous: string | null
   results: T[]
 }
 
 export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisSearchProps) {
   const { apiRequest } = useApi()
   const [searchTerm, setSearchTerm] = useState("")
-  const [searchResults, setSearchResults] = useState<AnalysisPanel[]>([])
+  const [searchResults, setSearchResults] = useState<Analysis[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [nextUrl, setNextUrl] = useState<string | null>(null)
+  const [biochemicalActCache, setBiochemicalActCache] = useState<Record<number, Analysis | null>>({})
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  const loadMorePanels = () => {
+  const loadMoreAnalyses = () => {
     if (nextUrl && !isLoadingMore) {
-      searchPanels(debouncedSearchTerm, false)
+      searchAnalyses(debouncedSearchTerm, false)
     }
   }
 
   const setLastElementRef = useInfiniteScroll({
     loading: isLoadingMore,
     hasMore,
-    onLoadMore: loadMorePanels,
+    onLoadMore: loadMoreAnalyses,
   })
 
-  const searchPanels = async (term: string, isNewSearch = false) => {
+  const fetchBiochemicalAct = async (code: number): Promise<Analysis | null> => {
+    if (biochemicalActCache[code] !== undefined) {
+      return biochemicalActCache[code]
+    }
+
+    try {
+      const url = `${CATALOG_ENDPOINTS.ANALYSIS}?code=${code}&is_active=true`
+      const response = await apiRequest(url)
+
+      if (response.ok) {
+        const data: PaginatedResponse<Analysis> = await response.json()
+        const analysis = data.results.length > 0 ? data.results[0] : null
+        setBiochemicalActCache((prev) => ({ ...prev, [code]: analysis }))
+        return analysis
+      }
+    } catch (error) {
+      console.error(`Error fetching biochemical act ${code}:`, error)
+    }
+
+    setBiochemicalActCache((prev) => ({ ...prev, [code]: null }))
+    return null
+  }
+
+  const searchAnalyses = async (term: string, isNewSearch = false) => {
     if (!term.trim()) {
       setSearchResults([])
       setShowResults(false)
@@ -69,20 +95,16 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
       }
 
       const url = isNewSearch
-        ? `${ANALYSIS_ENDPOINTS.PANELS}?search=${encodeURIComponent(term.trim())}&is_active=true&limit=20&offset=0`
+        ? `${CATALOG_ENDPOINTS.ANALYSIS}?search=${encodeURIComponent(term.trim())}&is_active=true&limit=20&offset=0`
         : nextUrl
 
       if (!url) return
 
-      console.log("Searching panels with URL:", url)
-
       const response = await apiRequest(url)
 
       if (response.ok) {
-        const data: PaginatedResponse<AnalysisPanel> = await response.json()
+        const data: PaginatedResponse<Analysis> = await response.json()
         const newResults = data.results || []
-
-        console.log("Search results:", newResults)
 
         if (isNewSearch) {
           setSearchResults(newResults)
@@ -95,11 +117,9 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
         setShowResults(newResults.length > 0 || searchResults.length > 0)
       } else {
         console.error("Search failed with status:", response.status)
-        const errorData = await response.json()
-        console.error("Search error:", errorData)
       }
     } catch (error) {
-      console.error("Error searching panels:", error)
+      console.error("Error searching analyses:", error)
     } finally {
       setIsSearching(false)
       setIsLoadingMore(false)
@@ -108,7 +128,7 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
 
   useEffect(() => {
     if (debouncedSearchTerm.trim()) {
-      searchPanels(debouncedSearchTerm, true)
+      searchAnalyses(debouncedSearchTerm, true)
     } else {
       setSearchResults([])
       setShowResults(false)
@@ -117,13 +137,157 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
     }
   }, [debouncedSearchTerm])
 
-  const handleAddPanel = (panel: AnalysisPanel) => {
-    if (!selectedAnalyses.find((p) => p.id === panel.id)) {
-      onAnalysisChange([...selectedAnalyses, panel])
-      toast.success(`Panel "${panel.name}" agregado`)
-    } else {
-      toast.info(`El panel "${panel.name}" ya está seleccionado`)
+  const handleAddAnalysis = async (analysis: Analysis) => {
+    if (selectedAnalyses.find((a) => a.id === analysis.id)) {
+      toast.info(`El análisis "${analysis.name}" ya está seleccionado`)
+      setSearchTerm("")
+      setShowResults(false)
+      return
     }
+
+    const analysisCode = typeof analysis.code === "string" ? Number.parseInt(analysis.code, 10) : Number(analysis.code)
+
+    console.log("[v0] === INICIO handleAddAnalysis ===")
+    console.log("[v0] Análisis agregado:", analysis.name, "| Código:", analysis.code, "| Tipo:", typeof analysis.code)
+    console.log("[v0] analysisCode (convertido):", analysisCode, "| Tipo:", typeof analysisCode)
+    console.log("[v0] THRESHOLD_CODE:", THRESHOLD_CODE)
+    console.log("[v0] BIOCHEMICAL_ACT_CODE:", BIOCHEMICAL_ACT_CODE)
+    console.log("[v0] SPECIAL_BIOCHEMICAL_ACT_CODE:", SPECIAL_BIOCHEMICAL_ACT_CODE)
+
+    if (analysisCode === BIOCHEMICAL_ACT_CODE || analysisCode === SPECIAL_BIOCHEMICAL_ACT_CODE) {
+      toast.info("El acto bioquímico se agrega automáticamente según los análisis seleccionados")
+      setSearchTerm("")
+      setShowResults(false)
+      return
+    }
+
+    const needsNormalAct = analysisCode < THRESHOLD_CODE
+    const needsSpecialAct = analysisCode > THRESHOLD_CODE
+
+    console.log("[v0] analysisCode < THRESHOLD_CODE:", analysisCode, "<", THRESHOLD_CODE, "=", needsNormalAct)
+    console.log("[v0] analysisCode > THRESHOLD_CODE:", analysisCode, ">", THRESHOLD_CODE, "=", needsSpecialAct)
+    console.log("[v0] needsNormalAct:", needsNormalAct)
+    console.log("[v0] needsSpecialAct:", needsSpecialAct)
+
+    const hasNormalAct = selectedAnalyses.some((a) => {
+      const code = typeof a.code === "string" ? Number.parseInt(a.code, 10) : Number(a.code)
+      return code === BIOCHEMICAL_ACT_CODE
+    })
+    const hasSpecialAct = selectedAnalyses.some((a) => {
+      const code = typeof a.code === "string" ? Number.parseInt(a.code, 10) : Number(a.code)
+      return code === SPECIAL_BIOCHEMICAL_ACT_CODE
+    })
+
+    console.log("[v0] hasNormalAct (ya existe 660001):", hasNormalAct)
+    console.log("[v0] hasSpecialAct (ya existe 661001):", hasSpecialAct)
+    console.log(
+      "[v0] selectedAnalyses actual:",
+      selectedAnalyses.map((a) => ({ name: a.name, code: a.code })),
+    )
+
+    let newAnalyses = [...selectedAnalyses]
+    const actsToAdd: SelectedAnalysis[] = []
+
+    if (needsNormalAct && !hasNormalAct) {
+      console.log("[v0] -> Agregando acto bioquímico NORMAL (660001)")
+      const normalAct = await fetchBiochemicalAct(BIOCHEMICAL_ACT_CODE)
+      if (normalAct) {
+        actsToAdd.push({
+          ...normalAct,
+          is_authorized: false,
+        })
+        toast.success(`Acto bioquímico (${BIOCHEMICAL_ACT_CODE}) agregado automáticamente`)
+      } else {
+        console.log("[v0] -> ERROR: No se pudo obtener el acto bioquímico normal")
+      }
+    } else {
+      console.log("[v0] -> NO se agrega acto normal. needsNormalAct:", needsNormalAct, "hasNormalAct:", hasNormalAct)
+    }
+
+    if (needsSpecialAct && !hasSpecialAct) {
+      console.log("[v0] -> Agregando acto bioquímico ESPECIAL (661001)")
+      const specialAct = await fetchBiochemicalAct(SPECIAL_BIOCHEMICAL_ACT_CODE)
+      if (specialAct) {
+        actsToAdd.push({
+          ...specialAct,
+          is_authorized: false,
+        })
+        toast.success(`Acto bioquímico especial (${SPECIAL_BIOCHEMICAL_ACT_CODE}) agregado automáticamente`)
+      } else {
+        console.log("[v0] -> ERROR: No se pudo obtener el acto bioquímico especial")
+      }
+    } else {
+      console.log(
+        "[v0] -> NO se agrega acto especial. needsSpecialAct:",
+        needsSpecialAct,
+        "hasSpecialAct:",
+        hasSpecialAct,
+      )
+    }
+
+    console.log(
+      "[v0] actsToAdd:",
+      actsToAdd.map((a) => ({ name: a.name, code: a.code })),
+    )
+
+    const existingWithoutBioActs = newAnalyses.filter((a) => {
+      const code = typeof a.code === "string" ? Number.parseInt(a.code, 10) : Number(a.code)
+      return code !== BIOCHEMICAL_ACT_CODE && code !== SPECIAL_BIOCHEMICAL_ACT_CODE
+    })
+    const existingBioActs = newAnalyses.filter((a) => {
+      const code = typeof a.code === "string" ? Number.parseInt(a.code, 10) : Number(a.code)
+      return code === BIOCHEMICAL_ACT_CODE || code === SPECIAL_BIOCHEMICAL_ACT_CODE
+    })
+
+    console.log(
+      "[v0] existingBioActs:",
+      existingBioActs.map((a) => ({ name: a.name, code: a.code })),
+    )
+    console.log(
+      "[v0] existingWithoutBioActs:",
+      existingWithoutBioActs.map((a) => ({ name: a.name, code: a.code })),
+    )
+
+    const allBioActs = [...existingBioActs, ...actsToAdd]
+    const uniqueBioActs = allBioActs.reduce((acc, act) => {
+      const code = typeof act.code === "string" ? Number.parseInt(act.code, 10) : Number(act.code)
+      const exists = acc.some((a) => {
+        const aCode = typeof a.code === "string" ? Number.parseInt(a.code, 10) : Number(a.code)
+        return aCode === code
+      })
+      if (!exists) {
+        acc.push(act)
+      }
+      return acc
+    }, [] as SelectedAnalysis[])
+
+    uniqueBioActs.sort((a, b) => {
+      const codeA = typeof a.code === "string" ? Number.parseInt(a.code, 10) : Number(a.code)
+      const codeB = typeof b.code === "string" ? Number.parseInt(b.code, 10) : Number(b.code)
+      return codeA - codeB
+    })
+
+    console.log(
+      "[v0] uniqueBioActs (final):",
+      uniqueBioActs.map((a) => ({ name: a.name, code: a.code })),
+    )
+
+    const selectedAnalysis: SelectedAnalysis = {
+      ...analysis,
+      is_authorized: false,
+    }
+
+    newAnalyses = [...uniqueBioActs, ...existingWithoutBioActs, selectedAnalysis]
+
+    console.log(
+      "[v0] newAnalyses (resultado final):",
+      newAnalyses.map((a) => ({ name: a.name, code: a.code })),
+    )
+    console.log("[v0] === FIN handleAddAnalysis ===")
+
+    onAnalysisChange(newAnalyses)
+    toast.success(`Análisis "${analysis.name}" agregado`)
+
     setSearchTerm("")
     setShowResults(false)
   }
@@ -131,12 +295,12 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && filteredResults.length > 0) {
       e.preventDefault()
-      handleAddPanel(filteredResults[0])
+      handleAddAnalysis(filteredResults[0])
     }
   }
 
   const filteredResults = searchResults.filter(
-    (panel) => !selectedAnalyses.find((selected) => selected.id === panel.id),
+    (analysis) => !selectedAnalyses.find((selected) => selected.id === analysis.id),
   )
 
   return (
@@ -144,7 +308,7 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
         <Input
-          placeholder="Buscar paneles por nombre o código... (Enter para agregar el primero)"
+          placeholder="Buscar análisis por nombre o código... (Enter para agregar el primero)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -159,25 +323,26 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
         )}
       </div>
 
-      {/* Resultados de búsqueda */}
       {showResults && filteredResults.length > 0 && (
         <div
           ref={resultsRef}
           className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto"
         >
-          {filteredResults.map((panel, index) => (
+          {filteredResults.map((analysis, index) => (
             <div
-              key={`panel-${panel.id}`}
+              key={`analysis-${analysis.id}`}
               ref={index === filteredResults.length - 1 ? setLastElementRef : null}
               className="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
             >
               <div className="flex items-center gap-3">
                 <Package className="h-4 w-4 text-[#204983]" />
                 <div>
-                  <div className="font-medium text-sm">{panel.name}</div>
-                  <div className="text-xs text-gray-500">Código: {panel.code || "N/A"} | Panel completo</div>
+                  <div className="font-medium text-sm">{analysis.name}</div>
+                  <div className="text-xs text-gray-500">
+                    Código: {analysis.code || "N/A"} | UB: {analysis.bio_unit}
+                  </div>
                 </div>
-                {panel.is_urgent && (
+                {analysis.is_urgent && (
                   <Badge variant="destructive" className="text-xs">
                     Urgente
                   </Badge>
@@ -186,7 +351,7 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleAddPanel(panel)}
+                onClick={() => handleAddAnalysis(analysis)}
                 className="border-[#204983] text-[#204983] hover:bg-[#204983] hover:text-white"
               >
                 <Plus className="h-4 w-4" />
@@ -197,7 +362,7 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
           {isLoadingMore && (
             <div className="flex items-center justify-center p-3 text-sm text-gray-500">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#204983] mr-2" />
-              Cargando más paneles...
+              Cargando más análisis...
             </div>
           )}
 
@@ -207,11 +372,10 @@ export function AnalysisSearch({ selectedAnalyses, onAnalysisChange }: AnalysisS
         </div>
       )}
 
-      {/* No hay resultados */}
       {showResults && searchTerm && filteredResults.length === 0 && !isSearching && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
           <TestTube className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-          <p className="text-sm">No se encontraron paneles para "{searchTerm}"</p>
+          <p className="text-sm">No se encontraron análisis para "{searchTerm}"</p>
         </div>
       )}
     </div>

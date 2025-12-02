@@ -14,35 +14,33 @@ import {
   Pencil,
   ChevronDown,
   ChevronRight,
-  Calendar,
   Clock,
   TestTube2,
   Plus,
   User,
   Settings,
+  History,
 } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
-import { CreateAnalysisDialog } from "./create-analysis-dialog"
-import { EditAnalysisDialog } from "./edit-analysis-dialog"
-import { DeleteAnalysisDialog } from "./delete-analysis-dialog"
-import type { AnalysisItem } from "../configuration-page" // <--- Usa la interfaz compartida
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { CreateDeterminationDialog } from "./create-determination-dialog"
+import { EditDeterminationDialog } from "./edit-determination-dialog"
+import { DeleteDeterminationDialog } from "./delete-determination-dialog"
+import { DeterminationHistoryDialog } from "./determination-history-dialog"
+import type { Determination } from "@/types"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 
-interface Panel {
+interface AnalysisCatalog {
   id: number
   name: string | null
   code: number | null
 }
 
 interface AnalysisListProps {
-  panel: Panel
+  analysis: AnalysisCatalog
   showInactive: boolean
-  canCreate: boolean
-  canEdit: boolean
-  canDelete: boolean
   refreshKey: number
 }
 
@@ -108,7 +106,7 @@ const UserAvatar = ({ user, date }: { user: any; date: string }) => {
   )
 }
 
-const UpdatedByAvatars = ({ updatedBy }: { updatedBy: AnalysisItem["updated_by"] }) => {
+const UpdatedByAvatars = ({ updatedBy }: { updatedBy: Determination["updated_by"] }) => {
   if (!updatedBy || updatedBy.length === 0) {
     return (
       <TooltipProvider>
@@ -172,20 +170,14 @@ const UpdatedByAvatars = ({ updatedBy }: { updatedBy: AnalysisItem["updated_by"]
   )
 }
 
-export const AnalysisList: React.FC<AnalysisListProps> = ({
-  panel,
-  showInactive,
-  canCreate,
-  canEdit,
-  canDelete,
-  refreshKey,
-}) => {
+export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInactive, refreshKey }) => {
   const { apiRequest } = useApi()
   const { error } = useToast()
 
-  const [analyses, setAnalyses] = useState<AnalysisItem[]>([])
+  const [analyses, setAnalyses] = useState<Determination[]>([])
   const [totalAnalyses, setTotalAnalyses] = useState(0)
   const [analysesNextUrl, setAnalysesNextUrl] = useState<string | null>(null)
+  const [expandedDeterminations, setExpandedDeterminations] = useState<Set<number>>(new Set())
   const [expandedAnalyses, setExpandedAnalyses] = useState<Set<number>>(new Set())
 
   const [isLoadingInitial, setIsLoadingInitial] = useState(true)
@@ -198,15 +190,18 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisItem | null>(null)
+  const [selectedAnalysis, setSelectedAnalysis] = useState<Determination | null>(null)
+
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
+  const [selectedHistoryAnalysis, setSelectedHistoryAnalysis] = useState<{ id: number; name: string } | null>(null)
 
   const buildAnalysesUrl = useCallback(
     (offset = 0, search = "") => {
-      let url = `${ANALYSIS_ENDPOINTS.ANALYSES}?panel=${panel.id}&limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${CATALOG_ENDPOINTS.DETERMINATIONS}?analysis=${analysis.id}&limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) url += `&search=${encodeURIComponent(search)}`
       return url
     },
-    [panel.id],
+    [analysis.id],
   )
 
   const fetchAnalyses = useCallback(
@@ -235,11 +230,11 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
         if (response.ok) {
           const data = await response.json()
 
-          // Verificar que data.results existe y es un array
           const results = Array.isArray(data.results) ? data.results : []
 
-          // Filtrar las determinaciones que pertenecen al panel actual
-          const filteredResults = results.filter((analysis: AnalysisItem) => analysis.panel === panel.id)
+          const filteredResults = results.filter(
+            (determination: Determination) => determination.analysis === analysis.id,
+          )
 
           setAnalyses((prev) => (isNewSearchOrFilter ? filteredResults : [...prev, ...filteredResults]))
           setTotalAnalyses(data.count || 0)
@@ -261,33 +256,16 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
         setIsLoadingMore(false)
       }
     },
-    [apiRequest, error, buildAnalysesUrl, analysesNextUrl, debouncedSearchTerm, panel.id],
+    [apiRequest, error, buildAnalysesUrl, analysesNextUrl, debouncedSearchTerm, analysis.id],
   )
 
-  useEffect(() => {
-    fetchAnalyses(true)
-  }, [panel.id, debouncedSearchTerm, showInactive, refreshKey])
-
-  const hasMoreAnalyses = !!analysesNextUrl && analyses.length < totalAnalyses
-
-  const loadMoreSentinelRef = useInfiniteScroll({
-    loading: isLoadingMore,
-    hasMore: hasMoreAnalyses,
-    onLoadMore: () => {
-      if (analysesNextUrl && !isLoadingMore) {
-        fetchAnalyses(false)
-      }
-    },
-    dependencies: [analysesNextUrl, isLoadingMore],
-  })
-
-  const toggleAnalysis = (analysisId: number) => {
-    setExpandedAnalyses((prev) => {
+  const toggleDetermination = (determinationId: number) => {
+    setExpandedDeterminations((prev) => {
       const newSet = new Set(prev)
-      if (newSet.has(analysisId)) {
-        newSet.delete(analysisId)
+      if (newSet.has(determinationId)) {
+        newSet.delete(determinationId)
       } else {
-        newSet.add(analysisId)
+        newSet.add(determinationId)
       }
       return newSet
     })
@@ -306,6 +284,23 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
     setSelectedAnalysis(null)
   }
 
+  useEffect(() => {
+    fetchAnalyses(true)
+  }, [analysis.id, debouncedSearchTerm, showInactive, refreshKey])
+
+  const hasMoreAnalyses = !!analysesNextUrl && analyses.length < totalAnalyses
+
+  const loadMoreSentinelRef = useInfiniteScroll({
+    loading: isLoadingMore,
+    hasMore: hasMoreAnalyses,
+    onLoadMore: () => {
+      if (analysesNextUrl && !isLoadingMore) {
+        fetchAnalyses(false)
+      }
+    },
+    dependencies: [analysesNextUrl, isLoadingMore],
+  })
+
   return (
     <div className="space-y-3 pt-3">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4">
@@ -319,16 +314,14 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
             className="pl-9 text-sm h-8 w-full"
           />
         </div>
-        {canCreate && (
-          <Button
-            variant="outline"
-            className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white bg-transparent"
-            size="sm"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Nueva Determinación
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white bg-transparent"
+          size="sm"
+          onClick={() => setIsCreateModalOpen(true)}
+        >
+          <Plus className="mr-1 h-4 w-4" /> Nueva Determinación
+        </Button>
       </div>
 
       {isLoadingInitial && (
@@ -350,21 +343,25 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
 
       {analyses.length > 0 && (
         <div className="space-y-2 px-4">
-          {analyses.map((analysis) => {
-            const isExpanded = expandedAnalyses.has(analysis.id)
+          {analyses.map((analysisItem) => {
+            const isExpanded = expandedDeterminations.has(analysisItem.id)
 
             return (
               <div
-                key={analysis.id}
+                key={analysisItem.id}
                 className={`border rounded-md transition-all duration-300 bg-white border-gray-100 ${
                   isExpanded ? "ring-2 ring-blue-200" : ""
                 }`}
               >
-                <div
-                  className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => toggleAnalysis(analysis.id)}
-                >
-                  <div className="flex items-center gap-2">
+                <div className="flex justify-between items-center p-2">
+                  {/* Left side: clickable area to expand/collapse */}
+                  <div
+                    className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-50 transition-colors rounded-md p-1 -m-1"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleDetermination(analysisItem.id)
+                    }}
+                  >
                     <div className="flex items-center gap-1">
                       {isExpanded ? (
                         <ChevronDown className="h-3 w-3 text-gray-500" />
@@ -374,132 +371,150 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
                       <TestTube2 className="h-4 w-4 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800 flex items-center gap-2">{analysis.name}</p>
-                      <p className="text-xs text-gray-500">Unidad: {analysis.measure_unit}</p>
+                      <p className="text-sm font-medium text-gray-800">{analysisItem.name}</p>
+                      <p className="text-xs text-gray-500">Unidad: {analysisItem.measure_unit}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        {analysisItem.creation && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 cursor-help">
+                                  <Avatar className="h-4 w-4">
+                                    <AvatarImage src={analysisItem.creation.user.photo || "/placeholder.svg"} />
+                                    <AvatarFallback className="text-[8px]">
+                                      {analysisItem.creation.user.username.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-[10px] text-gray-500">Creado</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs">
+                                  <p className="font-semibold">{analysisItem.creation.user.username}</p>
+                                  <p className="text-gray-500">
+                                    {new Date(analysisItem.creation.date).toLocaleString()}
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {analysisItem.last_change && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 cursor-help">
+                                  <Avatar className="h-4 w-4">
+                                    <AvatarImage src={analysisItem.last_change.user.photo || "/placeholder.svg"} />
+                                    <AvatarFallback className="text-[8px]">
+                                      {analysisItem.last_change.user.username.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-[10px] text-gray-500">Modificado</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs">
+                                  <p className="font-semibold">{analysisItem.last_change.user.username}</p>
+                                  <p className="text-gray-500">
+                                    {new Date(analysisItem.last_change.date).toLocaleString()}
+                                  </p>
+                                  {analysisItem.last_change.changes && analysisItem.last_change.changes.length > 0 && (
+                                    <div className="mt-1">
+                                      <p className="font-medium">Cambios:</p>
+                                      <ul className="list-disc list-inside">
+                                        {analysisItem.last_change.changes.map((change, idx) => (
+                                          <li key={idx}>{change}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-500">Creado:</span>
-                        <UserAvatar user={analysis.created_by} date={analysis.created_at || ""} />
-                      </div>
-                      {analysis.updated_by && analysis.updated_by.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-gray-500">Editado:</span>
-                          <UpdatedByAvatars updatedBy={analysis.updated_by} />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center space-x-1">
-                      {canEdit && (
-                        <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedAnalysis(analysis)
-                                  setIsEditModalOpen(true)
-                                }}
-                                className="h-7 w-7 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar Determinación</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      {canDelete && (
-                        <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedAnalysis(analysis)
-                                  setIsDeleteModalOpen(true)
-                                }}
-                                className="h-7 w-7 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
-                              >
-                                <Trash className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Desactivar Determinación</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
+                  {/* Right side: action buttons (not clickable for expand/collapse) */}
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedAnalysis(analysisItem)
+                              setIsEditModalOpen(true)
+                            }}
+                            className="h-7 w-7 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Editar Determinación</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedAnalysis(analysisItem)
+                              setIsDeleteModalOpen(true)
+                            }}
+                            className="h-7 w-7 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
+                          >
+                            <Trash className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Eliminar Determinación</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedHistoryAnalysis({ id: analysisItem.id, name: analysisItem.name })
+                              setIsHistoryDialogOpen(true)
+                            }}
+                            className="h-7 w-7 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                          >
+                            <History className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver Historial</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t bg-green-50 p-3">
-                    <h6 className="text-xs font-semibold text-gray-700 mb-3">Información de Auditoría</h6>
-                    <div className="space-y-3">
-                      <div className="bg-white p-2 rounded-md border border-blue-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="h-3 w-3 text-blue-600" />
-                          <h6 className="text-xs font-semibold text-blue-800">Creación</h6>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <UserAvatar user={analysis.created_by} date={analysis.created_at || ""} />
-                          <div>
-                            <p className="text-xs font-medium">Usuario: {analysis.created_by?.username || "Sistema"}</p>
-                            <p className="text-xs text-gray-600 flex items-center gap-1">
-                              <Calendar className="h-2 w-2" />
-                              {formatFullDate(analysis.created_at)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {analysis.updated_by && analysis.updated_by.length > 0 && (
-                        <div className="bg-white p-2 rounded-md border border-green-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Clock className="h-3 w-3 text-green-600" />
-                            <h6 className="text-xs font-semibold text-green-800">Última Modificación</h6>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarImage
-                                src={analysis.updated_by[analysis.updated_by.length - 1]?.photo || "/placeholder.svg"}
-                              />
-                              <AvatarFallback className="bg-green-100">
-                                {analysis.updated_by[analysis.updated_by.length - 1]?.username
-                                  ?.charAt(0)
-                                  .toUpperCase() || <User className="h-3 w-3" />}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-xs font-medium">
-                                Usuario: {analysis.updated_by[analysis.updated_by.length - 1]?.username}
-                              </p>
-                              <p className="text-xs text-gray-600 flex items-center gap-1">
-                                <Clock className="h-2 w-2" />
-                                {formatFullDate(analysis.updated_at)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.formula && (
-                        <div className="bg-white p-2 rounded-md border border-gray-200">
-                          <p className="text-xs font-medium mb-1">Fórmula:</p>
-                          <p className="text-xs text-gray-700 bg-gray-50 p-2 rounded border font-mono">
-                            {analysis.formula}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                  <div className="border-t p-4 bg-gray-50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedHistoryAnalysis({ id: analysisItem.id, name: analysisItem.name })
+                        setIsHistoryDialogOpen(true)
+                      }}
+                      className="w-full flex items-center justify-center gap-2"
+                    >
+                      <History className="h-4 w-4" />
+                      Ver Historial Completo
+                    </Button>
                   </div>
                 )}
               </div>
@@ -517,35 +532,42 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({
         <p className="text-center text-xs text-gray-400 mt-3">Fin de las determinaciones.</p>
       )}
 
-      {isCreateModalOpen && canCreate && (
-        <CreateAnalysisDialog
-          open={isCreateModalOpen}
-          onOpenChange={(openValue) => {
-            if (!openValue) handleDialogClose(setIsCreateModalOpen)
-          }}
+      {isCreateModalOpen && (
+        <CreateDeterminationDialog
+          analysis={analysis}
+          isOpen={isCreateModalOpen}
+          onClose={() => handleDialogClose(setIsCreateModalOpen)}
           onSuccess={handleSuccess}
-          panelId={panel.id}
         />
       )}
-      {isEditModalOpen && selectedAnalysis && canEdit && (
-        <EditAnalysisDialog
-          open={isEditModalOpen}
-          onOpenChange={(openValue) => {
-            if (!openValue) handleDialogClose(setIsEditModalOpen)
-          }}
+
+      {isEditModalOpen && selectedAnalysis && (
+        <EditDeterminationDialog
+          determination={selectedAnalysis}
+          isOpen={isEditModalOpen}
+          onClose={() => handleDialogClose(setIsEditModalOpen)}
           onSuccess={handleSuccess}
-          analysis={selectedAnalysis}
-          panelId={panel.id}
         />
       )}
-      {isDeleteModalOpen && selectedAnalysis && canDelete && (
-        <DeleteAnalysisDialog
+
+      {isDeleteModalOpen && selectedAnalysis && (
+        <DeleteDeterminationDialog
+          determination={selectedAnalysis}
           open={isDeleteModalOpen}
-          onOpenChange={(openValue) => {
-            if (!openValue) handleDialogClose(setIsDeleteModalOpen)
+          onOpenChange={(open) => {
+            setIsDeleteModalOpen(open)
+            if (!open) setSelectedAnalysis(null)
           }}
           onSuccess={handleSuccess}
-          analysis={selectedAnalysis}
+        />
+      )}
+
+      {isHistoryDialogOpen && selectedHistoryAnalysis && (
+        <DeterminationHistoryDialog
+          open={isHistoryDialogOpen}
+          onOpenChange={setIsHistoryDialogOpen}
+          determinationId={selectedHistoryAnalysis.id}
+          determinationName={selectedHistoryAnalysis.name}
         />
       )}
     </div>

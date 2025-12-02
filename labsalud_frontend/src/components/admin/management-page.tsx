@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
-import { USER_ENDPOINTS } from "@/config/api"
+import { USER_ENDPOINTS, AC_ENDPOINTS } from "@/config/api"
+import { PERMISSIONS } from "@/config/permissions"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
@@ -12,7 +13,7 @@ import { Loader2, AlertCircle } from "lucide-react"
 import type { User, Role, Permission } from "@/types"
 
 export default function ManagementPage() {
-  const { hasPermission } = useAuth()
+  const { hasPermission, user: currentUser } = useAuth()
   const { apiRequest } = useApi()
   const [users, setUsers] = useState<User[]>([])
   const [roles, setRoles] = useState<Role[]>([])
@@ -20,76 +21,68 @@ export default function ManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Verificar si el usuario tiene solo permiso de vista y ningún otro de gestión
-  const hasOnlyViewPermission =
-    hasPermission("24") &&
-    !["21", "22", "23", "9", "10", "11", "34", "35", "36"].some((permId) => hasPermission(permId))
+  const canManageUsers = hasPermission(PERMISSIONS.MANAGE_USERS.id)
+  const canManageRoles = hasPermission(PERMISSIONS.MANAGE_ROLES.id)
+  const canManageTempPermissions = hasPermission(PERMISSIONS.MANAGE_TEMP_PERMISSIONS.id)
 
-  const canAccessManagement =
-    !hasOnlyViewPermission &&
-    (hasPermission("24") || // view_customuser
-      hasPermission("21") || // add_customuser
-      hasPermission("22") || // change_customuser
-      hasPermission("23") || // delete_customuser
-      hasPermission("9") || // add_group
-      hasPermission("10") || // change_group
-      hasPermission("11") || // delete_group
-      hasPermission("12") || // view_group
-      hasPermission("34") || // assign_role
-      hasPermission("35") || // remove_role
-      hasPermission("36")) // assign_temp_permission
+  const canAccessManagement = canManageUsers || canManageRoles || canManageTempPermissions
 
   const refreshData = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      console.log("Cargando datos de gestión...")
+      console.log("[v0] Cargando datos de gestión...")
 
-      // Cargar usuarios - permisos: 21, 22, 23, 24
-      if (hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) {
-        const usersResponse = await apiRequest(`${USER_ENDPOINTS.USERS}active/?is_staff=false`)
+      if (canManageUsers) {
+        let usersUrl = USER_ENDPOINTS.USERS
+        if (!currentUser?.is_superuser) {
+          // Usuarios normales solo ven usuarios activos y no superusuarios
+          usersUrl = `${USER_ENDPOINTS.USERS}?is_superuser=false&is_active=True`
+          console.log("[v0] Usuario normal: cargando solo usuarios activos y no superusuarios")
+        } else {
+          console.log("[v0] Usuario superusuario: cargando todos los usuarios")
+        }
+
+        const usersResponse = await apiRequest(usersUrl)
         if (usersResponse.ok) {
           const usersData = await usersResponse.json()
           if (usersData && Array.isArray(usersData.results)) {
             setUsers(usersData.results)
-            console.log(`Usuarios cargados: ${usersData.results.length}`)
+            console.log("[v0] Usuarios cargados:", usersData.results.length)
           }
         } else {
-          console.error("Error al cargar usuarios:", usersResponse.status)
+          console.error("[v0] Error al cargar usuarios:", usersResponse.status)
         }
       }
 
-      // Cargar roles - permisos: 9, 10, 11, 12 (paginado)
-      if (hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) {
-        const rolesResponse = await apiRequest(`${USER_ENDPOINTS.ROLES}?limit=20&offset=0&search=`)
+      if (canManageRoles) {
+        const rolesResponse = await apiRequest(`${AC_ENDPOINTS.ROLES}?limit=100`)
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json()
           if (rolesData && Array.isArray(rolesData.results)) {
             setRoles(rolesData.results)
-            console.log(`Roles cargados: ${rolesData.results.length} / ${rolesData.count}`)
-            // rolesData.next → para scroll infinito si se implementa después
+            console.log("[v0] Roles cargados:", rolesData.results.length)
           }
         } else {
-          console.error("Error al cargar roles:", rolesResponse.status)
+          console.error("[v0] Error al cargar roles:", rolesResponse.status)
         }
       }
 
-      // Cargar permisos - permiso: 8 (paginado)
-      if (hasPermission("8")) {
-        const permissionsResponse = await apiRequest(`${USER_ENDPOINTS.PERMISSIONS}?limit=20&offset=0&search=`)
+      if (canManageRoles) {
+        const permissionsResponse = await apiRequest(`${AC_ENDPOINTS.PERMISSIONS}?limit=100`)
         if (permissionsResponse.ok) {
           const permissionsData = await permissionsResponse.json()
           if (permissionsData && Array.isArray(permissionsData.results)) {
             setPermissions(permissionsData.results)
-            console.log(`Permisos cargados: ${permissionsData.results.length}`)
+            console.log("[v0] Permisos cargados:", permissionsData.results.length)
           }
         } else {
-          console.error("Error al cargar permisos:", permissionsResponse.status)
+          console.error("[v0] Error al cargar permisos:", permissionsResponse.status)
         }
       }
     } catch (err) {
-      console.error("Error al cargar datos:", err)
+      console.error("[v0] Error al cargar datos:", err)
       setError("Error al cargar los datos. Por favor, intenta nuevamente.")
     } finally {
       setIsLoading(false)
@@ -148,16 +141,12 @@ export default function ManagementPage() {
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Gestión de Usuarios y Permisos</h1>
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="mb-6">
-            {(hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) && (
-              <TabsTrigger value="users">Usuarios</TabsTrigger>
-            )}
-            {(hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) && (
-              <TabsTrigger value="roles">Roles</TabsTrigger>
-            )}
-            {hasPermission("8") && <TabsTrigger value="permissions">Permisos</TabsTrigger>}
+            {canManageUsers && <TabsTrigger value="users">Usuarios</TabsTrigger>}
+            {canManageRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
+            {canManageRoles && <TabsTrigger value="permissions">Permisos</TabsTrigger>}
           </TabsList>
 
-          {(hasPermission("24") || hasPermission("21") || hasPermission("22") || hasPermission("23")) && (
+          {canManageUsers && (
             <TabsContent value="users">
               <UserManagement
                 users={users}
@@ -169,13 +158,13 @@ export default function ManagementPage() {
             </TabsContent>
           )}
 
-          {(hasPermission("12") || hasPermission("9") || hasPermission("10") || hasPermission("11")) && (
+          {canManageRoles && (
             <TabsContent value="roles">
               <RoleManagement roles={roles} setRoles={setRoles} refreshData={refreshData} />
             </TabsContent>
           )}
 
-          {hasPermission("8") && (
+          {canManageRoles && (
             <TabsContent value="permissions">
               <PermissionManagement permission={permissions} />
             </TabsContent>

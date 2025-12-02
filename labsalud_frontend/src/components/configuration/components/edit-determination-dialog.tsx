@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import {
   Dialog,
@@ -19,42 +18,46 @@ import { Textarea } from "@/components/ui/textarea"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import type { AnalysisItem } from "../configuration-page"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import type { Determination } from "@/types"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 
-interface CreateAnalysisDialogProps {
+interface EditDeterminationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: (newAnalysis: AnalysisItem) => void
-  panelId: number
+  onSuccess: (updatedDetermination: Determination) => void
+  determination: Determination
+  analysisId?: number
 }
 
-export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
+export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = ({
   open,
   onOpenChange,
   onSuccess,
-  panelId,
+  determination,
 }) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
   const [name, setName] = useState("")
   const [measureUnit, setMeasureUnit] = useState("")
   const [formula, setFormula] = useState("")
+  const [code, setCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    if (open) {
-      setName("")
-      setMeasureUnit("")
-      setFormula("")
+    if (determination && open) {
+      setCode(determination.code || "")
+      setName(determination.name)
+      setMeasureUnit(determination.measure_unit)
+      setFormula(determination.formula || "")
       setErrors({})
       setIsLoading(false)
     }
-  }, [open])
+  }, [determination, open])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
+    if (!code.trim()) newErrors.code = "El código es requerido."
     if (!name.trim()) newErrors.name = "El nombre es requerido."
     if (!measureUnit.trim()) newErrors.measureUnit = "La unidad de medida es requerida."
 
@@ -63,26 +66,34 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
   }
 
   const handleSubmit = async () => {
-    if (!validateForm()) return
+    if (!determination || !validateForm()) return
 
     setIsLoading(true)
     try {
-      const analysisData = {
-        panel: panelId,
-        name,
-        measure_unit: measureUnit,
-        formula: formula || null,
-        is_active: true, // Siempre activo al crear
+      const determinationUpdateData: Partial<Determination> = {}
+
+      if (code !== (determination.code || "")) determinationUpdateData.code = code
+      if (name !== determination.name) determinationUpdateData.name = name
+      if (measureUnit !== determination.measure_unit) determinationUpdateData.measure_unit = measureUnit
+      if (formula !== (determination.formula || "")) {
+        determinationUpdateData.formula = formula.trim() || ""
       }
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSES, {
-        method: "POST",
-        body: analysisData,
+
+      if (Object.keys(determinationUpdateData).length === 0) {
+        toastActions.info("Sin cambios", { description: "No se realizaron modificaciones." })
+        onOpenChange(false)
+        return
+      }
+
+      const response = await apiRequest(CATALOG_ENDPOINTS.DETERMINATION_DETAIL(determination.id), {
+        method: "PATCH",
+        body: determinationUpdateData,
       })
 
       if (response.ok) {
-        const newAnalysis = await response.json()
-        toastActions.success("Éxito", { description: "Determinación creada correctamente." })
-        onSuccess(newAnalysis)
+        const updatedDetermination = await response.json()
+        toastActions.success("Éxito", { description: "Determinación actualizada correctamente." })
+        onSuccess(updatedDetermination)
         onOpenChange(false)
       } else {
         const errorData = await response.json()
@@ -98,12 +109,12 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
           }
           setErrors(formattedErrors)
         } else {
-          setErrors({ form: String(backendErrors) || "Error al crear la determinación." })
+          setErrors({ form: String(backendErrors) || "Error al actualizar la determinación." })
         }
-        toastActions.error("Error", { description: "No se pudo crear la determinación." })
+        toastActions.error("Error", { description: "No se pudo actualizar la determinación." })
       }
     } catch (error) {
-      console.error("Error creating analysis:", error)
+      console.error("Error updating determination:", error)
       setErrors({ form: "Ocurrió un error de red o servidor." })
       toastActions.error("Error", { description: "Ocurrió un error inesperado." })
     } finally {
@@ -111,12 +122,14 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
     }
   }
 
+  if (!determination) return null
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Nueva Determinación</DialogTitle>
-          <DialogDescription>Completa los datos para la nueva determinación del panel.</DialogDescription>
+          <DialogTitle>Editar Determinación: {determination.name}</DialogTitle>
+          <DialogDescription>Modifica los datos de la determinación.</DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
           {errors.form && (
@@ -124,9 +137,20 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="analysis-name">Nombre *</Label>
+            <Label htmlFor="edit-determination-code">Código *</Label>
             <Input
-              id="analysis-name"
+              id="edit-determination-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ingrese el código de la determinación"
+            />
+            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-determination-name">Nombre *</Label>
+            <Input
+              id="edit-determination-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ingrese el nombre de la determinación"
@@ -135,9 +159,9 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="analysis-measureUnit">Unidad de Medida *</Label>
+            <Label htmlFor="edit-determination-measureUnit">Unidad de Medida *</Label>
             <Input
-              id="analysis-measureUnit"
+              id="edit-determination-measureUnit"
               value={measureUnit}
               onChange={(e) => setMeasureUnit(e.target.value)}
               placeholder="ej: mg/dL, UI/L, etc."
@@ -146,9 +170,9 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="analysis-formula">Fórmula (Opcional)</Label>
+            <Label htmlFor="edit-determination-formula">Fórmula (Opcional)</Label>
             <Textarea
-              id="analysis-formula"
+              id="edit-determination-formula"
               value={formula}
               onChange={(e) => setFormula(e.target.value)}
               placeholder="Ingrese la fórmula de cálculo si aplica"
@@ -171,7 +195,7 @@ export const CreateAnalysisDialog: React.FC<CreateAnalysisDialogProps> = ({
             style={{ backgroundColor: "#204983", color: "white" }}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Crear Determinación
+            Guardar Cambios
           </Button>
         </DialogFooter>
       </DialogContent>

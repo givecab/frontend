@@ -1,45 +1,51 @@
 "use client"
 
-import { useState, useCallback, useMemo, useEffect } from "react"
-import { Loader2, AlertCircle, Search, Filter, FileText, User, Calendar, Activity } from "lucide-react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { Loader2, AlertCircle, Search, FileText, User } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { RESULTS_ENDPOINTS } from "@/config/api"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
 import { ValidationProtocolCard } from "./validation-protocol-card"
-import type { ProtocolSummary } from "@/types"
+import type { ProtocolWithLoadedResults } from "@/types"
 
 interface PaginatedResponse<T> {
-  count: number
+  count?: number
   next: string | null
-  previous: string | null
+  previous?: string | null
   results: T[]
 }
 
-const getStateLabel = (state: string): string => {
-  const stateMap: Record<string, string> = {
-    pending_entry: "Carga Pendiente",
-    entry_complete: "Carga Completa",
-    pending_validation: "Validación Pendiente",
-    completed: "Finalizado",
-    cancelled: "Cancelado",
+const getStatusLabel = (statusId: number): string => {
+  const statusMap: Record<number, string> = {
+    1: "Carga Pendiente",
+    2: "Validación Pendiente",
+    3: "Pago Incompleto",
+    4: "Cancelado",
+    5: "Completado",
+    6: "Pendiente de Retiro",
+    7: "Envío Fallido",
   }
-  return stateMap[state] || state
+  return statusMap[statusId] || "Desconocido"
 }
 
-const getStateBadgeClasses = (state: string): string => {
-  switch (state) {
-    case "pending_entry":
-      return "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200"
-    case "pending_validation":
+const getStatusBadgeClasses = (statusId: number): string => {
+  switch (statusId) {
+    case 1: // Pendiente de carga - yellow
       return "bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200"
-    case "completed":
-      return "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-    case "cancelled":
+    case 2: // Pendiente de validación - blue
+      return "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200"
+    case 3: // Pago incompleto - orange
+      return "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200"
+    case 4: // Cancelado - red
       return "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
+    case 5: // Completado - green
+      return "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
+    case 6: // Pendiente de Retiro - purple
+      return "bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200"
+    case 7: // Envío fallido - rose
+      return "bg-rose-100 text-rose-700 border-rose-300 hover:bg-rose-200"
     default:
       return "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
   }
@@ -47,36 +53,30 @@ const getStateBadgeClasses = (state: string): string => {
 
 export function ValidationProtocolList() {
   const { apiRequest } = useApi()
-  const [protocols, setProtocols] = useState<ProtocolSummary[]>([])
+  const [protocols, setProtocols] = useState<ProtocolWithLoadedResults[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [nextUrl, setNextUrl] = useState<string | null>(null)
-  const [totalCount, setTotalCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
+  const [expandedProtocols, setExpandedProtocols] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [stateFilter, setStateFilter] = useState<string>("pending_validation")
 
-  const buildUrl = useCallback(
-    (search = "", offset = 0) => {
-      const params = new URLSearchParams({
-        limit: "20",
-        offset: offset.toString(),
-      })
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
-      if (search.trim()) {
-        params.append("search", search.trim())
-      }
+  const buildUrl = useCallback((search = "", offset = 0) => {
+    const params = new URLSearchParams({
+      limit: "20",
+      offset: offset.toString(),
+    })
 
-      if (stateFilter !== "all") {
-        params.append("state", stateFilter)
-      }
+    if (search.trim()) {
+      params.append("search", search.trim())
+    }
 
-      return `${ANALYSIS_ENDPOINTS.PROTOCOLS_SUMMARY}?${params.toString()}`
-    },
-    [stateFilter],
-  )
+    return `${RESULTS_ENDPOINTS.PROTOCOLS_WITH_LOADED_RESULTS}?${params.toString()}`
+  }, [])
 
   const fetchProtocols = useCallback(
     async (reset = true) => {
@@ -97,11 +97,10 @@ export function ValidationProtocolList() {
           throw new Error("Error al cargar los protocolos")
         }
 
-        const data: PaginatedResponse<ProtocolSummary> = await response.json()
+        const data: PaginatedResponse<ProtocolWithLoadedResults> = await response.json()
 
         if (reset) {
           setProtocols(data.results)
-          setTotalCount(data.count)
         } else {
           setProtocols((prev) => [...prev, ...data.results])
         }
@@ -109,7 +108,7 @@ export function ValidationProtocolList() {
         setNextUrl(data.next)
         setHasMore(!!data.next)
       } catch (err) {
-        console.error("[v0] Error loading protocols:", err)
+        console.error("Error loading protocols:", err)
         setError("Error al cargar los protocolos pendientes de validación")
       } finally {
         setIsLoading(false)
@@ -119,30 +118,31 @@ export function ValidationProtocolList() {
     [apiRequest, buildUrl, searchTerm, nextUrl],
   )
 
-  const loadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore && nextUrl) {
-      fetchProtocols(false)
-    }
-  }, [isLoadingMore, hasMore, nextUrl, fetchProtocols])
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
 
-  const sentinelRef = useInfiniteScroll({
-    loading: isLoadingMore,
-    hasMore: hasMore,
-    onLoadMore: loadMore,
-    dependencies: [hasMore, nextUrl],
-  })
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isLoading) {
+          fetchProtocols(false)
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, isLoading, fetchProtocols])
 
   const filteredProtocols = useMemo(() => {
+    if (!searchTerm) return protocols
     return protocols.filter((protocol) => {
       const matchesSearch =
-        searchTerm === "" ||
-        protocol.patient_first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        protocol.patient_last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        protocol.patient_dni?.includes(searchTerm) ||
-        String(protocol.id || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())
-
+        protocol.patient.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        protocol.patient.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        protocol.patient.dni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(protocol.id).includes(searchTerm)
       return matchesSearch
     })
   }, [protocols, searchTerm])
@@ -152,15 +152,17 @@ export function ValidationProtocolList() {
   }, [])
 
   useEffect(() => {
-    setProtocols([])
-    setNextUrl(null)
-    setHasMore(true)
-    fetchProtocols()
-  }, [stateFilter])
+    const timer = setTimeout(() => {
+      setProtocols([])
+      setNextUrl(null)
+      setHasMore(true)
+      fetchProtocols()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   const handleProtocolValidated = (protocolId: number) => {
     setProtocols((prev) => prev.filter((p) => p.id !== protocolId))
-    setTotalCount((prev) => prev - 1)
   }
 
   if (isLoading) {
@@ -168,7 +170,7 @@ export function ValidationProtocolList() {
       <div className="flex justify-center py-12">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-[#204983]" />
-          <p className="text-gray-600">Cargando protocolos activos...</p>
+          <p className="text-gray-600">Cargando protocolos pendientes...</p>
         </div>
       </div>
     )
@@ -197,19 +199,6 @@ export function ValidationProtocolList() {
             className="pl-10 bg-white"
           />
         </div>
-        <div className="sm:w-64">
-          <Select value={stateFilter} onValueChange={setStateFilter}>
-            <SelectTrigger className="bg-white">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending_validation">Validación Pendiente</SelectItem>
-              <SelectItem value="entry_complete">Carga Completa</SelectItem>
-              <SelectItem value="all">Todos los estados</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {filteredProtocols.length === 0 ? (
@@ -220,7 +209,12 @@ export function ValidationProtocolList() {
         </div>
       ) : (
         <>
-          <Accordion type="multiple" className="w-full space-y-2">
+          <Accordion
+            type="multiple"
+            value={expandedProtocols}
+            onValueChange={setExpandedProtocols}
+            className="w-full space-y-2"
+          >
             {filteredProtocols.map((protocol) => (
               <AccordionItem
                 key={protocol.id}
@@ -236,45 +230,36 @@ export function ValidationProtocolList() {
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-gray-600" />
                       <span className="font-medium text-gray-900">
-                        {protocol.patient_first_name} {protocol.patient_last_name}
+                        {protocol.patient.first_name} {protocol.patient.last_name}
                       </span>
+                      {protocol.patient.dni && (
+                        <span className="text-sm text-gray-500">(DNI: {protocol.patient.dni})</span>
+                      )}
                     </div>
-                    <Badge variant="outline" className="bg-gray-50">
-                      DNI: {protocol.patient_dni}
+                    <Badge variant="outline" className={`font-medium ${getStatusBadgeClasses(protocol.status.id)}`}>
+                      {protocol.status.name || getStatusLabel(protocol.status.id)}
                     </Badge>
-                    <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700">
-                      {protocol.ooss}
-                    </Badge>
-                    <Badge variant="outline" className={`font-medium ${getStateBadgeClasses(protocol.state)}`}>
-                      {getStateLabel(protocol.state)}
-                    </Badge>
-                    <div className="flex items-center gap-1 text-sm font-medium text-[#204983]">
-                      <Activity className="h-4 w-4" />
-                      {protocol.loaded_results_count}/{protocol.total_analyses_count}
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(protocol.created_at).toLocaleDateString()}
-                    </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 py-4 bg-gray-50">
-                  <ValidationProtocolCard protocol={protocol} onProtocolValidated={handleProtocolValidated} />
+                  <ValidationProtocolCard
+                    protocol={protocol}
+                    onProtocolValidated={handleProtocolValidated}
+                    isExpanded={expandedProtocols.includes(`protocol-${protocol.id}`)}
+                  />
                 </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
 
-          {hasMore && !isLoading && filteredProtocols.length > 0 && (
-            <div ref={sentinelRef} className="flex justify-center py-4">
-              {isLoadingMore && (
-                <div className="flex items-center">
-                  <Loader2 className="h-6 w-6 text-[#204983] animate-spin mr-2" />
-                  <span className="text-gray-600">Cargando más protocolos...</span>
-                </div>
-              )}
-            </div>
-          )}
+          <div ref={sentinelRef} className="flex justify-center py-4">
+            {isLoadingMore && (
+              <div className="flex items-center">
+                <Loader2 className="h-6 w-6 text-[#204983] animate-spin mr-2" />
+                <span className="text-gray-600">Cargando más protocolos...</span>
+              </div>
+            )}
+          </div>
 
           {!hasMore && filteredProtocols.length > 0 && (
             <div className="text-center py-4 text-gray-500">

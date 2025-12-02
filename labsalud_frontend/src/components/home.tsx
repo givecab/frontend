@@ -3,7 +3,8 @@ import { useState, useEffect } from "react"
 import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
-import { User, Shield, Clock, TestTube, Users, TrendingUp, Calendar, CheckCircle, AlertCircle } from "lucide-react"
+import { ANALYTICS_ENDPOINTS } from "@/config/api"
+import { User, Shield, Clock, TestTube, Users, TrendingUp, CheckCircle, AlertCircle } from "lucide-react"
 
 interface Permission {
   id: number
@@ -16,11 +17,11 @@ interface Permission {
 interface Stats {
   analysisToday: number
   patientsToday: number
-  pendingResults: number
-  completedAnalysis: number
-  monthlyGrowth: number
-  averageProcessingTime: string
-  pendingEntryProtocols: number
+  pendingResultsLoad: number
+  pendingResultsValidation: number
+  protocolsCompletedMonth: number
+  protocolsCompletedGrowthPercent: string
+  avgResultLoadTimeHuman: string
 }
 
 const parseTimeToHours = (timeString: string): string => {
@@ -62,35 +63,37 @@ export default function Home() {
   const [stats, setStats] = useState<Stats>({
     analysisToday: 0,
     patientsToday: 0,
-    pendingResults: 0,
-    completedAnalysis: 0,
-    monthlyGrowth: 0,
-    averageProcessingTime: "0 min",
-    pendingEntryProtocols: 0,
+    pendingResultsLoad: 0,
+    pendingResultsValidation: 0,
+    protocolsCompletedMonth: 0,
+    protocolsCompletedGrowthPercent: "0.0",
+    avgResultLoadTimeHuman: "0 min",
   })
   const [loading, setLoading] = useState(true)
 
   const getActivePermissions = (): Permission[] => {
-    if (!user || !user.temp_permissions) return []
+    if (!user || !user.permissions) return []
     const now = new Date()
-    return user.temp_permissions.filter((perm: Permission) => perm.expires_at && new Date(perm.expires_at) > now)
+    return user.permissions.filter(
+      (perm: Permission) => perm.temporary && perm.expires_at && new Date(perm.expires_at) > now,
+    )
   }
 
   const fetchStats = async () => {
     try {
       setLoading(true)
 
-      const response = await apiRequest("/api/v1/analysis/stats/general-stats/")
+      const response = await apiRequest(ANALYTICS_ENDPOINTS.DASHBOARD)
       const data = await response.json()
 
       setStats({
-        analysisToday: data.analysis_made_today || 0,
-        completedAnalysis: data.analysis_completed_month || 0,
-        patientsToday: data.patients_treated_today || 0,
-        pendingResults: data.pending_validated_results || 0,
-        pendingEntryProtocols: data.pending_entry_protocols || 0,
-        monthlyGrowth: data.growth_patients_percent !== null ? Number(data.growth_patients_percent.toFixed(1)) : 0,
-        averageProcessingTime: parseTimeToHours(data.avg_result_load_time || "0 min"),
+        analysisToday: data.analysis_today || 0,
+        patientsToday: data.patients_today || 0,
+        protocolsCompletedMonth: data.protocols_completed_month || 0,
+        protocolsCompletedGrowthPercent: data.protocols_completed_growth_percent || "0.0",
+        avgResultLoadTimeHuman: data.avg_result_load_time_human || "0 min",
+        pendingResultsLoad: data.pending_results_load || 0,
+        pendingResultsValidation: data.pending_results_validation || 0,
       })
     } catch (error) {
       console.error("Error fetching stats:", error)
@@ -104,7 +107,7 @@ export default function Home() {
     fetchStats()
   }, [])
 
-  const canSeeValidationStats = isInGroup("Bioquimica") || hasPermission("validation_access")
+  const canSeeValidationStats = hasPermission("validar_resultados") || hasPermission(4)
 
   return (
     <div className="max-w-7xl mx-auto py-6">
@@ -191,7 +194,7 @@ export default function Home() {
           <p className="text-green-600 text-sm">Pacientes atendidos</p>
         </div>
 
-        {/* Análisis Completados (Mes) */}
+        {/* Protocolos Completados (Mes) */}
         <div className="bg-purple-50/80 backdrop-blur-sm p-6 rounded-lg border border-purple-200">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-purple-100 rounded-lg">
@@ -203,10 +206,10 @@ export default function Home() {
             {loading ? (
               <div className="animate-pulse bg-purple-200 h-8 w-20 rounded"></div>
             ) : (
-              stats.completedAnalysis.toLocaleString()
+              stats.protocolsCompletedMonth.toLocaleString()
             )}
           </h3>
-          <p className="text-purple-600 text-sm">Análisis completados</p>
+          <p className="text-purple-600 text-sm">Protocolos completados</p>
         </div>
 
         {/* Crecimiento Mensual */}
@@ -221,7 +224,7 @@ export default function Home() {
             {loading ? (
               <div className="animate-pulse bg-emerald-200 h-8 w-16 rounded"></div>
             ) : (
-              `${stats.monthlyGrowth >= 0 ? "+" : ""}${stats.monthlyGrowth}%`
+              `${Number(stats.protocolsCompletedGrowthPercent) >= 0 ? "+" : ""}${stats.protocolsCompletedGrowthPercent}%`
             )}
           </h3>
           <p className="text-emerald-600 text-sm">vs. mes anterior</p>
@@ -231,7 +234,7 @@ export default function Home() {
         <div className="bg-indigo-50/80 backdrop-blur-sm p-6 rounded-lg border border-indigo-200">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-indigo-100 rounded-lg">
-              <Calendar className="w-6 h-6 text-indigo-600" />
+              <Clock className="w-6 h-6 text-indigo-600" />
             </div>
             <span className="text-xs text-indigo-500 font-medium">PROMEDIO</span>
           </div>
@@ -239,13 +242,13 @@ export default function Home() {
             {loading ? (
               <div className="animate-pulse bg-indigo-200 h-8 w-20 rounded"></div>
             ) : (
-              stats.averageProcessingTime
+              stats.avgResultLoadTimeHuman
             )}
           </h3>
           <p className="text-indigo-600 text-sm">Tiempo de carga de resultados</p>
         </div>
 
-        {/* Protocolos por Ingresar */}
+        {/* Resultados por Cargar */}
         <div className="bg-amber-50/80 backdrop-blur-sm p-6 rounded-lg border border-amber-200">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-amber-100 rounded-lg">
@@ -257,7 +260,7 @@ export default function Home() {
             {loading ? (
               <div className="animate-pulse bg-amber-200 h-8 w-16 rounded"></div>
             ) : (
-              stats.pendingEntryProtocols.toLocaleString()
+              stats.pendingResultsLoad.toLocaleString()
             )}
           </h3>
           <p className="text-amber-600 text-sm">Resultados por cargar</p>
@@ -276,7 +279,7 @@ export default function Home() {
               {loading ? (
                 <div className="animate-pulse bg-orange-200 h-8 w-16 rounded"></div>
               ) : (
-                stats.pendingResults.toLocaleString()
+                stats.pendingResultsValidation.toLocaleString()
               )}
             </h3>
             <p className="text-orange-600 text-sm">Resultados por validar</p>

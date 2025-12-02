@@ -5,12 +5,13 @@ import { CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import useAuth from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
 import { ValidationProtocolList } from "./components/validation-protocol-list"
+import { PERMISSIONS } from "@/config/permissions"
 
 export default function ValidacionPage() {
   const { hasPermission } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
 
-  const canValidateResults = hasPermission(71)
+  const canValidateResults = hasPermission(Number(PERMISSIONS.VALIDATE_RESULTS.id))
 
   useEffect(() => {
     // Simular carga inicial

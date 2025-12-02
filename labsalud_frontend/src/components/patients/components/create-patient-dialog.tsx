@@ -24,7 +24,7 @@ interface ValidationState {
   last_name: { isValid: boolean; message: string }
   email: { isValid: boolean; message: string }
   phone_mobile: { isValid: boolean; message: string }
-  phone_landline: { isValid: boolean; message: string }
+  alt_phone: { isValid: boolean; message: string }
   birth_date: { isValid: boolean; message: string }
 }
 
@@ -34,7 +34,7 @@ const initialValidation: ValidationState = {
   last_name: { isValid: false, message: "Ingresa el apellido" },
   email: { isValid: true, message: "" },
   phone_mobile: { isValid: true, message: "" },
-  phone_landline: { isValid: true, message: "" },
+  alt_phone: { isValid: true, message: "" },
   birth_date: { isValid: false, message: "Selecciona la fecha de nacimiento" },
 }
 
@@ -46,7 +46,7 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
     birth_date: "",
     gender: "",
     phone_mobile: "",
-    phone_landline: "",
+    alt_phone: "",
     email: "",
     country: "Argentina",
     province: "Córdoba",
@@ -147,8 +147,8 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
       case "phone_mobile":
         result = validatePhone(value, "El teléfono móvil")
         break
-      case "phone_landline":
-        result = validatePhone(value, "El teléfono fijo")
+      case "alt_phone":
+        result = validatePhone(value, "El teléfono alternativo")
         break
       case "birth_date":
         result = validateBirthDate(value)
@@ -208,7 +208,7 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
       birth_date: "",
       gender: "",
       phone_mobile: "",
-      phone_landline: "",
+      alt_phone: "",
       email: "",
       country: "Argentina",
       province: "Córdoba",
@@ -226,7 +226,7 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
       return fieldValidation.isValid
     })
 
-    const optionalFieldsValid = ["email", "phone_mobile", "phone_landline"].every((field) => {
+    const optionalFieldsValid = ["email", "phone_mobile", "alt_phone"].every((field) => {
       const fieldValidation = validation[field as keyof ValidationState]
       return fieldValidation.isValid
     })
@@ -236,7 +236,7 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
 
   const handleCreatePatient = async () => {
     // Marcar todos los campos como tocados
-    const allFields = ["dni", "first_name", "last_name", "birth_date", "email", "phone_mobile", "phone_landline"]
+    const allFields = ["dni", "first_name", "last_name", "birth_date", "email", "phone_mobile", "alt_phone"]
     const newTouched = allFields.reduce((acc, field) => ({ ...acc, [field]: true }), {})
     setTouched(newTouched)
 
@@ -400,6 +400,8 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
                 <SelectContent>
                   <SelectItem value="M">Masculino</SelectItem>
                   <SelectItem value="F">Femenino</SelectItem>
+                  <SelectItem value="O">Otro</SelectItem>
+                  <SelectItem value="N">No especificar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -420,16 +422,16 @@ export function CreatePatientDialog({ isOpen, onClose, addPatient, apiRequest }:
               {renderFieldMessage("phone_mobile")}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone_landline">Teléfono fijo</Label>
+              <Label htmlFor="alt_phone">Teléfono alternativo</Label>
               <Input
-                id="phone_landline"
-                name="phone_landline"
-                value={formData.phone_landline}
+                id="alt_phone"
+                name="alt_phone"
+                value={formData.alt_phone}
                 onChange={handleInputChange}
-                placeholder="Teléfono fijo"
-                className={getFieldStyle("phone_landline")}
+                placeholder="Teléfono alternativo"
+                className={getFieldStyle("alt_phone")}
               />
-              {renderFieldMessage("phone_landline")}
+              {renderFieldMessage("alt_phone")}
             </div>
           </div>
 

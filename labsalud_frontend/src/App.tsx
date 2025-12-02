@@ -14,6 +14,7 @@ import { Toaster } from "sonner"
 import ProtocolosPage from "./components/protocolos/protocolos-page"
 import ResultadosPage from "./components/results/results-page"
 import ValidacionPage from "./components/validacion/validacion-page"
+import { PERMISSIONS } from "./config/permissions"
 
 function App() {
   return (
@@ -45,7 +46,7 @@ function App() {
           <Route
             path="/management"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_USERS.id}>
                 <Layout />
               </ProtectedRoute>
             }
@@ -119,7 +120,7 @@ function App() {
           <Route
             path="/validacion"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredPermission={PERMISSIONS.VALIDATE_RESULTS.id}>
                 <Layout />
               </ProtectedRoute>
             }

@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import {
   Dialog,
@@ -15,80 +14,80 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import type { AnalysisPanel } from "../configuration-page"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import type { Determination } from "@/types"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 
-interface EditPanelDialogProps {
+interface CreateDeterminationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: (updatedPanel: AnalysisPanel) => void
-  panel: AnalysisPanel
+  onSuccess: (newDetermination: Determination) => void
+  analysisId: number
 }
 
-export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenChange, onSuccess, panel }) => {
+export const CreateDeterminationDialog: React.FC<CreateDeterminationDialogProps> = ({
+  open,
+  onOpenChange,
+  onSuccess,
+  analysisId,
+}) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
   const [code, setCode] = useState("")
   const [name, setName] = useState("")
-  const [bioUnit, setBioUnit] = useState("")
-  const [isUrgent, setIsUrgent] = useState(false)
+  const [measureUnit, setMeasureUnit] = useState("")
+  const [formula, setFormula] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    if (panel && open) {
-      setCode(panel.code.toString())
-      setName(panel.name)
-      setBioUnit(panel.bio_unit)
-      setIsUrgent(panel.is_urgent)
+    if (open) {
+      setCode("")
+      setName("")
+      setMeasureUnit("")
+      setFormula("")
       setErrors({})
+      setIsLoading(false)
     }
-  }, [panel, open])
+  }, [open])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-    if (!name.trim()) newErrors.name = "El nombre es requerido."
     if (!code.trim()) newErrors.code = "El código es requerido."
-    else if (isNaN(Number(code))) newErrors.code = "El código debe ser numérico."
-    if (!bioUnit.trim()) newErrors.bioUnit = "La unidad bioquímica es requerida."
+    if (!name.trim()) newErrors.name = "El nombre es requerido."
+    if (!measureUnit.trim()) newErrors.measureUnit = "La unidad de medida es requerida."
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async () => {
-    if (!panel || !validateForm()) return
+    if (!validateForm()) return
 
     setIsLoading(true)
     try {
-      const panelUpdateData: Partial<AnalysisPanel> = {}
-      if (Number.parseInt(code, 10) !== panel.code) panelUpdateData.code = Number.parseInt(code, 10)
-      if (name !== panel.name) panelUpdateData.name = name
-      if (bioUnit !== panel.bio_unit) panelUpdateData.bio_unit = bioUnit
-      if (isUrgent !== panel.is_urgent) panelUpdateData.is_urgent = isUrgent
-
-      if (Object.keys(panelUpdateData).length === 0) {
-        toastActions.info("Sin cambios", { description: "No se realizaron modificaciones." })
-        onOpenChange(false)
-        return
+      const determinationData = {
+        code,
+        analysis: analysisId,
+        name,
+        measure_unit: measureUnit,
+        formula: formula || "",
       }
-
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.PANEL_DETAIL(panel.id), {
-        method: "PATCH",
-        body: panelUpdateData,
+      const response = await apiRequest(CATALOG_ENDPOINTS.DETERMINATIONS, {
+        method: "POST",
+        body: determinationData,
       })
 
       if (response.ok) {
-        const updatedPanel = await response.json()
-        toastActions.success("Éxito", { description: "Panel actualizado correctamente." })
-        onSuccess(updatedPanel)
+        const newDetermination = await response.json()
+        toastActions.success("Éxito", { description: "Determinación creada correctamente." })
+        onSuccess(newDetermination)
         onOpenChange(false)
       } else {
-        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
+        const errorData = await response.json()
         const backendErrors = errorData.errors || errorData.detail || errorData
         if (typeof backendErrors === "object" && backendErrors !== null) {
           const formattedErrors: Record<string, string> = {}
@@ -101,12 +100,12 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
           }
           setErrors(formattedErrors)
         } else {
-          setErrors({ form: backendErrors || "Error al actualizar el panel." })
+          setErrors({ form: String(backendErrors) || "Error al crear la determinación." })
         }
-        toastActions.error("Error", { description: "No se pudo actualizar el panel." })
+        toastActions.error("Error", { description: "No se pudo crear la determinación." })
       }
     } catch (error) {
-      console.error("Error updating panel:", error)
+      console.error("Error creating determination:", error)
       setErrors({ form: "Ocurrió un error de red o servidor." })
       toastActions.error("Error", { description: "Ocurrió un error inesperado." })
     } finally {
@@ -114,14 +113,12 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
     }
   }
 
-  if (!panel) return null
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Editar Panel: {panel.name}</DialogTitle>
-          <DialogDescription>Modifica los datos del panel.</DialogDescription>
+          <DialogTitle>Nueva Determinación</DialogTitle>
+          <DialogDescription>Completa los datos para la nueva determinación del análisis.</DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
           {errors.form && (
@@ -129,46 +126,48 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="edit-code">Código *</Label>
+            <Label htmlFor="determination-code">Código *</Label>
             <Input
-              id="edit-code"
+              id="determination-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Ingrese el código numérico"
+              placeholder="Ingrese el código de la determinación"
             />
             {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-name">Nombre *</Label>
+            <Label htmlFor="determination-name">Nombre *</Label>
             <Input
-              id="edit-name"
+              id="determination-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ingrese el nombre del panel"
+              placeholder="Ingrese el nombre de la determinación"
             />
             {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-bioUnit">Unidad Bioquímica *</Label>
+            <Label htmlFor="determination-measureUnit">Unidad de Medida *</Label>
             <Input
-              id="edit-bioUnit"
-              value={bioUnit}
-              onChange={(e) => setBioUnit(e.target.value)}
-              placeholder="Ingrese la unidad bioquímica"
+              id="determination-measureUnit"
+              value={measureUnit}
+              onChange={(e) => setMeasureUnit(e.target.value)}
+              placeholder="ej: mg/dL, UI/L, etc."
             />
-            {errors.bioUnit && <p className="text-sm text-red-500">{errors.bioUnit}</p>}
+            {errors.measureUnit && <p className="text-sm text-red-500">{errors.measureUnit}</p>}
           </div>
 
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <Label htmlFor="edit-isUrgent" className="font-medium">
-                Panel Urgente
-              </Label>
-              <p className="text-sm text-gray-500">Marcar si este panel es de carácter urgente</p>
-            </div>
-            <Switch id="edit-isUrgent" checked={isUrgent} onCheckedChange={setIsUrgent} />
+          <div className="space-y-2">
+            <Label htmlFor="determination-formula">Fórmula (Opcional)</Label>
+            <Textarea
+              id="determination-formula"
+              value={formula}
+              onChange={(e) => setFormula(e.target.value)}
+              placeholder="Ingrese la fórmula de cálculo si aplica"
+              rows={3}
+            />
+            {errors.formula && <p className="text-sm text-red-500">{errors.formula}</p>}
           </div>
         </div>
 
@@ -185,7 +184,7 @@ export const EditPanelDialog: React.FC<EditPanelDialogProps> = ({ open, onOpenCh
             style={{ backgroundColor: "#204983", color: "white" }}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Cambios
+            Crear Determinación
           </Button>
         </DialogFooter>
       </DialogContent>

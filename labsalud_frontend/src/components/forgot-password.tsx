@@ -45,15 +45,15 @@ export default function ForgotPassword() {
       if (response.ok) {
         setIsSuccess(true)
       } else {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({ detail: "Error al procesar la solicitud" }))
         if (response.status === 404) {
           setError("No se encontró una cuenta con este email")
         } else {
-          setError(errorData.message || "Error al procesar la solicitud. Intenta nuevamente.")
+          setError(errorData.detail || errorData.message || "Error al procesar la solicitud. Intenta nuevamente.")
         }
       }
     } catch (err) {
-      console.error("Error al enviar solicitud:", err)
+      console.error("[v0] Password reset error:", err)
       setError("Error de conexión. Por favor, verifica tu conexión e intenta nuevamente.")
     } finally {
       setIsSubmitting(false)

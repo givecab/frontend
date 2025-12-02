@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
-import { USER_ENDPOINTS } from "@/config/api"
+import { USER_ENDPOINTS, AC_ENDPOINTS } from "@/config/api"
 
 interface EditUserDialogProps {
   open: boolean
@@ -37,8 +37,8 @@ export function EditUserDialog({
     email: "",
     first_name: "",
     last_name: "",
-    groups: [] as number[],
   })
+  const [selectedRoles, setSelectedRoles] = useState<number[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -49,16 +49,16 @@ export function EditUserDialog({
         email: user.email,
         first_name: user.first_name || "",
         last_name: user.last_name || "",
-        groups: userGroups.map((group) => group.id),
       })
+      setSelectedRoles(userGroups.map((group) => group.id))
     } else if (!open) {
       setUserData({
         username: "",
         email: "",
         first_name: "",
         last_name: "",
-        groups: [],
       })
+      setSelectedRoles([])
       setIsSubmitting(false)
     }
   }, [open, user])
@@ -72,10 +72,7 @@ export function EditUserDialog({
   }, [])
 
   const handleRoleChange = useCallback((roleId: number, checked: boolean) => {
-    setUserData((prev) => ({
-      ...prev,
-      groups: checked ? [...prev.groups, roleId] : prev.groups.filter((id) => id !== roleId),
-    }))
+    setSelectedRoles((prev) => (checked ? [...prev, roleId] : prev.filter((id) => id !== roleId)))
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,20 +87,43 @@ export function EditUserDialog({
         body: userData,
       })
 
-      if (response.ok) {
-        const updatedUser = await response.json()
-        setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
-        await refreshData()
-        success("Usuario actualizado", {
-          description: "Los datos del usuario han sido actualizados exitosamente.",
-        })
-        onOpenChange(false)
-      } else {
+      if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         showError("Error al actualizar usuario", {
           description: errorData.detail || "Ha ocurrido un error al actualizar el usuario.",
         })
+        setIsSubmitting(false)
+        return
       }
+
+      const updatedUser = await response.json()
+
+      const currentRoles = (user.groups || user.roles || []).map((r) => r.id)
+      const rolesChanged =
+        selectedRoles.length !== currentRoles.length || selectedRoles.some((id) => !currentRoles.includes(id))
+
+      if (rolesChanged) {
+        const roleResponse = await apiRequest(AC_ENDPOINTS.ROLE_ASSIGN, {
+          method: "POST",
+          body: {
+            user_id: user.id,
+            role_ids: selectedRoles,
+          },
+        })
+
+        if (!roleResponse.ok) {
+          showError("Roles no actualizados", {
+            description: "El usuario fue actualizado pero los roles no pudieron ser modificados debido a permisos.",
+          })
+        }
+      }
+
+      setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? { ...updatedUser, groups: selectedRoles } : u)))
+      await refreshData()
+      success("Usuario actualizado", {
+        description: "Los datos del usuario han sido actualizados exitosamente.",
+      })
+      onOpenChange(false)
     } catch (err) {
       console.error("Error al actualizar usuario:", err)
       showError("Error", {
@@ -120,7 +140,7 @@ export function EditUserDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Usuario: {user.username}</DialogTitle>
+          <DialogTitle>Editar Usuario: {user?.username}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -180,7 +200,7 @@ export function EditUserDialog({
                   <div key={role.id} className="flex items-center space-x-2">
                     <Checkbox
                       id={`role-${role.id}`}
-                      checked={userData.groups.includes(role.id)}
+                      checked={selectedRoles.includes(role.id)}
                       onCheckedChange={(checked) => handleRoleChange(role.id, Boolean(checked))}
                     />
                     <Label htmlFor={`role-${role.id}`} className="text-sm">

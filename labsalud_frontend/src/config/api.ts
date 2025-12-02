@@ -11,24 +11,23 @@ export const API_CONFIG = {
 } as const
 
 export const UI_CONFIG = {
-  TOAST_DURATION: 4000, // 4 seconds
+  TOAST_DURATION: 4000,
 } as const
 
 export const TOAST_DURATION = UI_CONFIG.TOAST_DURATION
 
 // Helper function to build API URLs
 export const buildApiUrl = (endpoint: string): string => {
-  const baseUrl = API_CONFIG.BASE_URL.replace(/\/$/, "") // Remove trailing slash
+  const baseUrl = API_CONFIG.BASE_URL.replace(/\/$/, "")
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`
-  return `${baseUrl}/api/${API_CONFIG.API_VERSION}${cleanEndpoint}`
+  return `${baseUrl}${cleanEndpoint}`
 }
 
 // Authentication endpoints
 export const AUTH_ENDPOINTS = {
-  TOKEN: buildApiUrl("/users/token/"),
-  TOKEN_REFRESH: buildApiUrl("/users/token/refresh/"),
-  TOKEN_VERIFY: buildApiUrl("/users/token/verify/"),
-  ME: buildApiUrl("/users/me/"),
+  TOKEN: buildApiUrl("/auth/token/"),
+  TOKEN_REFRESH: buildApiUrl("/auth/token/refresh/"),
+  TOKEN_VERIFY: buildApiUrl("/auth/token/verify/"),
   PASSWORD_RESET: buildApiUrl("/users/password-reset/"),
 } as const
 
@@ -36,76 +35,88 @@ export const AUTH_ENDPOINTS = {
 export const USER_ENDPOINTS = {
   USERS: buildApiUrl("/users/users/"),
   USER_DETAIL: (id: number) => buildApiUrl(`/users/users/${id}/`),
-  USER_ASSIGN_ROLE: (id: number) => buildApiUrl(`/users/users/${id}/assign-role/`),
-  USER_REMOVE_ROLE: (id: number) => buildApiUrl(`/users/users/${id}/remove-role/`),
-  USER_ASSIGN_TEMP_PERMISSION: (id: number) => buildApiUrl(`/users/users/${id}/assign-temp-permission/`),
-  USER_MISSING_PERMISSIONS: (id: number) => buildApiUrl(`/users/users/${id}/missing-permissions/`),
-  ROLES: buildApiUrl("/users/roles/"),
-  ROLE_DETAIL: (id: number) => buildApiUrl(`/users/roles/${id}/`),
-  PERMISSIONS: buildApiUrl("/users/permissions/"),
-  PERMISSION_DETAIL: (id: number) => buildApiUrl(`/users/permissions/${id}/`),
+  ME: buildApiUrl("/users/me/"),
+  PASSWORD_RESET: buildApiUrl("/users/password-reset/"),
+} as const
+
+// Access control endpoints
+export const AC_ENDPOINTS = {
+  ROLES: buildApiUrl("/ac/roles/"),
+  ROLE_DETAIL: (id: number) => buildApiUrl(`/ac/roles/${id}/`),
+  ROLE_ASSIGN: buildApiUrl("/ac/roles/assign-roles/"),
+  PERMISSIONS: buildApiUrl("/ac/permissions/"),
+  PERMISSION_DETAIL: (id: number) => buildApiUrl(`/ac/permissions/${id}/`),
+  TEMP_PERMISSIONS: buildApiUrl("/ac/tp/"),
+  TEMP_PERMISSION_DETAIL: (id: number) => buildApiUrl(`/ac/tp/${id}/`),
+  TEMP_PERMISSION_REVOKE: (id: number) => buildApiUrl(`/ac/tp/${id}/revoke/`),
+  TEMP_PERMISSION_REVOKE_BY_USER: buildApiUrl("/ac/tp/revoke-by-user/"),
 } as const
 
 // Patient management endpoints
 export const PATIENT_ENDPOINTS = {
-  PATIENTS: buildApiUrl("/patients/"),
-  PATIENT_DETAIL: (id: number) => buildApiUrl(`/patients/${id}/`),
-  ACTIVE_PATIENTS: buildApiUrl("/patients/active/"),
-  PATIENT_HISTORY: (id: number) => buildApiUrl(`/patients/${id}/history/`),
+  PATIENTS: buildApiUrl("/patients/patients/"),
+  PATIENT_DETAIL: (id: number) => buildApiUrl(`/patients/patients/${id}/`),
 } as const
 
-// Laboratory analysis endpoints
-export const ANALYSIS_ENDPOINTS = {
-  // Panels
-  PANELS: buildApiUrl("/analysis/panels/"),
-  PANEL_DETAIL: (id: number) => buildApiUrl(`/analysis/panels/${id}/`),
-  IMPORT_PANELS: buildApiUrl("/analysis/panels/import/"),
-  IMPORT_ANALYSES: buildApiUrl("/analysis/analyses/import/"),
-  IMPORT_XLSX: buildApiUrl("/analysis/panels/import-xlsx/"),
+export const MEDICAL_ENDPOINTS = {
+  DOCTORS: buildApiUrl("/medicale/doctors/"),
+  DOCTOR_DETAIL: (id: number) => buildApiUrl(`/medicale/doctors/${id}/`),
+  INSURANCES: buildApiUrl("/medicale/insurances/"),
+  INSURANCE_DETAIL: (id: number) => buildApiUrl(`/medicale/insurances/${id}/`),
+} as const
 
-  // Analyses
-  ANALYSES: buildApiUrl("/analysis/analyses/"),
-  ANALYSIS_DETAIL: (id: number) => buildApiUrl(`/analysis/analyses/${id}/`),
+export const CATALOG_ENDPOINTS = {
+  ANALYSIS: buildApiUrl("/catalog/analysis/"),
+  ANALYSIS_DETAIL: (id: number) => buildApiUrl(`/catalog/analysis/${id}/`),
+  ANALYSIS_IMPORT: buildApiUrl("/catalog/analysis/import-catalog/"),
+  DETERMINATIONS: buildApiUrl("/catalog/determination/"),
+  DETERMINATION_DETAIL: (id: number) => buildApiUrl(`/catalog/determination/${id}/`),
+} as const
 
-  // Doctors
-  MEDICOS: buildApiUrl("/analysis/medicos/"),
-  MEDICO_DETAIL: (id: number) => buildApiUrl(`/analysis/medicos/${id}/`),
+// Protocol management endpoints
+export const PROTOCOL_ENDPOINTS = {
+  PROTOCOLS: buildApiUrl("/protocols/protocols/"),
+  PROTOCOL_DETAIL: (id: number) => buildApiUrl(`/protocols/protocols/${id}/`),
+  PROTOCOL_DETAILS: (id: number) => buildApiUrl(`/protocols/protocols/${id}/details/`),
+  PROTOCOL_DETAIL_UPDATE: (protocolId: number, detailId: number) =>
+    buildApiUrl(`/protocols/protocols/${protocolId}/details/${detailId}/`),
+  SEND_METHODS: buildApiUrl("/protocols/send-methods/"),
+} as const
 
-  // Insurance (OOSS)
-  OOSS: buildApiUrl("/analysis/ooss/"),
-  OOSS_DETAIL: (id: number) => buildApiUrl(`/analysis/ooss/${id}/`),
-  OOSS_ACTIVE: buildApiUrl("/analysis/ooss/?active=true"),
+// Audit system endpoints
+export const AUDIT_ENDPOINTS = {
+  AUDIT: buildApiUrl("/audit/complete/"),
+} as const
 
-  // Protocols
-  PROTOCOLS: buildApiUrl("/analysis/protocols/"),
-  PROTOCOL_DETAIL: (id: number) => buildApiUrl(`/analysis/protocols/${id}/`),
-  PROTOCOL_HIERARCHY: (id: number) => buildApiUrl(`/analysis/protocols/${id}/hierarchy/`),
-  ACTIVE_PROTOCOLS: buildApiUrl("/analysis/protocols/active/"),
+// Analytics endpoints
+export const ANALYTICS_ENDPOINTS = {
+  DASHBOARD: buildApiUrl("/analytics/dashboard/"),
+  PROTOCOLS_BY_STATUS: buildApiUrl("/analytics/dashboard/protocols-by-status/"),
+} as const
 
-  // Protocol Analyses
-  PROTOCOL_ANALYSES: buildApiUrl("/analysis/protocol-analyses/"),
-  PROTOCOL_ANALYSIS_DETAIL: (id: number) => buildApiUrl(`/analysis/protocol-analyses/${id}/`),
+// Results endpoints
+export const RESULTS_ENDPOINTS = {
+  AVAILABLE_ANALYSIS: buildApiUrl("/results/results/available-analyses/"),
+  BY_ANALYSIS: (id: number) => buildApiUrl(`/results/results/by-analysis/${id}/`),
+  BY_PROTOCOL: (id: number) => buildApiUrl(`/results/results/by-protocol/${id}/`),
+  RESULT_DETAIL: (id: number) => buildApiUrl(`/results/results/${id}/`),
+  VALIDATE: (id: number) => buildApiUrl(`/results/results/${id}/validate/`),
+  PREVIOUS_RESULTS: (patientId: number, determinationId: number) =>
+    buildApiUrl(`/results/results/history/?patient_id=${patientId}&determination_id=${determinationId}`),
+  PROTOCOLS_WITH_LOADED_RESULTS: buildApiUrl("/results/results/protocols-with-loaded-results/"),
+  BY_PROTOCOL_WITH_VALUE: (protocolId: number) => buildApiUrl(`/results/results/by-protocol-with-value/${protocolId}/`),
+} as const
 
-  // Results
-  RESULTS: buildApiUrl("/analysis/results/"),
-  RESULT_DETAIL: (id: number) => buildApiUrl(`/analysis/results/${id}/`),
-  RESULTS_BY_PATIENT_ANALYSIS: buildApiUrl("/analysis/results/by-patient-analysis/"),
-  RESULTS_BY_PANEL_PROTOCOLS: buildApiUrl("/analysis/results/by-panel-protocols/"),
-
-  PROTOCOLS_SUMMARY: buildApiUrl("/analysis/results/protocols-summary/"),
-
-  ACTIVE_PANELS: buildApiUrl("/analysis/results/active-panels/"),
-  PROTOCOLS_BY_PANEL: (panelId: number) => buildApiUrl(`/analysis/results/protocols-by-panel/${panelId}/`),
-  PROTOCOL_RESULTS: (protocolId: number) => buildApiUrl(`/analysis/results/protocol-results/${protocolId}/`),
-
-  PROTOCOL_VALIDATION_RESULTS: (protocolId: number) =>
-    buildApiUrl(`/analysis/results/protocol-validation-results/${protocolId}/`),
-  VALIDATE_RESULT: (resultId: number) => buildApiUrl(`/analysis/results/${resultId}/validate/`),
+// Reporting endpoints
+export const REPORTING_ENDPOINTS = {
+  PRINT: (id: number, type: "full" | "summary") => buildApiUrl(`/reports/protocols/${id}/print/?type=${type}`),
+  SEND_EMAIL: (id: number, type: "full" | "summary") =>
+    buildApiUrl(`/reports/protocols/${id}/send-email/?type=${type}`),
 } as const
 
 // Core endpoints
 export const CORE_ENDPOINTS = {
-  API_ROOT: `${API_CONFIG.BASE_URL}/api/`,
+  API_ROOT: `${API_CONFIG.BASE_URL}/`,
   HEALTH: `${API_CONFIG.BASE_URL}/health/`,
 } as const
 
@@ -126,7 +137,6 @@ export const getAuthHeaders = (token?: string) => ({
 
 export const getMultipartHeaders = (token?: string) => ({
   ...(token && { Authorization: `Bearer ${token}` }),
-  // Don't set Content-Type for multipart, let browser set it with boundary
 })
 
 // API Response types
@@ -137,9 +147,7 @@ export interface ApiResponse<T = any> {
 }
 
 export interface PaginatedResponse<T = any> {
-  count: number
   next: string | null
-  previous: string | null
   results: T[]
 }
 
@@ -171,19 +179,26 @@ export interface PatientFilters extends SearchParams {
 
 // Protocol specific filters
 export interface ProtocolFilters extends SearchParams {
-  state?: "pending" | "in_progress" | "completed" | "cancelled"
-  paid?: boolean
+  status?: string
+  is_paid?: boolean
   patient?: number
-  medico?: number
-  ooss?: number
+  doctor?: number
+  insurance?: number
 }
 
 // Export all endpoints in a single object for easy access
 export const API_ENDPOINTS = {
   AUTH: AUTH_ENDPOINTS,
   USERS: USER_ENDPOINTS,
+  AC: AC_ENDPOINTS,
   PATIENTS: PATIENT_ENDPOINTS,
-  ANALYSIS: ANALYSIS_ENDPOINTS,
+  MEDICAL: MEDICAL_ENDPOINTS,
+  CATALOG: CATALOG_ENDPOINTS,
+  PROTOCOL: PROTOCOL_ENDPOINTS,
+  AUDIT: AUDIT_ENDPOINTS,
+  ANALYTICS: ANALYTICS_ENDPOINTS,
+  RESULTS: RESULTS_ENDPOINTS,
+  REPORTING: REPORTING_ENDPOINTS,
   CORE: CORE_ENDPOINTS,
 } as const
 

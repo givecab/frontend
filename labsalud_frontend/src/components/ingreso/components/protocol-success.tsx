@@ -1,61 +1,217 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CheckIcon } from "lucide-react"
-import type { Patient } from "../../../types"
+import { useEffect, useState, useCallback } from "react"
+import { CheckIcon, X, User, FileText, Stethoscope, Building, Send, DollarSign } from "lucide-react"
+import { Button } from "../../ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card"
+import { Badge } from "../../ui/badge"
+import { Separator } from "../../ui/separator"
+import type { Patient, Doctor, Insurance, SendMethod } from "../../../types"
 
 interface ProtocolSuccessProps {
   protocol: any
-  patient: Patient | null
+  patient: Patient
+  doctor: Doctor
+  insurance: Insurance
+  sendMethod: SendMethod
   onClose: () => void
 }
 
-export function ProtocolSuccess({ onClose }: ProtocolSuccessProps) {
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [showCheckmark, setShowCheckmark] = useState(false)
+export function ProtocolSuccess({ protocol, patient, doctor, insurance, sendMethod, onClose }: ProtocolSuccessProps) {
+  const [animationPhase, setAnimationPhase] = useState<"initial" | "expand" | "moveUp" | "showSummary">("initial")
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose()
+      }
+    },
+    [onClose],
+  )
 
   useEffect(() => {
-    // Mostrar el checkmark después de un pequeño delay
-    const checkmarkTimer = setTimeout(() => {
-      setShowCheckmark(true)
-    }, 100)
+    // Listen for escape key
+    window.addEventListener("keydown", handleKeyDown)
 
-    // Iniciar la animación de expansión después de mostrar el checkmark
-    const expansionTimer = setTimeout(() => {
-      setShowSuccess(true)
-    }, 300)
+    // Animation sequence with proper timing
+    const timer1 = setTimeout(() => setAnimationPhase("expand"), 100)
+    const timer2 = setTimeout(() => setAnimationPhase("moveUp"), 1500)
+    const timer3 = setTimeout(() => setAnimationPhase("showSummary"), 2000)
 
-    // Cerrar automáticamente después de 3 segundos
+    // Auto-close after 10 seconds
     const closeTimer = setTimeout(() => {
       onClose()
-    }, 3000)
+    }, 10000)
 
     return () => {
-      clearTimeout(checkmarkTimer)
-      clearTimeout(expansionTimer)
+      window.removeEventListener("keydown", handleKeyDown)
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
       clearTimeout(closeTimer)
     }
-  }, [onClose])
+  }, [onClose, handleKeyDown])
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-      {/* Círculo verde que crece para cubrir toda la pantalla */}
+    <div className="fixed inset-0 z-50 overflow-hidden">
       <div
         className={`
-          absolute rounded-full bg-green-500 transition-all duration-1000 ease-out
-          flex items-center justify-center
-          ${showSuccess ? "w-[300vw] h-[300vw]" : "w-16 h-16"}
+          absolute inset-0 bg-green-500 transition-all duration-700 ease-out
+          ${animationPhase === "initial" ? "scale-0 rounded-full" : ""}
+          ${animationPhase === "expand" ? "scale-150" : ""}
+          ${animationPhase === "moveUp" || animationPhase === "showSummary" ? "scale-100" : ""}
+        `}
+        style={{
+          transformOrigin: "center center",
+        }}
+      />
+
+      <div
+        className={`
+          relative h-full flex flex-col items-center justify-center transition-all duration-700 ease-out
+          ${animationPhase === "moveUp" || animationPhase === "showSummary" ? "pt-8" : ""}
         `}
       >
-        {/* Checkmark que aparece en el centro */}
-        <CheckIcon
+        {/* Close button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
           className={`
-            text-white transition-all duration-500 z-10
-            ${showCheckmark ? "opacity-100 scale-100" : "opacity-0 scale-0"}
-            ${showSuccess ? "text-[80px]" : "text-[32px]"}
+            absolute top-4 right-4 h-10 w-10 text-white hover:bg-white/20 z-10
+            transition-opacity duration-500
+            ${animationPhase === "initial" ? "opacity-0" : "opacity-100"}
           `}
-          strokeWidth={3}
-        />
+        >
+          <X className="h-6 w-6" />
+        </Button>
+
+        <div
+          className={`
+            transition-all duration-700 ease-out
+            ${animationPhase === "initial" ? "opacity-0 scale-0" : "opacity-100 scale-100"}
+            ${
+              animationPhase === "moveUp" || animationPhase === "showSummary"
+                ? "transform -translate-y-4 mb-6"
+                : "transform translate-y-0 mb-0"
+            }
+          `}
+        >
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center shadow-2xl backdrop-blur-sm">
+              <CheckIcon className="text-white" size={48} strokeWidth={3} />
+            </div>
+            {/* Ripple effect */}
+            {animationPhase === "expand" && (
+              <div className="absolute inset-0 w-24 h-24 rounded-full bg-white/30 animate-ping" />
+            )}
+          </div>
+        </div>
+
+        <div
+          className={`
+            w-full max-w-2xl mx-4 transition-all duration-700 ease-out
+            ${
+              animationPhase === "showSummary"
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-16 pointer-events-none"
+            }
+          `}
+        >
+          <Card className="shadow-2xl border-0 bg-white">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-center text-green-600 text-2xl flex items-center justify-center gap-2">
+                <FileText className="h-6 w-6" />
+                Protocolo Creado Exitosamente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Protocol ID */}
+              <div className="text-center pb-2">
+                <Badge
+                  variant="outline"
+                  className="text-lg px-4 py-2 font-mono bg-green-50 border-green-200 text-green-700"
+                >
+                  N° {protocol.protocol_number || protocol.id}
+                </Badge>
+              </div>
+
+              <Separator />
+
+              {/* Patient info */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-600">
+                  <User className="h-4 w-4" />
+                  <span className="font-semibold">Paciente:</span>
+                </div>
+                <div className="pl-6 text-gray-800">
+                  <div className="font-medium text-lg">
+                    {patient.first_name} {patient.last_name}
+                  </div>
+                  <div className="text-sm text-gray-600">DNI: {patient.dni}</div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Building className="h-4 w-4" />
+                    <span>Obra Social:</span>
+                  </div>
+                  <div className="pl-6 font-medium text-gray-800">{insurance.name}</div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Stethoscope className="h-4 w-4" />
+                    <span>Médico:</span>
+                  </div>
+                  <div className="pl-6 font-medium text-gray-800">
+                    {doctor.first_name} {doctor.last_name}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Send className="h-4 w-4" />
+                    <span>Método de envío:</span>
+                  </div>
+                  <div className="pl-6 font-medium text-gray-800">{sendMethod.name}</div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Payment and analyses */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Monto pagado:</span>
+                  </div>
+                  <div className="pl-6 font-medium text-green-600 text-lg">${protocol.value_paid || "0.00"}</div>
+                </div>
+
+                {protocol.details && protocol.details.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-sm text-gray-600">Análisis solicitados:</div>
+                    <div className="pl-2">
+                      <Badge variant="secondary" className="text-base">
+                        {protocol.details.length} análisis
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 text-center text-sm text-gray-500">
+                Presione <kbd className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">ESC</kbd> o la X para cerrar
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

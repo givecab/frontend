@@ -1,213 +1,128 @@
 "use client"
 
 import type React from "react"
-import { Loader2 } from "lucide-react"
-
-import { useState } from "react"
-import {
-  ChevronDown,
-  Calendar,
-  User,
-  Building,
-  CreditCard,
-  Send,
-  Clock,
-  TestTube,
-  Settings,
-  History,
-  Edit,
-  X,
-  AlertTriangle,
-  DollarSign,
-} from "lucide-react"
+import { useState, useCallback } from "react"
 import { Card, CardContent } from "../../ui/card"
-import { Button } from "../../ui/button"
-import { Badge } from "../../ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "../../ui/alert-dialog"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
-import { ANALYSIS_ENDPOINTS, TOAST_DURATION } from "@/config/api"
+import { PROTOCOL_ENDPOINTS, REPORTING_ENDPOINTS, TOAST_DURATION } from "@/config/api"
+import type {
+  ProtocolListItem,
+  ProtocolDetail as ProtocolDetailType,
+  SendMethod,
+  HistoryEntry,
+  PaymentStatus,
+  ProtocolStatus,
+} from "@/types"
 
-interface AnalysisItem {
+// Componentes modulares
+import { ProtocolHeader } from "./protocol-header"
+import { ProtocolDetailsSection } from "./protocol-details-section"
+import { ProtocolActions } from "./protocol-actions"
+import { PaymentDialog, AnalysisDialog, AuditDialog, EditDialog, ReportDialog } from "./dialogs"
+import { ProtocolHistoryDialog } from "./dialogs/protocol-history-dialog"
+
+interface ProtocolDetailResponse {
   id: number
-  analysis: {
+  patient: {
     id: number
-    code: string
+    dni: string
+    first_name: string
+    last_name: string
+  }
+  doctor: {
+    id: number
+    first_name: string
+    last_name: string
+    license: string
+  }
+  insurance: {
+    id: number
     name: string
   }
-  created_at: string
-  created_by: {
+  affiliate_number?: string
+  status: ProtocolStatus
+  send_method: {
     id: number
-    username: string
-    photo: string
+    name: string
   }
-  history: any[]
-}
-
-interface PanelHierarchy {
-  id: number
-  code: string
-  name: string
-  bio_unit: string
-  is_urgent: boolean
-  analyses: AnalysisItem[]
-}
-
-interface HistoryEntry {
-  version: number
-  user: {
-    id: number
-    username: string
-    photo: string
-  } | null
-  created_at: string
-}
-
-interface Patient {
-  id: number
-  first_name: string
-  last_name: string
-}
-
-interface ObraSocial {
-  id: number
-  name: string
-}
-
-interface Medico {
-  id: number
-  first_name: string
-  last_name: string
-}
-
-interface Protocol {
-  id: number
-  patient: Patient
-  state: string
-  paid: boolean
-  created_at: string
-  created_by: {
-    id: number
-    username: string
-    photo: string
-  }
-  history: HistoryEntry[]
-}
-
-interface ProtocolDetail extends Protocol {
-  ooss: ObraSocial
-  medico: Medico
-  ooss_number?: string
-  contact_method: string
+  // New payment fields
+  insurance_total_to_pay: string
+  private_total_to_pay: string
+  estimated_total_to_earn: string
+  total_earned: string
+  value_paid: string
+  payment_status: PaymentStatus
+  patient_to_lab_amount: string
+  lab_to_patient_amount: string
+  insurance_ub_value: string
+  private_ub_value: string
+  is_printed: boolean
+  is_active: boolean
+  details: ProtocolDetailType[]
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
 interface ProtocolCardProps {
-  protocol: Protocol
+  protocol: ProtocolListItem
   onUpdate: () => void
+  sendMethods?: SendMethod[]
 }
 
-const UserAvatar: React.FC<{
-  user: { id: number; username: string; photo: string } | null | undefined
-  size?: "sm" | "md"
-}> = ({ user, size = "md" }) => {
-  const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8"
-
-  if (!user || !user.username || user.username.trim() === "") {
-    return (
-      <Avatar className={sizeClasses}>
-        <AvatarFallback className="text-xs bg-gray-200 text-gray-500">
-          <Settings className="h-3 w-3 text-gray-600" />
-        </AvatarFallback>
-      </Avatar>
-    )
-  }
-
-  return (
-    <Avatar className={sizeClasses}>
-      <AvatarImage src={user.photo || undefined} alt={user.username} />
-      <AvatarFallback className="text-xs bg-slate-200 text-slate-700">
-        {user.username.substring(0, 2).toUpperCase()}
-      </AvatarFallback>
-    </Avatar>
-  )
-}
-
-export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
+export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolCardProps) {
   const { apiRequest } = useApi()
   const [isExpanded, setIsExpanded] = useState(false)
-  const [protocolDetail, setProtocolDetail] = useState<ProtocolDetail | null>(null)
-  const [panelHierarchy, setPanelHierarchy] = useState<PanelHierarchy[]>([])
+  const [protocolDetail, setProtocolDetail] = useState<ProtocolDetailResponse | null>(null)
+  const [protocolDetails, setProtocolDetails] = useState<ProtocolDetailType[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [loadingAnalyses, setLoadingAnalyses] = useState(false)
-  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
-  const [isMarkingPaid, setIsMarkingPaid] = useState(false)
 
-  const getStateLabel = (state: string) => {
-    const stateLabels = {
-      pending_entry: "Pendiente de Carga",
-      entry_complete: "Carga Completa",
-      pending_validation: "Pendiente de Validación",
-      completed: "Completado",
-      cancelled: "Cancelado",
+  // Dialog states
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState("")
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false)
+  const [updatingDetailId, setUpdatingDetailId] = useState<number | null>(null)
+
+  const [auditDialogOpen, setAuditDialogOpen] = useState(false)
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    send_method: "",
+    affiliate_number: "",
+  })
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportType, setReportType] = useState<"full" | "summary">("full")
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+
+  const refreshProtocolDetail = useCallback(async () => {
+    try {
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id))
+      if (response.ok) {
+        const data: ProtocolDetailResponse = await response.json()
+        setProtocolDetail(data)
+      }
+    } catch (error) {
+      console.error("Error refreshing protocol detail:", error)
     }
-    return stateLabels[state as keyof typeof stateLabels] || state
-  }
+  }, [apiRequest, protocol.id])
 
-  const getStateColor = (state: string) => {
-    const stateColors = {
-      pending_entry: "bg-yellow-100 text-yellow-800",
-      entry_complete: "bg-blue-100 text-blue-800",
-      pending_validation: "bg-orange-100 text-orange-800",
-      completed: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
-    }
-    return stateColors[state as keyof typeof stateColors] || "bg-gray-100 text-gray-800"
-  }
-
-  const getContactMethodLabel = (method: string) => {
-    const methodLabels = {
-      email: "Email",
-      whatsapp: "WhatsApp",
-      in_person: "Retiro físico",
-    }
-    return methodLabels[method as keyof typeof methodLabels] || method
-  }
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  // Función para cargar detalles del protocolo
   const fetchProtocolDetail = async () => {
-    if (protocolDetail) return // Ya está cargado
+    if (protocolDetail) return
 
     setLoadingDetail(true)
     try {
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id))
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id))
 
       if (response.ok) {
-        const data: ProtocolDetail = await response.json()
+        const data: ProtocolDetailResponse = await response.json()
         setProtocolDetail(data)
       } else {
         throw new Error("Error fetching protocol detail")
@@ -222,14 +137,12 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
 
   const handleExpand = async () => {
     if (!isExpanded) {
-      // Cargar detalles cuando se expande
       await fetchProtocolDetail()
     }
     setIsExpanded(!isExpanded)
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // No expandir si se hace clic en botones
     if ((e.target as HTMLElement).closest("[data-no-expand]")) {
       return
     }
@@ -237,23 +150,19 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
   }
 
   const handleAnalysisDialog = async () => {
-    if (panelHierarchy.length === 0) {
+    if (protocolDetails.length === 0) {
       setLoadingAnalyses(true)
       try {
-        const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_HIERARCHY(protocol.id))
+        const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAILS(protocol.id))
 
         if (response.ok) {
-          const data: PanelHierarchy[] = await response.json()
-          console.log("[v0] Protocol hierarchy response:", data)
-          console.log("[v0] Response type:", typeof data)
-          console.log("[v0] Is array:", Array.isArray(data))
-
-          setPanelHierarchy(data)
+          const data: ProtocolDetailType[] = await response.json()
+          setProtocolDetails(data)
         } else {
-          throw new Error("Error fetching protocol hierarchy")
+          throw new Error("Error fetching protocol details")
         }
       } catch (error) {
-        console.error("Error fetching protocol hierarchy:", error)
+        console.error("Error fetching protocol details:", error)
         toast.error("Error al cargar los análisis del protocolo", { duration: TOAST_DURATION })
         return
       } finally {
@@ -266,14 +175,13 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
   const handleCancelProtocol = async () => {
     setIsCancelling(true)
     try {
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
-        method: "PATCH",
-        body: { state: "cancelled" },
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
+        method: "DELETE",
       })
 
-      if (response.ok) {
+      if (response.status === 204 || response.ok) {
         toast.success("Protocolo cancelado exitosamente", { duration: TOAST_DURATION })
-        onUpdate() // Actualizar la lista
+        onUpdate()
       } else {
         throw new Error("Error cancelling protocol")
       }
@@ -285,234 +193,310 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
     }
   }
 
-  const handleMarkAsPaid = async () => {
-    setIsMarkingPaid(true)
+  const handleOpenPaymentDialog = async () => {
+    if (!protocolDetail) {
+      await fetchProtocolDetail()
+    }
+    setPaymentAmount("")
+    setPaymentDialogOpen(true)
+  }
+
+  const handleProcessPayment = async () => {
+    const amount = Number.parseFloat(paymentAmount)
+    const patientDebt = protocolDetail ? Number.parseFloat(protocolDetail.patient_to_lab_amount) : 0
+
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Ingrese un monto válido", { duration: TOAST_DURATION })
+      return
+    }
+
+    if (amount > patientDebt) {
+      toast.error(`El monto no puede superar la deuda pendiente ($${patientDebt.toFixed(2)})`, {
+        duration: TOAST_DURATION,
+      })
+      return
+    }
+
+    setIsProcessingPayment(true)
     try {
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
+      const currentValuePaid = protocolDetail ? Number.parseFloat(protocolDetail.value_paid) : 0
+      const newValuePaid = currentValuePaid + amount
+
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
         method: "PATCH",
-        body: { paid: true },
+        body: { value_paid: newValuePaid.toFixed(2) },
       })
 
       if (response.ok) {
-        toast.success("Protocolo marcado como pagado", { duration: TOAST_DURATION })
-        onUpdate() // Actualizar la lista
+        toast.success(`Pago de $${amount.toFixed(2)} registrado exitosamente`, { duration: TOAST_DURATION })
+        setPaymentDialogOpen(false)
+        setPaymentAmount("")
+        await refreshProtocolDetail()
+        onUpdate()
       } else {
-        throw new Error("Error marking as paid")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || "Error processing payment")
       }
     } catch (error) {
-      console.error("Error marking as paid:", error)
-      toast.error("Error al marcar como pagado", { duration: TOAST_DURATION })
+      console.error("Error processing payment:", error)
+      toast.error("Error al procesar el pago", { duration: TOAST_DURATION })
     } finally {
-      setIsMarkingPaid(false)
+      setIsProcessingPayment(false)
     }
   }
 
-  const getUserDisplayName = (user: { id: number; username: string; photo: string } | null | undefined) => {
-    if (!user || !user.username || user.username.trim() === "") {
-      return "Sistema"
+  const handleSettleDebt = async () => {
+    if (!protocolDetail) {
+      await fetchProtocolDetail()
     }
-    return user.username
+
+    setIsProcessingPayment(true)
+    try {
+      // To refund/settle, we set value_paid to private_total_to_pay
+      // This makes lab_to_patient_amount = 0 and settles the balance
+      const privateTotalToPay = protocolDetail ? Number.parseFloat(protocolDetail.private_total_to_pay) : 0
+
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
+        method: "PATCH",
+        body: { value_paid: privateTotalToPay.toFixed(2) },
+      })
+
+      if (response.ok) {
+        const labOwes = protocolDetail ? Number.parseFloat(protocolDetail.lab_to_patient_amount) : 0
+        toast.success(`Reembolso completado. Se devolvieron $${labOwes.toFixed(2)} al paciente`, {
+          duration: TOAST_DURATION,
+        })
+        await refreshProtocolDetail()
+        onUpdate()
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || "Error settling debt")
+      }
+    } catch (error) {
+      console.error("Error settling debt:", error)
+      toast.error("Error al realizar el reembolso", { duration: TOAST_DURATION })
+    } finally {
+      setIsProcessingPayment(false)
+    }
+  }
+
+  const handleOpenEditDialog = async () => {
+    if (!protocolDetail) {
+      await fetchProtocolDetail()
+    }
+    if (protocolDetail) {
+      setEditFormData({
+        send_method: protocolDetail.send_method.id.toString(),
+        affiliate_number: protocolDetail.affiliate_number || "",
+      })
+    }
+    setEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    setIsSavingEdit(true)
+    try {
+      const updateData: Record<string, unknown> = {}
+
+      if (editFormData.send_method !== protocolDetail?.send_method.id.toString()) {
+        updateData.send_method = Number.parseInt(editFormData.send_method)
+      }
+      if (editFormData.affiliate_number !== (protocolDetail?.affiliate_number || "")) {
+        updateData.affiliate_number = editFormData.affiliate_number
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        toast.info("No hay cambios para guardar", { duration: TOAST_DURATION })
+        setEditDialogOpen(false)
+        return
+      }
+
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
+        method: "PATCH",
+        body: updateData,
+      })
+
+      if (response.ok) {
+        toast.success("Protocolo actualizado exitosamente", { duration: TOAST_DURATION })
+        setEditDialogOpen(false)
+        await refreshProtocolDetail()
+        onUpdate()
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || "Error updating protocol")
+      }
+    } catch (error) {
+      console.error("Error updating protocol:", error)
+      toast.error("Error al actualizar el protocolo", { duration: TOAST_DURATION })
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  const handleGenerateReport = async () => {
+    setIsGeneratingReport(true)
+    try {
+      const response = await apiRequest(REPORTING_ENDPOINTS.PRINT(protocol.id, reportType), {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const printWindow = window.open(url, "_blank")
+        if (printWindow) {
+          printWindow.addEventListener("load", () => {
+            printWindow.print()
+          })
+        }
+        toast.success("Reporte generado exitosamente", { duration: TOAST_DURATION })
+      } else {
+        throw new Error("Error generating report")
+      }
+    } catch (error) {
+      console.error("Error generating report:", error)
+      toast.error("Error al generar el reporte", { duration: TOAST_DURATION })
+    } finally {
+      setIsGeneratingReport(false)
+    }
+  }
+
+  const handleSendEmail = async () => {
+    setIsSendingEmail(true)
+    try {
+      const response = await apiRequest(REPORTING_ENDPOINTS.SEND_EMAIL(protocol.id, reportType), {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(data.detail || "Email enviado exitosamente", { duration: TOAST_DURATION })
+        setReportDialogOpen(false)
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || "Error sending email")
+      }
+    } catch (error) {
+      console.error("Error sending email:", error)
+      toast.error("Error al enviar el email", { duration: TOAST_DURATION })
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
+  const handleToggleAuthorization = async (detail: ProtocolDetailType) => {
+    setUpdatingDetailId(detail.id)
+    try {
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL_UPDATE(protocol.id, detail.id), {
+        method: "PATCH",
+        body: { is_authorized: !detail.is_authorized },
+      })
+
+      if (response.ok) {
+        const updatedDetail = await response.json()
+        // Update local state immediately for responsive UI
+        setProtocolDetails((prev) =>
+          prev.map((d) => (d.id === detail.id ? { ...d, is_authorized: !d.is_authorized } : d)),
+        )
+        toast.success(`Análisis ${!detail.is_authorized ? "autorizado" : "desautorizado"} exitosamente`, {
+          duration: TOAST_DURATION,
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || "Error updating authorization")
+      }
+    } catch (error) {
+      console.error("Error updating authorization:", error)
+      toast.error("Error al actualizar la autorización", { duration: TOAST_DURATION })
+    } finally {
+      setUpdatingDetailId(null)
+    }
+  }
+
+  const handleAnalysisDialogClose = async (open: boolean) => {
+    setAnalysisDialogOpen(open)
+    if (!open) {
+      // Refresh protocol detail when dialog closes
+      await refreshProtocolDetail()
+    }
   }
 
   const getPatientName = () => {
-    return `${protocol.patient.first_name} ${protocol.patient.last_name}`.trim()
+    if (protocol.patient && typeof protocol.patient === "object") {
+      return `${protocol.patient.first_name || ""} ${protocol.patient.last_name || ""}`.trim() || "Sin nombre"
+    }
+    return "Sin nombre"
   }
 
-  const getObraSocialName = () => {
-    if (protocolDetail?.ooss) {
-      return protocolDetail.ooss.name
+  const getDoctorName = () => {
+    if (protocolDetail?.doctor) {
+      return `Dr. ${protocolDetail.doctor.first_name} ${protocolDetail.doctor.last_name}`.trim()
     }
     return "Cargando..."
   }
 
-  const getMedicoName = () => {
-    if (protocolDetail?.medico) {
-      return `Dr. ${protocolDetail.medico.first_name} ${protocolDetail.medico.last_name}`.trim()
+  const getInsuranceName = () => {
+    if (protocolDetail?.insurance) {
+      return protocolDetail.insurance.name
     }
     return "Cargando..."
   }
 
-  // Obtener información de auditoría desde history
-  const getCreationInfo = () => {
-    if (protocol.history && protocol.history.length > 0) {
-      // La primera entrada del history es la creación (version 1)
-      const creationEntry = protocol.history.find((entry) => entry.version === 1)
-      if (creationEntry) {
-        return {
-          user: creationEntry.user,
-          date: creationEntry.created_at,
-        }
-      }
+  const getSendMethodName = () => {
+    if (protocolDetail?.send_method) {
+      return protocolDetail.send_method.name
     }
-    // Fallback a los datos originales
-    return {
-      user: protocol.created_by,
-      date: protocol.created_at,
-    }
+    return "Cargando..."
   }
 
-  const getLatestUpdate = () => {
-    if (protocol.history && protocol.history.length > 1) {
-      // Ordenar por version descendente y tomar la más reciente
-      const sortedHistory = [...protocol.history].sort((a, b) => b.version - a.version)
-      const latestEntry = sortedHistory[0]
+  const statusId = protocol.status?.id ?? 0
+  const canBeCancelled = statusId !== 4 && statusId !== 5 && statusId !== 7
+  const isEditable = statusId !== 4 && statusId !== 5 && statusId !== 7
+  const showReports = statusId !== 4
 
-      if (latestEntry.version > 1) {
-        return {
-          user: latestEntry.user,
-          date: latestEntry.created_at,
-          version: latestEntry.version,
-        }
-      }
+  const patientDebt = protocolDetail ? Number.parseFloat(protocolDetail.patient_to_lab_amount) : 0
+  const labDebt = protocolDetail ? Number.parseFloat(protocolDetail.lab_to_patient_amount) : 0
+  const balance = Number.parseFloat(protocol.balance || "0")
+  const hasPatientDebt = patientDebt > 0
+  const labOwesPatient = labDebt > 0
+
+  const getBorderColor = (statusId: number): string => {
+    const borderColors: Record<number, string> = {
+      1: "border-l-yellow-500", // Pendiente de carga
+      2: "border-l-blue-500", // Pendiente de validación
+      3: "border-l-orange-500", // Pago incompleto
+      4: "border-l-red-500", // Cancelado
+      5: "border-l-green-500", // Completado
+      6: "border-l-purple-500", // Pendiente de Retiro
+      7: "border-l-rose-500", // Envío fallido
     }
-    return null
+    return borderColors[statusId] || "border-l-gray-500"
   }
-
-  const creationInfo = getCreationInfo()
-  const latestUpdate = getLatestUpdate()
-
-  // Verificar si el protocolo puede ser cancelado
-  const canBeCancelled =
-    protocol.state !== "cancelled" &&
-    protocol.state !== "completed" &&
-    protocol.state !== "cancelado" &&
-    protocol.state !== "finalizado"
 
   return (
     <>
       <Card
         className={`transition-all duration-300 shadow-sm hover:shadow-lg cursor-pointer bg-white ${
           isExpanded ? "ring-2 ring-[#204983] ring-opacity-20" : ""
-        } border-l-4 ${protocol.state === "cancelled" || protocol.state === "cancelado" ? "border-l-red-500" : "border-l-[#204983]"}`}
+        } border-l-4 ${getBorderColor(statusId)}`}
         onClick={handleCardClick}
       >
         <CardContent className="p-4 pb-3">
-          <div className="flex justify-between items-start">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`flex-shrink-0 p-2 rounded-full ${
-                    protocol.state === "cancelled" || protocol.state === "cancelado" ? "bg-red-500" : "bg-[#204983]"
-                  }`}
-                >
-                  <div className="h-5 w-5 bg-white rounded-sm flex items-center justify-center">
-                    <span
-                      className={`text-xs font-bold ${protocol.state === "cancelled" || protocol.state === "cancelado" ? "text-red-500" : "text-[#204983]"}`}
-                    >
-                      P
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold truncate text-gray-800" title={`Protocolo #${protocol.id}`}>
-                      Protocolo #{protocol.id}
-                    </h3>
-                    {/* Botón marcar como pagado en el header */}
-                    {!protocol.paid && protocol.state !== "cancelled" && protocol.state !== "cancelado" && (
-                      <Button
-                        size="sm"
-                        onClick={handleMarkAsPaid}
-                        disabled={isMarkingPaid}
-                        className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 h-6"
-                        data-no-expand
-                      >
-                        {isMarkingPaid ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <>
-                            <DollarSign className="h-3 w-3 mr-1" />
-                            Marcar Pagado
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getStateColor(protocol.state)} variant="secondary">
-                      {getStateLabel(protocol.state)}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 ml-2" data-no-expand>
-              <ChevronDown
-                className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-              />
-            </div>
-          </div>
-
-          {/* Información básica cuando está cerrada */}
-          {!isExpanded && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              {/* Información principal en una línea */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  {/* Paciente */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-sm text-gray-600 truncate" title={getPatientName()}>
-                      {getPatientName()}
-                    </span>
-                  </div>
-
-                  {/* Estado de pago */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <CreditCard className="h-4 w-4 text-gray-400" />
-                    <span className={`text-sm font-medium ${protocol.paid ? "text-green-600" : "text-red-600"}`}>
-                      {protocol.paid ? "Pagado" : "No Pagado"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Avatares de auditoría */}
-              <div className="flex items-center justify-end">
-                <TooltipProvider>
-                  <div className="flex items-center space-x-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="cursor-help">
-                          <UserAvatar user={creationInfo.user} size="sm" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-sm">
-                          <strong>Creado por:</strong> {getUserDisplayName(creationInfo.user)}
-                          <br />
-                          <strong>Fecha:</strong> {formatDate(creationInfo.date)}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {latestUpdate ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-help">
-                            <UserAvatar user={latestUpdate.user} size="sm" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-sm">
-                            <strong>Modificado por:</strong> {getUserDisplayName(latestUpdate.user)}
-                            <br />
-                            <strong>Fecha:</strong> {formatDate(latestUpdate.date)}
-                            <br />
-                            <strong>Versión:</strong> {latestUpdate.version}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <div className="w-6 h-6 flex items-center justify-center">
-                        <span className="text-xs text-gray-400">-</span>
-                      </div>
-                    )}
-                  </div>
-                </TooltipProvider>
-              </div>
-            </div>
-          )}
+          <ProtocolHeader
+            protocolId={protocol.id}
+            status={protocol.status}
+            patientName={getPatientName()}
+            paymentStatus={protocol.payment_status}
+            balance={balance}
+            isPrinted={protocol.is_printed}
+            canRegisterPayment={hasPatientDebt && canBeCancelled}
+            labOwesPatient={labOwesPatient && canBeCancelled}
+            isExpanded={isExpanded}
+            creation={protocol.creation}
+            lastChange={protocol.last_change}
+            onRegisterPayment={handleOpenPaymentDialog}
+            onSettleDebt={handleSettleDebt}
+          />
         </CardContent>
 
         {isExpanded && (
@@ -522,258 +506,109 @@ export function ProtocolCard({ protocol, onUpdate }: ProtocolCardProps) {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#204983]"></div>
               </div>
             ) : (
-              <div className="space-y-4 mt-4">
-                {/* Información detallada - una por línea */}
-                <div className="space-y-3">
-                  {/* Paciente */}
-                  <div className="flex items-center gap-3 text-sm">
-                    <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600 w-24 flex-shrink-0">Paciente:</span>
-                    <span className="font-medium">{getPatientName()}</span>
-                  </div>
-
-                  {/* Médico */}
-                  <div className="flex items-center gap-3 text-sm">
-                    <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600 w-24 flex-shrink-0">Médico:</span>
-                    <span className="font-medium">{getMedicoName()}</span>
-                  </div>
-
-                  {/* Obra Social */}
-                  <div className="flex items-center gap-3 text-sm">
-                    <Building className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600 w-24 flex-shrink-0">Obra Social:</span>
-                    <span className="font-medium">{getObraSocialName()}</span>
-                  </div>
-
-                  {/* Número de afiliado */}
-                  {protocolDetail?.ooss_number && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <CreditCard className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-600 w-24 flex-shrink-0">N° Afiliado:</span>
-                      <span className="font-medium">{protocolDetail.ooss_number}</span>
-                    </div>
-                  )}
-
-                  {/* Método de envío */}
-                  {protocolDetail?.contact_method && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Send className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-600 w-24 flex-shrink-0">Envío:</span>
-                      <span className="font-medium">{getContactMethodLabel(protocolDetail.contact_method)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Información de auditoría */}
-                <div className="space-y-4 pt-4 border-t border-gray-100">
-                  <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <History className="h-4 w-4 text-gray-400" />
-                    Registro de Auditoría
-                  </h4>
-
-                  {/* Información de creación */}
-                  <div className="flex items-start space-x-3">
-                    <Calendar className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Creado</p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <UserAvatar user={creationInfo.user} />
-                        <div>
-                          <p className="text-sm text-gray-600">{getUserDisplayName(creationInfo.user)}</p>
-                          <p className="text-xs text-gray-500">{formatDate(creationInfo.date)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Información de última actualización */}
-                  {latestUpdate ? (
-                    <div className="flex items-start space-x-3">
-                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">Última modificación</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <UserAvatar user={latestUpdate.user} />
-                          <div>
-                            <p className="text-sm text-gray-600">{getUserDisplayName(latestUpdate.user)}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatDate(latestUpdate.date)} • Versión {latestUpdate.version}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start space-x-3">
-                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">Actualizaciones</p>
-                        <p className="text-sm text-gray-500 mt-1">Sin actualizaciones</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Historial completo si hay múltiples versiones */}
-                  {protocol.history && protocol.history.length > 2 && (
-                    <div className="flex items-start space-x-3">
-                      <History className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">
-                          Historial completo ({protocol.history.length} versiones)
-                        </p>
-                        <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
-                          {protocol.history
-                            .sort((a, b) => b.version - a.version)
-                            .slice(0, 5) // Mostrar solo las últimas 5 versiones
-                            .map((entry) => (
-                              <div key={entry.version} className="flex items-center space-x-2 text-xs">
-                                <UserAvatar user={entry.user} size="sm" />
-                                <div className="flex-1">
-                                  <span className="text-gray-600">
-                                    {getUserDisplayName(entry.user)} • v{entry.version}
-                                  </span>
-                                  <span className="text-gray-500 ml-2">{formatDate(entry.created_at)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          {protocol.history.length > 5 && (
-                            <p className="text-xs text-gray-500 italic">
-                              ... y {protocol.history.length - 5} versiones más
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Botones de acción */}
-                <div className="pt-4 border-t border-gray-100" data-no-expand>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-[#204983] border-[#204983] hover:bg-[#204983] hover:text-white bg-transparent"
-                      onClick={handleAnalysisDialog}
-                    >
-                      <TestTube className="h-4 w-4 mr-1" />
-                      Ver Análisis
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar
-                    </Button>
-                    {canBeCancelled && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 text-red-600 border-red-600 hover:bg-red-600 hover:text-white bg-transparent"
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle className="flex items-center gap-2">
-                              <AlertTriangle className="h-5 w-5 text-red-600" />
-                              Cancelar Protocolo
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              ¿Estás seguro de que deseas cancelar el protocolo #{protocol.id}? Esta acción no se puede
-                              deshacer y el protocolo pasará al estado "Cancelado".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleCancelProtocol}
-                              disabled={isCancelling}
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                            >
-                              {isCancelling ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Cancelando...
-                                </>
-                              ) : (
-                                "Confirmar Cancelación"
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <>
+                <ProtocolDetailsSection
+                  patientName={getPatientName()}
+                  doctorName={getDoctorName()}
+                  insuranceName={getInsuranceName()}
+                  affiliateNumber={protocolDetail?.affiliate_number}
+                  sendMethodName={getSendMethodName()}
+                  valuePaid={protocolDetail?.value_paid || "0"}
+                  paymentStatus={protocol.payment_status}
+                  balance={balance}
+                  insuranceUbValue={protocolDetail?.insurance_ub_value}
+                  privateUbValue={protocolDetail?.private_ub_value}
+                  isPrinted={protocolDetail?.is_printed}
+                  onOpenHistoryDialog={() => setHistoryDialogOpen(true)}
+                  // New payment fields
+                  insuranceTotalToPay={protocolDetail?.insurance_total_to_pay}
+                  privateTotalToPay={protocolDetail?.private_total_to_pay}
+                  patientToLabAmount={protocolDetail?.patient_to_lab_amount}
+                  labToPatientAmount={protocolDetail?.lab_to_patient_amount}
+                />
+                <ProtocolActions
+                  protocolId={protocol.id}
+                  canBeCancelled={canBeCancelled}
+                  isEditable={isEditable}
+                  showReports={showReports}
+                  isCancelling={isCancelling}
+                  onViewAnalysis={handleAnalysisDialog}
+                  onEdit={handleOpenEditDialog}
+                  onReports={() => setReportDialogOpen(true)}
+                  onCancel={handleCancelProtocol}
+                />
+              </>
             )}
           </CardContent>
         )}
       </Card>
 
-      {/* Dialog de Análisis - Más grande */}
-      <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
-        <DialogContent className="!max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <TestTube className="h-5 w-5 text-[#204983]" />
-              Análisis del Protocolo #{protocol.id}
-            </DialogTitle>
-          </DialogHeader>
+      {/* Dialogs */}
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        protocolId={protocol.id}
+        balance={patientDebt}
+        valuePaid={protocolDetail?.value_paid || "0"}
+        paymentAmount={paymentAmount}
+        onPaymentAmountChange={setPaymentAmount}
+        onConfirm={handleProcessPayment}
+        isProcessing={isProcessingPayment}
+      />
 
-          {loadingAnalyses ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#204983]"></div>
-            </div>
-          ) : panelHierarchy.length > 0 ? (
-            <div className="space-y-6">
-              {panelHierarchy.map((panel) => (
-                <div key={panel.id} className="border rounded-lg overflow-hidden">
-                  {/* Header del Panel */}
-                  <div className="bg-gray-50 px-4 py-3 border-b">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <TestTube className="h-5 w-5 text-[#204983]" />
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{panel.name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {panel.code}
-                            </Badge>
-                            {panel.is_urgent && (
-                              <Badge variant="destructive" className="text-xs">
-                                Urgente
-                              </Badge>
-                            )}
-                            <Badge variant="secondary" className="text-xs">
-                              {panel.analyses?.length || 0} análisis
-                            </Badge>
-                            {panel.bio_unit && (
-                              <Badge variant="outline" className="text-xs">
-                                {panel.bio_unit} unidades
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <TestTube className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay análisis</h3>
-              <p className="text-gray-600">Este protocolo no tiene análisis asignados.</p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AnalysisDialog
+        open={analysisDialogOpen}
+        onOpenChange={handleAnalysisDialogClose}
+        protocolId={protocol.id}
+        details={protocolDetails}
+        isLoading={loadingAnalyses}
+        updatingDetailId={updatingDetailId}
+        onToggleAuthorization={handleToggleAuthorization}
+        isEditable={isEditable}
+        insuranceId={protocolDetail?.insurance?.id}
+      />
+
+      <AuditDialog
+        open={auditDialogOpen}
+        onOpenChange={setAuditDialogOpen}
+        protocolId={protocol.id}
+        history={protocolDetail?.history}
+        totalChanges={protocolDetail?.total_changes}
+        isLoading={loadingDetail}
+      />
+
+      <EditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        protocolId={protocol.id}
+        formData={editFormData}
+        onFormDataChange={setEditFormData}
+        sendMethods={sendMethods}
+        onSave={handleSaveEdit}
+        isSaving={isSavingEdit}
+        insuranceId={protocolDetail?.insurance?.id}
+      />
+
+      <ReportDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        protocolId={protocol.id}
+        reportType={reportType}
+        onReportTypeChange={setReportType}
+        onGenerateReport={handleGenerateReport}
+        onSendEmail={handleSendEmail}
+        isGenerating={isGeneratingReport}
+        isSending={isSendingEmail}
+      />
+
+      <ProtocolHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        protocolId={protocol.id}
+        history={protocolDetail?.history}
+        totalChanges={protocolDetail?.total_changes}
+        isLoading={loadingDetail}
+      />
     </>
   )
 }

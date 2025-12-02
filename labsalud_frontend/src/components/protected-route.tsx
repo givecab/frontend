@@ -6,10 +6,12 @@ import useAuth from "@/contexts/auth-context"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  requiredPermission?: number | string // ID o codename del permiso requerido
+  fallbackPath?: string // Ruta a la que redirigir si no tiene permiso
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, isLoading, isInitialized } = useAuth()
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermission, fallbackPath = "/" }) => {
+  const { user, isLoading, isInitialized, hasPermission } = useAuth()
 
   // Mostrar loading mientras se inicializa la autenticación
   if (!isInitialized || isLoading) {
@@ -26,6 +28,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Solo redirigir al login si ya terminó la inicialización y no hay usuario
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  if (requiredPermission && !hasPermission(requiredPermission)) {
+    return <Navigate to={fallbackPath} replace />
   }
 
   return <>{children}</>

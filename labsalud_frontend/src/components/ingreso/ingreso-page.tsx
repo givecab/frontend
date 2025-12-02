@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { FileText } from "lucide-react"
 import { Button } from "../ui/button"
-import { Card, CardContent } from "../ui/card"
 import { toast } from "sonner"
 import { ProtocolForm } from "./components/protocol-form"
 import { PatientInfo } from "./components/patient-info"
@@ -13,69 +12,138 @@ import { CreateMedicoForm } from "./components/create-medico-form"
 import { CreateObraSocialForm } from "./components/create-obra-social-form"
 import { ProtocolSuccess } from "./components/protocol-success"
 import { useApi } from "../../hooks/use-api"
-import useAuth from "../../contexts/auth-context"
-import { ANALYSIS_ENDPOINTS } from "../../config/api"
-import type { Patient, Medico, ObraSocial, AnalysisPanel } from "../../types"
-
-interface PaginatedResponse<T> {
-  count: number
-  next: string | null
-  previous: string | null
-  results: T[]
-}
+import { MEDICAL_ENDPOINTS, PROTOCOL_ENDPOINTS } from "@/config/api"
+import type {
+  Patient,
+  Doctor,
+  Insurance,
+  SelectedAnalysis,
+  SendMethod,
+  CreateProtocolInput,
+  PaginatedResponse,
+} from "../../types"
 
 export default function IngresoPage() {
-  const { hasPermission } = useAuth()
   const { apiRequest } = useApi()
 
-  // Estados principales
+  // Main states
   const [currentPatient, setCurrentPatient] = useState<Patient | null>(null)
   const [patientNotFound, setPatientNotFound] = useState(false)
   const [searchedDni, setSearchedDni] = useState("")
-  const [selectedAnalyses, setSelectedAnalyses] = useState<AnalysisPanel[]>([])
-  const [selectedMedico, setSelectedMedico] = useState<Medico | null>(null)
-  const [selectedObraSocial, setSelectedObraSocial] = useState<ObraSocial | null>(null)
+  const [selectedAnalyses, setSelectedAnalyses] = useState<SelectedAnalysis[]>([])
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null)
+  const [selectedInsurance, setSelectedInsurance] = useState<Insurance | null>(null)
   const [showEditPatient, setShowEditPatient] = useState(false)
-  const [paid, setPaid] = useState(false)
-  const [contactMethod, setContactMethod] = useState("email")
-  const [oossNumber, setOossNumber] = useState("")
-
-  // Estados de datos
-  const [medicos, setMedicos] = useState<Medico[]>([])
-  const [obrasSociales, setObrasSociales] = useState<ObraSocial[]>([])
+  const [valuePaid, setValuePaid] = useState("")
+  const [selectedSendMethod, setSelectedSendMethod] = useState<SendMethod | null>(null)
+  const [affiliateNumber, setAffiliateNumber] = useState("")
+  const [isRefund, setIsRefund] = useState(false)
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [insurances, setInsurances] = useState<Insurance[]>([])
+  const [sendMethods, setSendMethods] = useState<SendMethod[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  // Estados de formularios adicionales
   const [showCreateMedico, setShowCreateMedico] = useState(false)
   const [showCreateObraSocial, setShowCreateObraSocial] = useState(false)
-  const [protocolCreated, setProtocolCreated] = useState<any>(null)
-  const [isCreatingProtocol, setIsCreatingProtocol] = useState(false)
+  const [successData, setSuccessData] = useState<{
+    protocol: any
+    patient: Patient
+    doctor: Doctor
+    insurance: Insurance
+    sendMethod: SendMethod
+  } | null>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [animationResult, setAnimationResult] = useState<"success" | "error" | null>(null)
+  const [pendingSuccessData, setPendingSuccessData] = useState<{
+    protocol: any
+    patient: Patient
+    doctor: Doctor
+    insurance: Insurance
+    sendMethod: SendMethod
+  } | null>(null)
 
-  // Verificar permisos
-  const canCreateProtocol = hasPermission(71) // add_protocol
+  const animationRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (canCreateProtocol) {
-      loadInitialData()
+    loadInitialData()
+  }, [])
+
+  useEffect(() => {
+    if (!isAnimating || animationResult === null) {
+      return
     }
-  }, [canCreateProtocol])
+
+    const duration = 3000 // 3 seconds total
+    const startTime = performance.now()
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime
+      const linearProgress = Math.min(elapsed / duration, 1)
+
+      // Logarithmic curve: fast at start, slow at end
+      const logProgress = Math.log10(1 + linearProgress * 9) * 100
+
+      setProgress(logProgress)
+
+      if (linearProgress < 1) {
+        animationRef.current = requestAnimationFrame(animate)
+      } else {
+        // Animation complete - show result
+        if (animationResult === "success" && pendingSuccessData) {
+          setSuccessData(pendingSuccessData)
+          setPendingSuccessData(null)
+          toast.success("Protocolo creado exitosamente")
+          handleReset()
+        } else if (animationResult === "error") {
+          toast.error("Error al crear el protocolo")
+        }
+
+        // Reset animation state after a brief delay
+        setTimeout(
+          () => {
+            setIsAnimating(false)
+            setProgress(0)
+            setAnimationResult(null)
+          },
+          animationResult === "error" ? 1500 : 300,
+        )
+      }
+    }
+
+    animationRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+  }, [isAnimating, animationResult, pendingSuccessData])
 
   const loadInitialData = async () => {
     try {
       setIsLoading(true)
-      const [medicosResponse, oossResponse] = await Promise.all([
-        apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS}?limit=20&offset=0&is_active=true`),
-        apiRequest(`${ANALYSIS_ENDPOINTS.OOSS}?limit=20&offset=0&is_active=true`),
+      const [doctorsResponse, insurancesResponse, sendMethodsResponse] = await Promise.all([
+        apiRequest(`${MEDICAL_ENDPOINTS.DOCTORS}?limit=20&offset=0&is_active=true`),
+        apiRequest(`${MEDICAL_ENDPOINTS.INSURANCES}?limit=20&offset=0&is_active=true`),
+        apiRequest(PROTOCOL_ENDPOINTS.SEND_METHODS),
       ])
 
-      if (medicosResponse.ok) {
-        const medicosData: PaginatedResponse<Medico> = await medicosResponse.json()
-        setMedicos(medicosData.results)
+      if (doctorsResponse.ok) {
+        const doctorsData: PaginatedResponse<Doctor> = await doctorsResponse.json()
+        setDoctors(doctorsData.results)
       }
 
-      if (oossResponse.ok) {
-        const oossData: PaginatedResponse<ObraSocial> = await oossResponse.json()
-        setObrasSociales(oossData.results)
+      if (insurancesResponse.ok) {
+        const insurancesData: PaginatedResponse<Insurance> = await insurancesResponse.json()
+        setInsurances(insurancesData.results)
+      }
+
+      if (sendMethodsResponse.ok) {
+        const sendMethodsData: PaginatedResponse<SendMethod> = await sendMethodsResponse.json()
+        setSendMethods(sendMethodsData.results)
+        if (sendMethodsData.results.length > 0) {
+          setSelectedSendMethod(sendMethodsData.results[0])
+        }
       }
     } catch (error) {
       console.error("Error loading initial data:", error)
@@ -83,6 +151,36 @@ export default function IngresoPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const calculateTotals = () => {
+    if (!selectedInsurance || selectedAnalyses.length === 0) {
+      return { authorizedTotal: 0, privateTotal: 0, total: 0, patientOwes: 0, authorizedUb: 0, privateUb: 0 }
+    }
+
+    const insuranceUbValue = Number.parseFloat(selectedInsurance.ub_value) || 0
+    const privateUbValue = selectedInsurance.private_ub_value || 0
+
+    let authorizedUb = 0
+    let privateUb = 0
+
+    selectedAnalyses.forEach((analysis) => {
+      const ub = Number.parseFloat(analysis.bio_unit) || 0
+      if (selectedInsurance?.name.toLowerCase() === "particular") {
+        privateUb += ub
+      } else if (analysis.is_authorized) {
+        authorizedUb += ub
+      } else {
+        privateUb += ub
+      }
+    })
+
+    const authorizedTotal = authorizedUb * insuranceUbValue
+    const privateTotal = privateUb * privateUbValue
+    const total = authorizedTotal + privateTotal
+    const patientOwes = isRefund ? total : privateTotal
+
+    return { authorizedTotal, privateTotal, total, patientOwes, authorizedUb, privateUb }
   }
 
   const handleEditPatient = () => {
@@ -112,14 +210,14 @@ export default function IngresoPage() {
     setSearchedDni("")
   }
 
-  const handleMedicoCreated = (medico: Medico) => {
-    setMedicos([...medicos, medico])
+  const handleDoctorCreated = (doctor: Doctor) => {
+    setDoctors([...doctors, doctor])
     setShowCreateMedico(false)
     toast.success("Médico creado exitosamente")
   }
 
-  const handleObraSocialCreated = (obraSocial: ObraSocial) => {
-    setObrasSociales([...obrasSociales, obraSocial])
+  const handleInsuranceCreated = (insurance: Insurance) => {
+    setInsurances([...insurances, insurance])
     setShowCreateObraSocial(false)
     toast.success("Obra social creada exitosamente")
   }
@@ -129,23 +227,17 @@ export default function IngresoPage() {
     setPatientNotFound(false)
     setSearchedDni("")
     setSelectedAnalyses([])
-    setSelectedMedico(null)
-    setSelectedObraSocial(null)
+    setSelectedDoctor(null)
+    setSelectedInsurance(null)
     setShowCreateMedico(false)
     setShowCreateObraSocial(false)
-    setProtocolCreated(null)
-    setPaid(false)
-    setContactMethod("email")
-    setOossNumber("")
+    setValuePaid("")
+    setSelectedSendMethod(sendMethods[0] || null)
+    setAffiliateNumber("")
+    setIsRefund(false)
   }
 
-  const handleProtocolCreated = (protocol: any) => {
-    setProtocolCreated(protocol)
-    // Reset después de 5 segundos
-    setTimeout(() => {
-      handleReset()
-    }, 5000)
-  }
+  const isPrivateInsurance = selectedInsurance?.name.toLowerCase() === "particular"
 
   const handleCreateProtocol = async () => {
     if (!currentPatient) {
@@ -153,35 +245,58 @@ export default function IngresoPage() {
       return
     }
 
-    if (!selectedMedico) {
+    if (!selectedDoctor) {
       toast.error("Seleccione un médico")
       return
     }
 
-    if (!selectedObraSocial) {
+    if (!selectedInsurance) {
       toast.error("Seleccione una obra social")
       return
     }
 
     if (selectedAnalyses.length === 0) {
-      toast.error("Seleccione al menos un panel")
+      toast.error("Seleccione al menos un análisis")
       return
     }
 
+    if (!selectedSendMethod) {
+      toast.error("Seleccione un método de envío")
+      return
+    }
+
+    if (!isPrivateInsurance && !affiliateNumber.trim()) {
+      toast.error("Ingrese el número de afiliado")
+      return
+    }
+
+    const patientForSuccess = currentPatient
+    const doctorForSuccess = selectedDoctor
+    const insuranceForSuccess = selectedInsurance
+    const sendMethodForSuccess = selectedSendMethod
+
     try {
-      setIsCreatingProtocol(true)
-      const protocolData = {
-        patient: Number(currentPatient.id),
-        medico: Number(selectedMedico.id),
-        ooss: Number(selectedObraSocial.id),
-        ooss_number: oossNumber || null,
-        contact_method: contactMethod,
-        paid: paid,
+      const totals = calculateTotals()
+      const patientPaid = Number.parseFloat(valuePaid) || 0
+      const totalValuePaid = patientPaid
+
+      const protocolData: CreateProtocolInput = {
+        patient: currentPatient.id,
+        doctor: selectedDoctor.id,
+        insurance: selectedInsurance.id,
+        send_method: selectedSendMethod.id,
+        value_paid: totalValuePaid.toFixed(2),
+        details: selectedAnalyses.map((analysis) => ({
+          analysis: analysis.id,
+          is_authorized: isPrivateInsurance ? false : analysis.is_authorized,
+        })),
       }
 
-      console.log("Creating protocol with data:", protocolData)
+      if (!isPrivateInsurance && affiliateNumber.trim()) {
+        protocolData.affiliate_number = affiliateNumber.trim()
+      }
 
-      const protocolResponse = await apiRequest(ANALYSIS_ENDPOINTS.PROTOCOLS, {
+      const protocolResponse = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOLS, {
         method: "POST",
         body: protocolData,
       })
@@ -189,65 +304,27 @@ export default function IngresoPage() {
       if (!protocolResponse.ok) {
         const errorData = await protocolResponse.json()
         console.error("Protocol creation error:", errorData)
-        throw new Error(`Error creating protocol: ${JSON.stringify(errorData)}`)
+        setAnimationResult("error")
+        setIsAnimating(true)
+        return
       }
-
-      const locationHeader = protocolResponse.headers.get("Location")
-      if (!locationHeader) {
-        throw new Error("No se recibió el header Location del servidor")
-      }
-
-      console.log("Protocol created, location header:", locationHeader)
-
-      const generateAnalysesUrl = `${locationHeader}generate-analyses/`
-      const panelIds = selectedAnalyses.map((panel) => panel.id)
-
-      console.log("Generating analyses for panels:", panelIds)
-
-      const generateAnalysesResponse = await apiRequest(generateAnalysesUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          panels: panelIds,
-        }),
-      })
-
-      if (!generateAnalysesResponse.ok) {
-        const errorData = await generateAnalysesResponse.json()
-        console.error("Generate analyses error:", errorData)
-        throw new Error(`Error generating analyses: ${JSON.stringify(errorData)}`)
-      }
-
-      console.log("Analyses generated successfully")
 
       const newProtocol = await protocolResponse.json()
 
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      handleProtocolCreated(newProtocol)
-      toast.success("Protocolo creado exitosamente")
+      setPendingSuccessData({
+        protocol: newProtocol,
+        patient: patientForSuccess,
+        doctor: doctorForSuccess,
+        insurance: insuranceForSuccess,
+        sendMethod: sendMethodForSuccess,
+      })
+      setAnimationResult("success")
+      setIsAnimating(true)
     } catch (error) {
       console.error("Error creating protocol:", error)
-      toast.error("Error al crear el protocolo")
-    } finally {
-      setIsCreatingProtocol(false)
+      setAnimationResult("error")
+      setIsAnimating(true)
     }
-  }
-
-  if (!canCreateProtocol) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Sin Permisos</h3>
-            <p className="text-gray-600 text-center">No tienes permisos para crear protocolos.</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   if (isLoading) {
@@ -259,7 +336,13 @@ export default function IngresoPage() {
   }
 
   const showRightPanel = currentPatient || patientNotFound
-  const isFormValid = currentPatient && selectedMedico && selectedObraSocial && selectedAnalyses.length > 0
+  const isFormValid =
+    currentPatient &&
+    selectedDoctor &&
+    selectedInsurance &&
+    selectedAnalyses.length > 0 &&
+    selectedSendMethod &&
+    (isPrivateInsurance || affiliateNumber.trim())
 
   return (
     <div className="min-h-screen p-2 sm:p-4 lg:p-6">
@@ -277,30 +360,35 @@ export default function IngresoPage() {
           <div
             className={`
               w-full transition-all duration-500 ease-in-out
-              ${showRightPanel ? "lg:w-full lg:max-w-xl lg:transform lg:-translate-x-2" : "lg:max-w-3xl"}
+              ${showRightPanel ? "lg:flex-1 lg:max-w-2xl" : "lg:max-w-4xl mx-auto"}
             `}
           >
             <ProtocolForm
               patient={currentPatient}
-              medicos={medicos}
-              obrasSociales={obrasSociales}
+              doctors={doctors}
+              insurances={insurances}
+              sendMethods={sendMethods}
               selectedAnalyses={selectedAnalyses}
-              selectedMedico={selectedMedico}
-              selectedObraSocial={selectedObraSocial}
-              paid={paid}
-              contactMethod={contactMethod}
-              oossNumber={oossNumber}
+              selectedDoctor={selectedDoctor}
+              selectedInsurance={selectedInsurance}
+              selectedSendMethod={selectedSendMethod}
+              valuePaid={valuePaid}
+              affiliateNumber={affiliateNumber}
+              isRefund={isRefund}
+              isPrivateInsurance={isPrivateInsurance}
+              totals={calculateTotals()}
               onAnalysisChange={setSelectedAnalyses}
-              onMedicoSelect={setSelectedMedico}
-              onObraSocialSelect={setSelectedObraSocial}
+              onDoctorSelect={setSelectedDoctor}
+              onInsuranceSelect={setSelectedInsurance}
+              onSendMethodSelect={setSelectedSendMethod}
               onPatientFound={handlePatientFound}
               onPatientNotFound={handlePatientNotFound}
               onReset={handleReset}
               onShowCreateMedico={() => setShowCreateMedico(true)}
               onShowCreateObraSocial={() => setShowCreateObraSocial(true)}
-              onPaidChange={setPaid}
-              onContactMethodChange={setContactMethod}
-              onOossNumberChange={setOossNumber}
+              onValuePaidChange={setValuePaid}
+              onAffiliateNumberChange={setAffiliateNumber}
+              onRefundChange={setIsRefund}
             />
           </div>
 
@@ -309,7 +397,7 @@ export default function IngresoPage() {
               w-full transition-all duration-500 ease-in-out
               ${
                 showRightPanel
-                  ? "lg:w-full lg:max-w-xl opacity-100 transform translate-x-0"
+                  ? "lg:w-96 lg:flex-shrink-0 opacity-100 transform translate-x-0"
                   : "lg:w-0 lg:opacity-0 lg:transform lg:translate-x-full lg:overflow-hidden"
               }
             `}
@@ -319,12 +407,12 @@ export default function IngresoPage() {
                 <PatientInfo patient={currentPatient} onEdit={handleEditPatient} />
 
                 {showCreateMedico && (
-                  <CreateMedicoForm onMedicoCreated={handleMedicoCreated} onCancel={() => setShowCreateMedico(false)} />
+                  <CreateMedicoForm onMedicoCreated={handleDoctorCreated} onCancel={() => setShowCreateMedico(false)} />
                 )}
 
                 {showCreateObraSocial && (
                   <CreateObraSocialForm
-                    onObraSocialCreated={handleObraSocialCreated}
+                    onObraSocialCreated={handleInsuranceCreated}
                     onCancel={() => setShowCreateObraSocial(false)}
                   />
                 )}
@@ -346,37 +434,36 @@ export default function IngresoPage() {
             <div
               className={`
                 w-full transition-all duration-500 ease-in-out
-                ${showRightPanel ? "max-w-full lg:max-w-4xl" : "max-w-full lg:max-w-3xl"}
+                ${showRightPanel ? "max-w-full lg:max-w-4xl" : "max-w-full lg:max-w-4xl"}
               `}
             >
               <Button
                 onClick={handleCreateProtocol}
-                disabled={!isFormValid}
+                disabled={!isFormValid || isAnimating}
                 className={`
                   w-full h-12 sm:h-14 lg:h-16 text-white text-base sm:text-lg font-semibold 
                   disabled:opacity-50 disabled:cursor-not-allowed
                   relative overflow-hidden transition-all duration-300
                   ${
-                    isCreatingProtocol
-                      ? "bg-[#3a5a8a] hover:bg-[#3a5a8a] cursor-wait"
+                    isAnimating
+                      ? animationResult === "error" && progress >= 100
+                        ? "bg-gray-300 hover:bg-gray-300"
+                        : "bg-gray-300 hover:bg-gray-300"
                       : "bg-[#204983] hover:bg-[#2d5a9b]"
                   }
                 `}
               >
-                {isCreatingProtocol && (
-                  <div
-                    className="absolute inset-0 bg-[#204983] transition-all duration-3000 ease-out"
-                    style={{
-                      width: "100%",
-                      animation: "fillButton 3s ease-out forwards",
-                    }}
-                  />
-                )}
+                <div
+                  className={`absolute inset-y-0 left-0 transition-colors duration-300 ${
+                    animationResult === "error" && progress >= 100 ? "bg-red-500" : "bg-[#204983]"
+                  }`}
+                  style={{ width: `${progress}%` }}
+                />
 
                 <div className="relative z-10 flex items-center justify-center">
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   <span className="text-sm sm:text-base lg:text-lg">
-                    {isCreatingProtocol ? "Creando protocolo..." : "Crear Protocolo"}
+                    {isAnimating ? "Creando protocolo..." : "Crear Protocolo"}
                   </span>
                 </div>
               </Button>
@@ -391,31 +478,17 @@ export default function IngresoPage() {
           onPatientUpdated={handlePatientUpdated}
         />
 
-        {protocolCreated && (
+        {successData && (
           <ProtocolSuccess
-            protocol={protocolCreated}
-            patient={currentPatient}
-            onClose={() => setProtocolCreated(null)}
+            protocol={successData.protocol}
+            patient={successData.patient}
+            doctor={successData.doctor}
+            insurance={successData.insurance}
+            sendMethod={successData.sendMethod}
+            onClose={() => setSuccessData(null)}
           />
         )}
       </div>
-
-      <style>{`
-        @keyframes fillButton {
-          0% { 
-            width: 0%; 
-            background-color: #3a5a8a;
-          }
-          50% { 
-            width: 50%; 
-            background-color: #2d5a9b;
-          }
-          100% { 
-            width: 100%; 
-            background-color: #204983;
-          }
-        }
-      `}</style>
     </div>
   )
 }

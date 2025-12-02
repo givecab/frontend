@@ -38,20 +38,24 @@ export const useApi = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ refresh: refreshTokenValue }),
+        mode: "cors",
       })
 
       if (!response.ok) return false
 
       const data = await response.json()
       localStorage.setItem("access_token", data.access)
+      if (data.refresh) {
+        localStorage.setItem("refresh_token", data.refresh)
+      }
       return true
-    } catch {
+    } catch (error) {
+      console.error("[v0] Token refresh error:", error)
       return false
     }
   }, [])
 
   const showSessionExpiredModal = useCallback(() => {
-    // Crear y mostrar modal de sesión expirada
     const modal = document.createElement("div")
     modal.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50"
     modal.innerHTML = `
@@ -77,15 +81,11 @@ export const useApi = () => {
 
     document.body.appendChild(modal)
 
-    // Manejar click del botón
     const reloginBtn = modal.querySelector("#relogin-btn")
     reloginBtn?.addEventListener("click", () => {
-      // Limpiar localStorage
       localStorage.removeItem("access_token")
       localStorage.removeItem("refresh_token")
       localStorage.removeItem("user")
-
-      // Recargar la página para que el AuthContext redirija al login
       window.location.reload()
     })
   }, [])
@@ -95,12 +95,7 @@ export const useApi = () => {
       const { loadingKey, skipTokenRefresh = false, ...apiOptions } = options
       if (loadingKey) setLoading(loadingKey, true)
 
-      const {
-        method = "GET",
-        body,
-        headers = {},
-        timeout = API_CONFIG.TIMEOUT,
-      } = apiOptions
+      const { method = "GET", body, headers = {}, timeout = API_CONFIG.TIMEOUT } = apiOptions
 
       const makeRequest = async (): Promise<Response> => {
         const requestHeaders: Record<string, string> = {
@@ -112,7 +107,6 @@ export const useApi = () => {
           requestHeaders["Content-Type"] = "application/json"
         }
 
-        // Get token from localStorage
         const token = localStorage.getItem("access_token")
         if (token) {
           requestHeaders.Authorization = `Bearer ${token}`
@@ -131,7 +125,7 @@ export const useApi = () => {
           finalUrl = `${cleanBaseUrl}${cleanUrl}`
         }
 
-        console.log(`[useApi] Making ${method} request to: ${finalUrl}`)
+        console.log(`[v0] Making ${method} request to: ${finalUrl}`)
 
         try {
           let requestBody: string | FormData | undefined
@@ -148,41 +142,37 @@ export const useApi = () => {
             headers: requestHeaders,
             body: requestBody,
             signal: controller.signal,
+            mode: "cors",
           })
 
           clearTimeout(timeoutId)
-          console.log(`[useApi] Response status: ${response.status} for ${finalUrl}`)
+          console.log(`[v0] Response status: ${response.status} for ${finalUrl}`)
 
           return response
         } catch (error) {
           clearTimeout(timeoutId)
           if (error instanceof Error && error.name === "AbortError") {
-            console.error(`[useApi] Request timed out for ${finalUrl} after ${timeout}ms`)
+            console.error(`[v0] Request timed out for ${finalUrl} after ${timeout}ms`)
             throw new Error(`Tiempo de espera agotado después de ${timeout}ms`)
           }
-          console.error(`[useApi] Network or unexpected error for ${finalUrl}:`, error)
+          console.error(`[v0] Network or unexpected error for ${finalUrl}:`, error)
           throw error
         }
       }
 
       try {
-        // Hacer la primera petición
         let response = await makeRequest()
 
-        // Si recibimos 401 y no estamos saltando el refresh de token
         if (response.status === 401 && !skipTokenRefresh) {
-          console.warn("[useApi] 401 Unauthorized. Attempting token refresh...")
+          console.warn("[v0] 401 Unauthorized. Attempting token refresh...")
 
-          // Intentar refrescar el token
           const refreshSuccess = await refreshToken()
 
           if (refreshSuccess) {
-            console.log("[useApi] Token refreshed successfully. Retrying request...")
-            // Reintentar la petición con el nuevo token
+            console.log("[v0] Token refreshed successfully. Retrying request...")
             response = await makeRequest()
           } else {
-            console.error("[useApi] Token refresh failed. Session expired.")
-            // Mostrar modal de sesión expirada
+            console.error("[v0] Token refresh failed. Session expired.")
             showSessionExpiredModal()
             throw new Error("Sesión expirada")
           }
@@ -190,7 +180,7 @@ export const useApi = () => {
 
         return response
       } catch (error) {
-        console.error(`[useApi] Final error:`, error)
+        console.error(`[v0] Final error:`, error)
         throw error
       } finally {
         if (loadingKey) setLoading(loadingKey, false)

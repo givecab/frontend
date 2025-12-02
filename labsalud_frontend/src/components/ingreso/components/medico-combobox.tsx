@@ -9,7 +9,7 @@ import { cn } from "../../../lib/utils"
 import { useApi } from "../../../hooks/use-api"
 import { useDebounce } from "../../../hooks/use-debounce"
 import type { Medico } from "../../../types"
-import { ANALYSIS_ENDPOINTS } from "../../../config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface MedicoComboboxProps {
   medicos: Medico[]
@@ -59,7 +59,7 @@ export function MedicoCombobox({
     try {
       setIsLoading(true)
       const response = await apiRequest(
-        `${ANALYSIS_ENDPOINTS.MEDICOS}?search=${encodeURIComponent(term)}&limit=50&offset=0&active=true`,
+        `${MEDICAL_ENDPOINTS.DOCTORS}?search=${encodeURIComponent(term)}&limit=50&offset=0&active=true`,
       )
 
       if (response.ok) {
@@ -80,7 +80,7 @@ export function MedicoCombobox({
 
     try {
       setIsLoading(true)
-      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.MEDICOS}?limit=20&offset=${offset}&active=true`)
+      const response = await apiRequest(`${MEDICAL_ENDPOINTS.DOCTORS}?limit=20&offset=${offset}&active=true`)
 
       if (response.ok) {
         const data: PaginatedResponse<Medico> = await response.json()

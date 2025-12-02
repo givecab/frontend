@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card"
 import { Button } from "../../ui/button"
 import { Input } from "../../ui/input"
 import { Label } from "../../ui/label"
+import { Textarea } from "../../ui/textarea"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
-import type { ObraSocial } from "../../../types"
-import { ANALYSIS_ENDPOINTS } from "../../../config/api"
+import type { Insurance } from "../../../types"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface CreateObraSocialFormProps {
-  onObraSocialCreated: (obraSocial: ObraSocial) => void
+  onObraSocialCreated: (obraSocial: Insurance) => void
   onCancel: () => void
 }
 
@@ -22,13 +23,13 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
   const { apiRequest } = useApi()
   const [formData, setFormData] = useState({
     name: "",
-    phone: "",
-    email: "",
-    address: "",
+    ub_value: "",
+    private_ub_value: "",
+    description: "",
   })
   const [isCreating, setIsCreating] = useState(false)
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
@@ -42,13 +43,31 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
       return
     }
 
+    if (!formData.ub_value || Number.parseFloat(formData.ub_value) <= 0) {
+      toast.error("Ingrese un valor de UB válido")
+      return
+    }
+
+    if (!formData.private_ub_value || Number.parseFloat(formData.private_ub_value) <= 0) {
+      toast.error("Ingrese un valor de UB particular válido")
+      return
+    }
+
     try {
       setIsCreating(true)
-      console.log("Creating obra social with data:", formData)
 
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS, {
+      const dataToSend = {
+        name: formData.name,
+        ub_value: formData.ub_value,
+        private_ub_value: formData.private_ub_value,
+        ...(formData.description && { description: formData.description }),
+      }
+
+      console.log("Creating obra social with data:", dataToSend)
+
+      const response = await apiRequest(MEDICAL_ENDPOINTS.INSURANCES, {
         method: "POST",
-        body: formData,
+        body: dataToSend,
       })
 
       if (response.ok) {
@@ -89,6 +108,49 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
             onChange={handleInputChange}
             placeholder="Nombre de la obra social"
             required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="ub_value">Valor UB Obra Social *</Label>
+            <Input
+              id="ub_value"
+              name="ub_value"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.ub_value}
+              onChange={handleInputChange}
+              placeholder="0.00"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="private_ub_value">Valor UB Particular *</Label>
+            <Input
+              id="private_ub_value"
+              name="private_ub_value"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.private_ub_value}
+              onChange={handleInputChange}
+              placeholder="0.00"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="description">Descripción (opcional)</Label>
+          <Textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="Descripción de la obra social..."
+            rows={3}
           />
         </div>
 

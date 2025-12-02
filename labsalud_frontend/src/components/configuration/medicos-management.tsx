@@ -9,7 +9,7 @@ import { Search, Plus, Eye, Pencil, Trash, Settings } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 import { toast } from "sonner"
 import { CreateMedicoDialog } from "./components/create-medico-dialog"
 import { EditMedicoDialog } from "./components/edit-medico-dialog"
@@ -17,31 +17,7 @@ import { DeleteMedicoDialog } from "./components/delete-medico-dialog"
 import { MedicoDetailsDialog } from "./components/medico-details-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-interface Medico {
-  id: number
-  first_name: string
-  last_name: string
-  license: string
-  is_active: boolean
-  created_at: string
-  created_by: {
-    id: number
-    username: string
-    photo: string
-  } | null
-  history: HistoryEntry[]
-}
-
-interface HistoryEntry {
-  version: number
-  user: {
-    id: number
-    username: string
-    photo: string
-  } | null
-  created_at: string
-}
+import type { Medico } from "@/types"
 
 interface ApiResponse {
   results: Medico[]
@@ -51,10 +27,6 @@ interface ApiResponse {
 }
 
 interface MedicosManagementProps {
-  canView: boolean
-  canCreate: boolean
-  canEdit: boolean
-  canDelete: boolean
   medico?: Medico
 }
 
@@ -84,7 +56,7 @@ const UserAvatar: React.FC<{
   )
 }
 
-export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: MedicosManagementProps) {
+export function MedicosManagement({ medico }: MedicosManagementProps) {
   const [medicos, setMedicos] = useState<Medico[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -107,7 +79,7 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
       search: searchTerm,
       is_active: "true",
     })
-    return `${ANALYSIS_ENDPOINTS.MEDICOS}?${params.toString()}`
+    return `${MEDICAL_ENDPOINTS.DOCTORS}?${params.toString()}`
   }, [])
 
   const fetchMedicos = useCallback(
@@ -178,17 +150,6 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
     toast.success("Médico eliminado exitosamente")
   }
 
-  if (!canView) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Sin permisos</h3>
-          <p className="text-gray-500">No tienes permisos para ver esta sección.</p>
-        </div>
-      </div>
-    )
-  }
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A"
     return new Date(dateString).toLocaleDateString("es-ES", {
@@ -205,41 +166,6 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
       return "Sistema"
     }
     return user.username
-  }
-
-  const getCreationInfo = (medicoItem: Medico) => {
-    if (medicoItem.history && medicoItem.history.length > 0) {
-      // La primera entrada del history es la creación (version 1)
-      const creationEntry = medicoItem.history.find((entry) => entry.version === 1)
-      if (creationEntry) {
-        return {
-          user: creationEntry.user,
-          date: creationEntry.created_at,
-        }
-      }
-    }
-    // Fallback a los datos originales
-    return {
-      user: medicoItem.created_by,
-      date: medicoItem.created_at,
-    }
-  }
-
-  const getLatestUpdate = (medicoItem: Medico) => {
-    if (medicoItem.history && medicoItem.history.length > 1) {
-      // Ordenar por version descendente y tomar la más reciente
-      const sortedHistory = [...medicoItem.history].sort((a, b) => b.version - a.version)
-      const latestEntry = sortedHistory[0]
-
-      if (latestEntry.version > 1) {
-        return {
-          user: latestEntry.user,
-          date: latestEntry.created_at,
-          version: latestEntry.version,
-        }
-      }
-    }
-    return null
   }
 
   return (
@@ -259,12 +185,10 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
             className="pl-10"
           />
         </div>
-        {canCreate && (
-          <Button onClick={() => setShowCreateDialog(true)} className="bg-[#204983] hover:bg-[#1a3d6f]">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Médico
-          </Button>
-        )}
+        <Button onClick={() => setShowCreateDialog(true)} className="bg-[#204983] hover:bg-[#1a3d6f]">
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo Médico
+        </Button>
       </div>
 
       {error && (
@@ -296,112 +220,99 @@ export function MedicosManagement({ canView, canCreate, canEdit, canDelete }: Me
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {medicos.map((medico) => {
-                const creationInfo = getCreationInfo(medico)
-                const latestUpdate = getLatestUpdate(medico)
-
-                return (
-                  <tr
-                    key={medico.id}
-                    ref={medicos.indexOf(medico) === medicos.length - 1 ? lastElementRef : null}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {medico.first_name} {medico.last_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.license}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+              {medicos.map((medico) => (
+                <tr
+                  key={medico.id}
+                  ref={medicos.indexOf(medico) === medicos.length - 1 ? lastElementRef : null}
+                  className="hover:bg-gray-50"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {medico.first_name} {medico.last_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.license}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help">
+                            <UserAvatar user={medico.creation?.user} size="md" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-sm">
+                            <strong>Creado por:</strong> {getUserDisplayName(medico.creation?.user)}
+                            <br />
+                            <strong>Fecha:</strong> {formatDate(medico.creation?.date)}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {medico.last_change ? (
                       <TooltipProvider>
-                        <div className="flex items-center space-x-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-help">
-                                <UserAvatar user={creationInfo.user} size="md" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-md">
-                                <strong>Creado por:</strong> {getUserDisplayName(creationInfo.user)}
-                                <br />
-                                <strong>Fecha:</strong> {formatDate(creationInfo.date)}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-help">
+                              <UserAvatar user={medico.last_change.user} size="md" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-sm">
+                              <strong>Modificado por:</strong> {getUserDisplayName(medico.last_change.user)}
+                              <br />
+                              <strong>Fecha:</strong> {formatDate(medico.last_change.date)}
+                              {medico.last_change.changes && medico.last_change.changes.length > 0 && (
+                                <>
+                                  <br />
+                                  <strong>Cambios:</strong> {medico.last_change.changes.join(", ")}
+                                </>
+                              )}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                       </TooltipProvider>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <TooltipProvider>
-                        <div>
-                          <Tooltip>
-                            {latestUpdate ? (
-                              <TooltipTrigger asChild>
-                                <div className="cursor-help">
-                                  <UserAvatar user={latestUpdate?.user} size="md" />
-                                </div>
-                              </TooltipTrigger>
-                            ) : null}
-                            <TooltipContent>
-                              <p className="text-sm">
-                                {latestUpdate ? (
-                                  <>
-                                    <strong>Modificado por:</strong> {getUserDisplayName(latestUpdate.user)}
-                                    <br />
-                                    <strong>Fecha:</strong> {formatDate(latestUpdate.date)}
-                                    <br />
-                                    <strong>Versión:</strong> {latestUpdate.version}
-                                  </>
-                                ) : (
-                                  <span>Sin modificaciones</span>
-                                )}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TooltipProvider>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedMedico(medico)
-                            setShowDetailsDialog(true)
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {canEdit && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMedico(medico)
-                              setShowEditDialog(true)
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-red-200 hover:bg-red-50 bg-transparent"
-                            onClick={() => {
-                              setSelectedMedico(medico)
-                              setShowDeleteDialog(true)
-                            }}
-                          >
-                            <Trash className="h-4 w-4 text-red-500" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+                    ) : (
+                      <span className="text-xs text-gray-400">Sin modificaciones</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMedico(medico)
+                          setShowDetailsDialog(true)
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMedico(medico)
+                          setShowEditDialog(true)
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-200 hover:bg-red-50 bg-transparent"
+                        onClick={() => {
+                          setSelectedMedico(medico)
+                          setShowDeleteDialog(true)
+                        }}
+                      >
+                        <Trash className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

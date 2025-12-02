@@ -17,9 +17,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, AlertTriangle, TestTube } from "lucide-react"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 
-interface Panel {
+interface Analysis {
   id: number
   name: string
   code: number
@@ -27,14 +27,19 @@ interface Panel {
   is_urgent: boolean
 }
 
-interface DeletePanelDialogProps {
+interface DeleteAnalysisCatalogDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
-  panel: Panel
+  analysis: Analysis
 }
 
-export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOpenChange, onSuccess, panel }) => {
+export const DeleteAnalysisCatalogDialog: React.FC<DeleteAnalysisCatalogDialogProps> = ({
+  open,
+  onOpenChange,
+  onSuccess,
+  analysis,
+}) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
   const [isDeleting, setIsDeleting] = useState(false)
@@ -42,23 +47,23 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
   const handleDelete = async () => {
     setIsDeleting(true)
     try {
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.PANEL_DETAIL(panel.id), {
+      const response = await apiRequest(CATALOG_ENDPOINTS.ANALYSIS_DETAIL(analysis.id), {
         method: "DELETE",
       })
 
       if (response.ok) {
         toastActions.success("Éxito", {
-          description: "Panel eliminado correctamente.",
+          description: "Análisis eliminado correctamente.",
         })
         onSuccess()
       } else {
         const errorData = await response.json().catch(() => ({}))
         toastActions.error("Error", {
-          description: errorData.detail || "No se pudo eliminar el panel.",
+          description: errorData.detail || "No se pudo eliminar el análisis.",
         })
       }
     } catch (error) {
-      console.error("Error deleting panel:", error)
+      console.error("Error deleting analysis:", error)
       toastActions.error("Error", {
         description: "Error de conexión. Inténtalo de nuevo.",
       })
@@ -76,7 +81,7 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
               <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <AlertDialogTitle className="text-lg font-semibold text-gray-900">Eliminar Panel</AlertDialogTitle>
+              <AlertDialogTitle className="text-lg font-semibold text-gray-900">Eliminar Análisis</AlertDialogTitle>
             </div>
           </div>
         </AlertDialogHeader>
@@ -88,8 +93,8 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
                 <TestTube className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-medium text-red-900">{panel.name || "Sin nombre"}</h4>
-                    {panel.is_urgent && (
+                    <h4 className="font-medium text-red-900">{analysis.name || "Sin nombre"}</h4>
+                    {analysis.is_urgent && (
                       <Badge variant="destructive" className="text-xs">
                         Urgente
                       </Badge>
@@ -97,10 +102,10 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
                   </div>
                   <div className="space-y-1 text-sm text-red-700">
                     <p>
-                      <span className="font-medium">Código:</span> {panel.code || "N/A"}
+                      <span className="font-medium">Código:</span> {analysis.code || "N/A"}
                     </p>
                     <p>
-                      <span className="font-medium">Unidad Bioquímica:</span> {panel.bio_unit || "N/A"}
+                      <span className="font-medium">Unidad Bioquímica:</span> {analysis.bio_unit || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -109,10 +114,7 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
 
             <div className="text-sm text-gray-600">
               <p className="font-medium text-gray-900 mb-2">⚠️ Esta acción no se puede deshacer</p>
-              <p>
-                Al eliminar este panel, se eliminarán también todas las determinaciones asociadas y no podrá ser
-                utilizado en futuros análisis.
-              </p>
+              <p>Al eliminar este análisis, se eliminarán también todas las determinaciones asociadas.</p>
             </div>
           </div>
         </AlertDialogDescription>
@@ -136,7 +138,7 @@ export const DeletePanelDialog: React.FC<DeletePanelDialogProps> = ({ open, onOp
                   Eliminando...
                 </>
               ) : (
-                "Eliminar Panel"
+                "Eliminar Análisis"
               )}
             </Button>
           </AlertDialogAction>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
-import { USER_ENDPOINTS } from "@/config/api"
+import { AC_ENDPOINTS } from "@/config/api"
 
 interface RoleAssignDialogProps {
   open: boolean
@@ -90,15 +90,24 @@ export function RoleAssignDialog({
     setIsSubmitting(true)
 
     try {
-      const response = await apiRequest(USER_ENDPOINTS.USER_ASSIGN_ROLE(user.id), {
-        method: "PUT",
+      const currentRoleIds = (user.groups || user.roles || []).map((group) => group.id)
+      const newRoleId = Number.parseInt(roleData.role_id)
+      const allRoleIds = [...currentRoleIds, newRoleId]
+
+      const response = await apiRequest(AC_ENDPOINTS.ROLE_ASSIGN, {
+        method: "POST",
         body: {
-          role_id: Number.parseInt(roleData.role_id),
+          user_id: user.id,
+          role_ids: allRoleIds,
         },
       })
 
       if (response.ok) {
-        const updatedUser = await response.json()
+        const data = await response.json()
+        const updatedUser = {
+          ...user,
+          groups: [...(user.groups || []), ...data.assigned_roles],
+        }
         setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
         if (refreshData) {
           await refreshData()

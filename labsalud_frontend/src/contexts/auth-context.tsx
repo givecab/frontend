@@ -5,45 +5,7 @@ import { useToast } from "@/hooks/use-toast"
 import { IdleWarningModal } from "@/components/idle-warning-modal"
 import useIdleTimeout from "@/hooks/use-idle-timeout"
 import { AUTH_ENDPOINTS } from "@/config/api"
-
-interface Permission {
-  id: number
-  codename: string
-  name: string
-  temporary: boolean
-  expires_at: string | null
-}
-
-interface Role {
-  id: number
-  name: string
-}
-
-interface User {
-  id: number
-  username: string
-  first_name: string
-  last_name: string
-  email: string
-  photo?: string
-  roles: Role[]
-  permissions: Permission[]
-  temp_permissions?: Permission[]
-}
-
-interface AuthContextType {
-  user: User | null
-  token: string | null
-  isAuthenticated: boolean
-  isInitialized: boolean
-  isLoading: boolean
-  login: (username: string, password: string) => Promise<boolean>
-  logout: (showToast?: boolean) => void
-  hasPermission: (permission: number | string) => boolean
-  isInGroup: (groupName: string) => boolean
-  refreshUser: () => Promise<void>
-  refreshToken: () => Promise<boolean>
-}
+import type { User, AuthResponse, TokenRefreshResponse, AuthContextType } from "@/types"
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -60,7 +22,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { success, error } = useToast()
   const initializationRef = useRef(false)
 
-  // Configuración del tiempo de inactividad (en milisegundos)
   const [idleConfig] = useState({
     idleTime: 5 * 60 * 1000, // 5 minutes
     warningTime: 30 * 1000, // 30 seconds
@@ -75,7 +36,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null)
       setIsAuthenticated(false)
 
-      // Only show toast if explicitly requested (manual logout)
       if (showToast) {
         success("Sesión cerrada", {
           description: "Has cerrado sesión exitosamente",
@@ -86,10 +46,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   )
 
   const { showWarning, timeLeft, extendSession, resetIdleTimeout } = useIdleTimeout({
-    onIdle: () => logout(false), // Don't show toast for idle logout
+    onIdle: () => logout(false),
     idleTime: idleConfig.idleTime,
     warningTime: idleConfig.warningTime,
-    enabled: isAuthenticated, // Only active when authenticated
+    enabled: isAuthenticated,
   })
 
   const hasPermission = useCallback(
@@ -127,8 +87,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (!response.ok) throw new Error()
 
-      const data = await response.json()
+      const data: TokenRefreshResponse = await response.json()
+
       localStorage.setItem("access_token", data.access)
+      if (data.refresh) {
+        localStorage.setItem("refresh_token", data.refresh)
+      }
       setToken(data.access)
       return true
     } catch {
@@ -141,6 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async (username: string, password: string): Promise<boolean> => {
       setIsLoading(true)
       try {
+        console.log("[v0] Attempting login to:", AUTH_ENDPOINTS.TOKEN)
         const response = await fetch(AUTH_ENDPOINTS.TOKEN, {
           method: "POST",
           headers: {
@@ -151,6 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ detail: "Error de autenticación" }))
+          console.log("[v0] Login failed:", errorData)
 
           error("Error de inicio de sesión", {
             description: errorData.detail || "Credenciales inválidas",
@@ -158,11 +124,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return false
         }
 
-        const data = await response.json()
+        const data: AuthResponse = await response.json()
+        console.log("[v0] Login successful, user:", data.user.username)
+
         localStorage.setItem("access_token", data.access)
         localStorage.setItem("refresh_token", data.refresh)
         localStorage.setItem("user", JSON.stringify(data.user))
         localStorage.setItem("last_username", username)
+
         setToken(data.access)
         setUser(data.user)
         setIsAuthenticated(true)
@@ -172,10 +141,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         success("Inicio de sesión exitoso", {
-          description: "Bienvenido de vuelta",
+          description: `Bienvenido, ${data.user.first_name}`,
         })
         return true
-      } catch {
+      } catch (err) {
+        console.error("[v0] Login error:", err)
         error("Error de conexión", {
           description: "No se pudo conectar con el servidor",
         })
@@ -237,16 +207,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider value={value}>
       {children}
       {isAuthenticated && showWarning && (
-        <IdleWarningModal isOpen={true} timeLeft={timeLeft} onExtend={extendSession} onLogout={logout} />
+        <IdleWarningModal isOpen={true} timeLeft={timeLeft} onExtend={extendSession} onLogout={() => logout(false)} />
       )}
     </AuthContext.Provider>
   )
 }
 
-export default function useAuth(): AuthContextType {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
   return context
 }
+
+export default useAuth

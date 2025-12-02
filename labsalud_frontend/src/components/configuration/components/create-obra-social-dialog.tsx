@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface CreateObraSocialDialogProps {
   open: boolean
@@ -27,18 +27,26 @@ interface CreateObraSocialDialogProps {
 
 interface FormData {
   name: string
+  description: string
+  ub_value: string
 }
 
 interface ValidationState {
   name: { isValid: boolean; message: string }
+  description: { isValid: boolean; message: string }
+  ub_value: { isValid: boolean; message: string }
 }
 
 export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: CreateObraSocialDialogProps) {
   const [formData, setFormData] = useState<FormData>({
     name: "",
+    description: "",
+    ub_value: "",
   })
   const [validation, setValidation] = useState<ValidationState>({
     name: { isValid: false, message: "" },
+    description: { isValid: true, message: "" },
+    ub_value: { isValid: true, message: "" },
   })
   const [loading, setLoading] = useState(false)
 
@@ -52,6 +60,20 @@ export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: Create
       case "name":
         isValid = value.trim().length >= 3
         message = isValid ? "Nombre válido" : "El nombre debe tener al menos 3 caracteres"
+        break
+      case "description":
+        isValid = true // Optional field
+        message = ""
+        break
+      case "ub_value":
+        if (value.trim() === "") {
+          isValid = true // Optional field
+          message = ""
+        } else {
+          const numValue = Number.parseFloat(value)
+          isValid = !isNaN(numValue) && numValue > 0
+          message = isValid ? "Valor válido" : "Debe ser un número mayor a 0"
+        }
         break
     }
 
@@ -76,16 +98,23 @@ export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: Create
 
     try {
       setLoading(true)
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS, {
+      const body: any = { name: formData.name }
+      if (formData.description.trim()) body.description = formData.description
+      if (formData.ub_value.trim()) body.ub_value = Number.parseFloat(formData.ub_value)
+
+      const response = await apiRequest(MEDICAL_ENDPOINTS.INSURANCES, {
         method: "POST",
-        body: formData,
+        body,
       })
 
       if (response.ok) {
+        toast.success("Obra Social creada exitosamente")
         onSuccess()
-        setFormData({ name: "" })
+        setFormData({ name: "", description: "", ub_value: "" })
         setValidation({
           name: { isValid: false, message: "" },
+          description: { isValid: true, message: "" },
+          ub_value: { isValid: true, message: "" },
         })
       } else {
         const errorData = await response.json()
@@ -121,18 +150,18 @@ export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: Create
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Crear Nueva Obra Social</DialogTitle>
-          <DialogDescription>Ingresa el nombre de la nueva obra social.</DialogDescription>
+          <DialogDescription>Ingresa los datos de la nueva obra social.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre</Label>
+              <Label htmlFor="name">Nombre *</Label>
               <div className="relative">
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="Ingresa el nombre de la obra social"
+                  placeholder="Ingresa el nombre"
                   className={`pr-10 ${
                     formData.name
                       ? validation.name.isValid
@@ -144,6 +173,37 @@ export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: Create
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">{renderValidationIcon("name")}</div>
               </div>
               {renderValidationMessage("name")}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Input
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleInputChange("description", e.target.value)}
+                placeholder="Ingresa una descripción (opcional)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ub_value">Valor UB</Label>
+              <div className="relative">
+                <Input
+                  id="ub_value"
+                  type="number"
+                  step="0.01"
+                  value={formData.ub_value}
+                  onChange={(e) => handleInputChange("ub_value", e.target.value)}
+                  placeholder="Ingresa el valor UB (opcional)"
+                  className={`pr-10 ${
+                    formData.ub_value && !validation.ub_value.isValid ? "border-red-500 focus:border-red-500" : ""
+                  }`}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  {renderValidationIcon("ub_value")}
+                </div>
+              </div>
+              {renderValidationMessage("ub_value")}
             </div>
           </div>
           <DialogFooter>

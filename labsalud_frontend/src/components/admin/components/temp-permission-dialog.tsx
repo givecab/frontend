@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import type { User, Permission } from "@/types"
-import { USER_ENDPOINTS } from "@/config/api"
+import { AC_ENDPOINTS } from "@/config/api"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,83 +20,162 @@ interface TempPermissionDialogProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
   apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
   permissions?: Permission[]
+  mode?: "assign" | "revoke"
 }
 
-export function TempPermissionDialog({ open, onOpenChange, user, setUsers, apiRequest }: TempPermissionDialogProps) {
+export function TempPermissionDialog({
+  open,
+  onOpenChange,
+  user,
+  setUsers,
+  apiRequest,
+  mode = "assign",
+}: TempPermissionDialogProps) {
   const { success, error: showError } = useToast()
 
   const [missingPerms, setMissingPerms] = useState<Permission[]>([])
+  const [activeTempPerms, setActiveTempPerms] = useState<any[]>([])
   const [loadingPerms, setLoadingPerms] = useState(false)
 
   const [permissionId, setPermissionId] = useState<string>("")
-  const [duration, setDuration] = useState<number>(60)
+  const [selectedTempPermId, setSelectedTempPermId] = useState<string>("")
+  const [expiresAt, setExpiresAt] = useState<string>("")
+  const [reason, setReason] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Carga los permisos que el usuario aún no posee
   useEffect(() => {
     if (!open || !user) return
 
     let cancelled = false
-    async function fetchMissing() {
+
+    async function fetchData() {
       setLoadingPerms(true)
       try {
         if (!user) return
-        const res = await apiRequest(USER_ENDPOINTS.USER_MISSING_PERMISSIONS(user.id), { method: "GET" })
-        if (!cancelled && res.ok) {
-          const data: Permission[] = await res.json()
-          setMissingPerms(data)
-          // Preseleccionar el primero (si existe)
-          if (data.length > 0) {
-            setPermissionId(data[0].id.toString())
-          } else {
-            setPermissionId("")
+
+        if (mode === "assign") {
+          const res = await apiRequest(`${AC_ENDPOINTS.PERMISSIONS}?limit=100`)
+          if (!cancelled && res.ok) {
+            const data = await res.json()
+            const allPermissions = data.results || []
+
+            // Filtrar permisos que el usuario ya tiene permanentemente
+            const userPermissionIds = (user.permissions || []).filter((p) => !p.temporary).map((p) => p.id)
+            const missing = allPermissions.filter((p: Permission) => !userPermissionIds.includes(p.id))
+
+            setMissingPerms(missing)
+            if (missing.length > 0) {
+              setPermissionId(missing[0].id.toString())
+            } else {
+              setPermissionId("")
+            }
           }
-        } else if (!cancelled) {
-          setMissingPerms([])
-          setPermissionId("")
+        } else {
+          const res = await apiRequest(`${AC_ENDPOINTS.TEMP_PERMISSIONS}?user_id=${user.id}`)
+          if (!cancelled && res.ok) {
+            const data = await res.json()
+            const tempPerms = data.results || []
+            // Filtrar solo los no expirados
+            const active = tempPerms.filter((tp: any) => !tp.is_expired)
+            setActiveTempPerms(active)
+            if (active.length > 0) {
+              setSelectedTempPermId(active[0].id.toString())
+            } else {
+              setSelectedTempPermId("")
+            }
+          }
         }
-      } catch {
+      } catch (err) {
+        console.error("[v0] Error cargando permisos:", err)
         if (!cancelled) {
           setMissingPerms([])
-          setPermissionId("")
+          setActiveTempPerms([])
         }
       } finally {
         if (!cancelled) setLoadingPerms(false)
       }
     }
 
-    fetchMissing()
+    fetchData()
     return () => {
       cancelled = true
       setMissingPerms([])
+      setActiveTempPerms([])
       setPermissionId("")
+      setSelectedTempPermId("")
+      setExpiresAt("")
+      setReason("")
       setLoadingPerms(false)
     }
-  }, [open, user, apiRequest])
+  }, [open, user, apiRequest, mode])
+
+  useEffect(() => {
+    if (open && mode === "assign" && !expiresAt) {
+      const now = new Date()
+      now.setHours(now.getHours() + 1)
+      setExpiresAt(now.toISOString().slice(0, 16)) // Format for datetime-local input
+    }
+  }, [open, mode])
 
   const handleAssign = async () => {
-    if (!user || !permissionId) return
+    if (!user || !permissionId || !expiresAt || !reason) {
+      showError("Por favor completa todos los campos")
+      return
+    }
 
     setIsSubmitting(true)
     try {
-      const res = await apiRequest(USER_ENDPOINTS.USER_ASSIGN_TEMP_PERMISSION(user.id), {
+      const res = await apiRequest(AC_ENDPOINTS.TEMP_PERMISSIONS, {
         method: "POST",
         body: {
+          user_id: user.id,
           permission_id: Number(permissionId),
-          duration_minutes: duration,
+          expires_at: new Date(expiresAt).toISOString(),
+          reason: reason,
         },
       })
+
       if (res.ok) {
-        const updatedUser = await res.json()
-        setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
-        success("Permiso temporal asignado")
+        success("Permiso temporal asignado correctamente")
         onOpenChange(false)
+        // Recargar la página para actualizar datos
+        window.location.reload()
       } else {
         const err = await res.json().catch(() => ({ detail: "Error desconocido" }))
         showError("No se pudo asignar el permiso", { description: err.detail })
       }
-    } catch {
+    } catch (err) {
+      console.error("[v0] Error asignando permiso temporal:", err)
       showError("Error de red al asignar permiso")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRevoke = async () => {
+    if (!selectedTempPermId) {
+      showError("Por favor selecciona un permiso temporal")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const res = await apiRequest(`${AC_ENDPOINTS.TEMP_PERMISSIONS}${selectedTempPermId}/revoke/`, {
+        method: "POST",
+      })
+
+      if (res.ok) {
+        success("Permiso temporal revocado correctamente")
+        onOpenChange(false)
+        // Recargar la página para actualizar datos
+        window.location.reload()
+      } else {
+        const err = await res.json().catch(() => ({ detail: "Error desconocido" }))
+        showError("No se pudo revocar el permiso", { description: err.detail })
+      }
+    } catch (err) {
+      console.error("[v0] Error revocando permiso temporal:", err)
+      showError("Error de red al revocar permiso")
     } finally {
       setIsSubmitting(false)
     }
@@ -104,37 +183,72 @@ export function TempPermissionDialog({ open, onOpenChange, user, setUsers, apiRe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Asignar Permiso Temporal</DialogTitle>
+          <DialogTitle>{mode === "assign" ? "Asignar Permiso Temporal" : "Revocar Permiso Temporal"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           {loadingPerms ? (
             <p className="text-center">Cargando permisos…</p>
-          ) : missingPerms.length === 0 ? (
-            <p className="text-center text-gray-500">El usuario ya tiene todos los permisos disponibles.</p>
+          ) : mode === "assign" ? (
+            missingPerms.length === 0 ? (
+              <p className="text-center text-gray-500">El usuario ya tiene todos los permisos disponibles.</p>
+            ) : (
+              <>
+                <div>
+                  <Label htmlFor="permission">Permiso *</Label>
+                  <Select value={permissionId} onValueChange={setPermissionId}>
+                    <SelectTrigger id="permission" className="w-full">
+                      <SelectValue placeholder="Selecciona un permiso" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" sideOffset={5}>
+                      {missingPerms.map((perm) => (
+                        <SelectItem key={perm.id} value={perm.id.toString()}>
+                          {perm.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="expires">Fecha de expiración *</Label>
+                  <Input
+                    id="expires"
+                    type="datetime-local"
+                    value={expiresAt}
+                    onChange={(e) => setExpiresAt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="reason">Razón *</Label>
+                  <Input
+                    id="reason"
+                    type="text"
+                    placeholder="Motivo de asignación"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </div>
+              </>
+            )
+          ) : activeTempPerms.length === 0 ? (
+            <p className="text-center text-gray-500">El usuario no tiene permisos temporales activos.</p>
           ) : (
-            <>
-              <div>
-                <Label>Permiso</Label>
-                <Select value={permissionId} onValueChange={setPermissionId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un permiso" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {missingPerms.map((perm) => (
-                      <SelectItem key={perm.id} value={perm.id.toString()}>
-                        {perm.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Duración (minutos)</Label>
-                <Input type="number" min={1} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
-              </div>
-            </>
+            <div>
+              <Label htmlFor="temp-perm">Permiso Temporal</Label>
+              <Select value={selectedTempPermId} onValueChange={setSelectedTempPermId}>
+                <SelectTrigger id="temp-perm" className="w-full">
+                  <SelectValue placeholder="Selecciona un permiso" />
+                </SelectTrigger>
+                <SelectContent position="popper" sideOffset={5}>
+                  {activeTempPerms.map((tp) => (
+                    <SelectItem key={tp.id} value={tp.id.toString()}>
+                      {tp.permission_details.name} - Expira: {new Date(tp.expires_at).toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
         <DialogFooter>
@@ -143,9 +257,19 @@ export function TempPermissionDialog({ open, onOpenChange, user, setUsers, apiRe
               Cancelar
             </Button>
           </DialogClose>
-          <Button onClick={handleAssign} disabled={isSubmitting || missingPerms.length === 0}>
-            {isSubmitting ? "Asignando…" : "Asignar"}
-          </Button>
+          {mode === "assign" ? (
+            <Button onClick={handleAssign} disabled={isSubmitting || missingPerms.length === 0}>
+              {isSubmitting ? "Asignando…" : "Asignar"}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleRevoke}
+              disabled={isSubmitting || activeTempPerms.length === 0}
+              variant="destructive"
+            >
+              {isSubmitting ? "Revocando…" : "Revocar"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

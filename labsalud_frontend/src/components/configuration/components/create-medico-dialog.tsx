@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface CreateMedicoDialogProps {
   isOpen: boolean
@@ -93,12 +93,13 @@ export function CreateMedicoDialog({ isOpen, onOpenChange, onSuccess }: CreateMe
 
     try {
       setLoading(true)
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.MEDICOS, {
+      const response = await apiRequest(MEDICAL_ENDPOINTS.DOCTORS, {
         method: "POST",
-        body: formData, // Removido JSON.stringify - el hook useApi lo maneja
+        body: formData,
       })
 
       if (response.ok) {
+        toast.success("Médico creado exitosamente")
         onSuccess()
         setFormData({ first_name: "", last_name: "", license: "" })
         setValidation({

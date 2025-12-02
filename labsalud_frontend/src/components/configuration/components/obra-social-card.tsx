@@ -5,18 +5,19 @@ import { useState } from "react"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Edit, ChevronDown, Calendar, Clock, Settings } from "lucide-react"
+import { Edit, ChevronDown, DollarSign, Settings } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { ObraSocial, User as UserType } from "../configuration-page"
+import type { ObraSocial } from "@/types"
+import { HistoryList } from "@/components/common/history-list"
+import { useApi } from "@/hooks/use-api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface ObraSocialCardProps {
   obraSocial: ObraSocial
   onEdit?: (os: ObraSocial) => void
   onToggleActive?: (os: ObraSocial, newStatus: boolean) => void
-  canEdit: boolean
-  canDelete: boolean
   isToggling?: boolean
 }
 
@@ -40,10 +41,14 @@ const formatDateShort = (dateString?: string) => {
   })
 }
 
-const UserAvatar: React.FC<{ user: UserType | null | undefined; size?: "sm" | "md" }> = ({ user, size = "md" }) => {
+const UserAvatar: React.FC<{ username?: string; photo?: string | null; size?: "sm" | "md" }> = ({
+  username,
+  photo,
+  size = "md",
+}) => {
   const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8"
 
-  if (!user) {
+  if (!username) {
     return (
       <Avatar className={sizeClasses}>
         <AvatarFallback className="text-xs bg-gray-200 text-gray-500">
@@ -54,25 +59,21 @@ const UserAvatar: React.FC<{ user: UserType | null | undefined; size?: "sm" | "m
   }
   return (
     <Avatar className={sizeClasses}>
-      <AvatarImage src={user.photo || undefined} alt={user.username} />
+      <AvatarImage src={photo || undefined} alt={username} />
       <AvatarFallback className="text-xs bg-slate-200 text-slate-700">
-        {user.username?.substring(0, 2).toUpperCase() || "S"}
+        {username?.substring(0, 2).toUpperCase() || "S"}
       </AvatarFallback>
     </Avatar>
   )
 }
 
-export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
-  obraSocial,
-  onEdit,
-  onToggleActive,
-  canEdit,
-  canDelete,
-  isToggling,
-}) => {
+export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({ obraSocial, onEdit, onToggleActive, isToggling }) => {
   const [isExpanded, setIsExpanded] = useState(false)
-  const { name, is_active, created_by, created_at, updated_by, updated_at } = obraSocial
-  const latestUpdater = updated_by && updated_by.length > 0 ? updated_by[updated_by.length - 1] : null
+  const [fullDetails, setFullDetails] = useState<ObraSocial | null>(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const { apiRequest } = useApi()
+
+  const { name, description, ub_value, is_active, creation, last_change } = obraSocial
 
   const handleToggle = (newStatus: boolean) => {
     if (onToggleActive) {
@@ -80,15 +81,30 @@ export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
     }
   }
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    // No expandir si se hace clic en el switch o botones
+  const handleCardClick = async (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("[data-no-expand]")) {
       return
     }
-    setIsExpanded(!isExpanded)
+
+    const newExpandedState = !isExpanded
+    setIsExpanded(newExpandedState)
+
+    // Fetch full details if expanding and not already loaded
+    if (newExpandedState && !fullDetails && obraSocial.id) {
+      setIsLoadingHistory(true)
+      try {
+        const response = await apiRequest(MEDICAL_ENDPOINTS.INSURANCE_DETAIL(obraSocial.id))
+        const data = await response.json()
+        setFullDetails(data)
+      } catch (error) {
+        console.error("Error fetching obra social details:", error)
+      } finally {
+        setIsLoadingHistory(false)
+      }
+    }
   }
 
-  const canBeToggled = (is_active && canDelete) || (!is_active && canEdit)
+  const canBeToggled = true
 
   return (
     <Card
@@ -117,8 +133,17 @@ export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
                   <Badge variant={is_active ? "default" : "secondary"} className="text-xs">
                     {is_active ? "Activa" : "Inactiva"}
                   </Badge>
+                  {ub_value && (
+                    <>
+                      <span className="text-xs text-gray-400">•</span>
+                      <div className="flex items-center space-x-1">
+                        <DollarSign className="h-3 w-3 text-green-600" />
+                        <span className="text-xs text-gray-600 font-medium">{ub_value}</span>
+                      </div>
+                    </>
+                  )}
                   <span className="text-xs text-gray-400">•</span>
-                  <span className="text-xs text-gray-500">{formatDateShort(created_at)}</span>
+                  <span className="text-xs text-gray-500">{formatDateShort(creation?.date)}</span>
                 </div>
               </div>
             </div>
@@ -141,7 +166,6 @@ export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
           </div>
         </div>
 
-        {/* Avatares con tooltip cuando la card está cerrada */}
         {!isExpanded && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
             <TooltipProvider>
@@ -149,14 +173,14 @@ export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="cursor-help">
-                      <UserAvatar user={created_by} size="sm" />
+                      <UserAvatar username={creation?.user?.username} photo={creation?.user?.photo} size="sm" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="text-sm">
-                      <strong>Creado por:</strong> {created_by?.username || "Sistema"}
+                      <strong>Creado por:</strong> {creation?.user?.username || "Sistema"}
                       <br />
-                      <strong>Fecha:</strong> {formatDate(created_at)}
+                      <strong>Fecha:</strong> {formatDate(creation?.date)}
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -164,14 +188,20 @@ export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="cursor-help">
-                      <UserAvatar user={latestUpdater} size="sm" />
+                      <UserAvatar username={last_change?.user?.username} photo={last_change?.user?.photo} size="sm" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="text-sm">
-                      <strong>Modificado por:</strong> {latestUpdater?.username || "Sistema"}
+                      <strong>Modificado por:</strong> {last_change?.user?.username || "Sistema"}
                       <br />
-                      <strong>Fecha:</strong> {formatDate(updated_at)}
+                      <strong>Fecha:</strong> {formatDate(last_change?.date)}
+                      {last_change?.changes && last_change.changes.length > 0 && (
+                        <>
+                          <br />
+                          <strong>Cambios:</strong> {last_change.changes.join(", ")}
+                        </>
+                      )}
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -184,38 +214,35 @@ export const ObraSocialCard: React.FC<ObraSocialCardProps> = ({
       {isExpanded && (
         <CardContent className="px-4 pb-4 pt-0 border-t border-gray-100">
           <div className="space-y-4 mt-4">
-            {/* Información de creación */}
-            <div className="flex items-start space-x-3">
-              <Calendar className="h-4 w-4 text-gray-400 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700">Creado</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <UserAvatar user={created_by} />
-                  <div>
-                    <p className="text-sm text-gray-600">{created_by?.username || "Sistema"}</p>
-                    <p className="text-xs text-gray-500">{formatDate(created_at)}</p>
-                  </div>
-                </div>
+            {description && (
+              <div className="p-3 bg-gray-50 rounded-md">
+                <p className="text-sm text-gray-700">{description}</p>
               </div>
-            </div>
+            )}
 
-            {/* Información de actualización */}
-            <div className="flex items-start space-x-3">
-              <Clock className="h-4 w-4 text-gray-400 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700">Última modificación</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <UserAvatar user={latestUpdater} />
-                  <div>
-                    <p className="text-sm text-gray-600">{latestUpdater?.username || "Sistema"}</p>
-                    <p className="text-xs text-gray-500">{formatDate(updated_at)}</p>
-                  </div>
+            {ub_value && (
+              <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-md">
+                <DollarSign className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Valor UB</p>
+                  <p className="text-lg font-semibold text-green-700">{ub_value}</p>
                 </div>
               </div>
-            </div>
+            )}
+
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-current border-t-transparent text-[#204983]" />
+              </div>
+            ) : fullDetails?.history ? (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-gray-700">Historial de Cambios</h4>
+                <HistoryList history={fullDetails.history} />
+              </div>
+            ) : null}
 
             {/* Botón de editar */}
-            {canEdit && onEdit && (
+            {onEdit && (
               <div className="pt-2 border-t border-gray-100" data-no-expand>
                 <Button
                   onClick={() => onEdit(obraSocial)}

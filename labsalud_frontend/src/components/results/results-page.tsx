@@ -3,8 +3,24 @@ import { TestTube } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs"
 import { ProtocolAccordionView } from "./components/protocol-accordion-view"
 import { AnalysisAccordionView } from "./components/analysis-accordion-view"
+import { useState, useEffect } from "react"
+
+const RESULTS_TAB_KEY = "labsalud_results_tab"
 
 export default function ResultadosPage() {
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(RESULTS_TAB_KEY)
+      return saved || "por-analisis"
+    } catch {
+      return "por-analisis"
+    }
+  })
+
+  useEffect(() => {
+    localStorage.setItem(RESULTS_TAB_KEY, activeTab)
+  }, [activeTab])
+
   return (
     <div className="w-full max-w-7xl mx-auto py-4 px-4">
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6 mb-4 md:mb-6">
@@ -22,7 +38,7 @@ export default function ResultadosPage() {
       </div>
 
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6">
-        <Tabs defaultValue="por-analisis" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4 bg-gray-100">
             <TabsTrigger
               value="por-analisis"

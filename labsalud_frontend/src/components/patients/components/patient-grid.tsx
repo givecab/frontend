@@ -1,25 +1,16 @@
 "use client"
-import type { Patient } from "../patients-page"
+import type { Patient } from "@/types"
 import { PatientCard } from "./patient-card"
 import { AlertCircle } from "lucide-react"
 
 interface PatientGridProps {
   patients: Patient[]
   onSelectPatient: (patient: Patient, action: string) => void
-  canEdit: boolean
-  canDelete: boolean
   updatePatient: (updatedPatient: Patient) => void
   apiRequest: (url: string, options?: any) => Promise<Response>
 }
 
-export function PatientGrid({
-  patients,
-  onSelectPatient,
-  canEdit,
-  canDelete,
-  updatePatient,
-  apiRequest,
-}: PatientGridProps) {
+export function PatientGrid({ patients, onSelectPatient, updatePatient, apiRequest }: PatientGridProps) {
   if (patients.length === 0) {
     return (
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-12">
@@ -39,8 +30,6 @@ export function PatientGrid({
           key={patient.id}
           patient={patient}
           onSelectPatient={onSelectPatient}
-          canEdit={canEdit}
-          canDelete={canDelete}
           updatePatient={updatePatient}
           apiRequest={apiRequest}
         />

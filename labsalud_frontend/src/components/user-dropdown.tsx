@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react"
 import { User, LogOut, Settings, UserCircle, Shield } from "lucide-react"
 import useAuth from "@/contexts/auth-context"
 import { Link } from "react-router-dom"
+import { PERMISSIONS } from "@/config/permissions"
 
 interface UserDropdownProps {
   isMobile?: boolean
@@ -17,20 +18,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
   const menuRef = useRef<HTMLDivElement>(null)
   const { user, logout, hasPermission } = useAuth()
 
-  // Verificar si el usuario tiene al menos uno de los permisos de gestión
-  // Excluimos el permiso 24 (view_customuser) si es el único que tiene
-  const hasOnlyViewPermission =
-    hasPermission("24") && ![21, 22, 23, 9, 34, 35, 36].some((permId) => hasPermission(permId.toString()))
-
-  const canAccessManagement =
-    !hasOnlyViewPermission &&
-    (hasPermission("21") || // add_customuser
-      hasPermission("22") || // change_customuser
-      hasPermission("23") || // delete_customuser
-      hasPermission("9") || // add_group
-      hasPermission("34") || // assign_role
-      hasPermission("35") || // remove_role
-      hasPermission("36")) // assign_temp_permission
+  const canAccessManagement = hasPermission(PERMISSIONS.MANAGE_USERS.id)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -45,7 +33,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
 
   useEffect(() => {
     onMenuToggle?.(isOpen)
-  }, [isOpen]) // Removemos onMenuToggle de las dependencias
+  }, [isOpen])
 
   const handleToggle = () => {
     setIsOpen(!isOpen)
@@ -90,7 +78,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ isMobile = false, on
         style={
           !isMobile
             ? {
-                right: "-2rem", // Alinear con el borde derecho de la navbar
+                right: "-2rem",
                 marginTop: "0px",
               }
             : {}

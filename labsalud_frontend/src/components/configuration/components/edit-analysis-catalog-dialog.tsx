@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import type { Analysis } from "@/types"
 import { useState, useEffect } from "react"
 import {
   Dialog,
@@ -14,44 +15,50 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import type { AnalysisItem } from "../configuration-page"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 
-interface EditAnalysisDialogProps {
+interface EditAnalysisCatalogDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: (updatedAnalysis: AnalysisItem) => void
-  analysis: AnalysisItem
-  panelId?: number
+  onSuccess: (updatedAnalysis: Analysis) => void
+  analysis: Analysis
 }
 
-export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, onOpenChange, onSuccess, analysis }) => {
+export const EditAnalysisCatalogDialog: React.FC<EditAnalysisCatalogDialogProps> = ({
+  open,
+  onOpenChange,
+  onSuccess,
+  analysis,
+}) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
+  const [code, setCode] = useState("")
   const [name, setName] = useState("")
-  const [measureUnit, setMeasureUnit] = useState("")
-  const [formula, setFormula] = useState("")
+  const [bioUnit, setBioUnit] = useState("")
+  const [isUrgent, setIsUrgent] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (analysis && open) {
+      setCode(analysis.code.toString())
       setName(analysis.name)
-      setMeasureUnit(analysis.measure_unit)
-      setFormula(analysis.formula || "")
+      setBioUnit(analysis.bio_unit)
+      setIsUrgent(analysis.is_urgent)
       setErrors({})
-      setIsLoading(false)
     }
   }, [analysis, open])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!name.trim()) newErrors.name = "El nombre es requerido."
-    if (!measureUnit.trim()) newErrors.measureUnit = "La unidad de medida es requerida."
+    if (!code.trim()) newErrors.code = "El código es requerido."
+    else if (isNaN(Number(code))) newErrors.code = "El código debe ser numérico."
+    if (!bioUnit.trim()) newErrors.bioUnit = "La unidad bioquímica es requerida."
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -62,15 +69,11 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
 
     setIsLoading(true)
     try {
-      const analysisUpdateData: Partial<
-        Omit<AnalysisItem, "id" | "created_at" | "updated_at" | "created_by" | "updated_by" | "panel">
-      > & { panel?: number } = {}
-
+      const analysisUpdateData: Partial<Analysis> = {}
+      if (Number.parseInt(code, 10) !== analysis.code) analysisUpdateData.code = Number.parseInt(code, 10)
       if (name !== analysis.name) analysisUpdateData.name = name
-      if (measureUnit !== analysis.measure_unit) analysisUpdateData.measure_unit = measureUnit
-      if (formula !== (analysis.formula || "")) {
-        analysisUpdateData.formula = formula.trim() || undefined
-      }
+      if (bioUnit !== analysis.bio_unit) analysisUpdateData.bio_unit = bioUnit
+      if (isUrgent !== analysis.is_urgent) analysisUpdateData.is_urgent = isUrgent
 
       if (Object.keys(analysisUpdateData).length === 0) {
         toastActions.info("Sin cambios", { description: "No se realizaron modificaciones." })
@@ -78,18 +81,18 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
         return
       }
 
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.ANALYSIS_DETAIL(analysis.id), {
+      const response = await apiRequest(CATALOG_ENDPOINTS.ANALYSIS_DETAIL(analysis.id), {
         method: "PATCH",
         body: analysisUpdateData,
       })
 
       if (response.ok) {
         const updatedAnalysis = await response.json()
-        toastActions.success("Éxito", { description: "Determinación actualizada correctamente." })
+        toastActions.success("Éxito", { description: "Análisis actualizado correctamente." })
         onSuccess(updatedAnalysis)
         onOpenChange(false)
       } else {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         const backendErrors = errorData.errors || errorData.detail || errorData
         if (typeof backendErrors === "object" && backendErrors !== null) {
           const formattedErrors: Record<string, string> = {}
@@ -102,9 +105,9 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
           }
           setErrors(formattedErrors)
         } else {
-          setErrors({ form: String(backendErrors) || "Error al actualizar la determinación." })
+          setErrors({ form: backendErrors || "Error al actualizar el análisis." })
         }
-        toastActions.error("Error", { description: "No se pudo actualizar la determinación." })
+        toastActions.error("Error", { description: "No se pudo actualizar el análisis." })
       }
     } catch (error) {
       console.error("Error updating analysis:", error)
@@ -121,8 +124,8 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Editar Determinación: {analysis.name}</DialogTitle>
-          <DialogDescription>Modifica los datos de la determinación.</DialogDescription>
+          <DialogTitle>Editar Análisis: {analysis.name}</DialogTitle>
+          <DialogDescription>Modifica los datos del análisis.</DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
           {errors.form && (
@@ -130,37 +133,46 @@ export const EditAnalysisDialog: React.FC<EditAnalysisDialogProps> = ({ open, on
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="edit-analysis-name">Nombre *</Label>
+            <Label htmlFor="edit-code">Código *</Label>
             <Input
-              id="edit-analysis-name"
+              id="edit-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ingrese el código numérico"
+            />
+            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-name">Nombre *</Label>
+            <Input
+              id="edit-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ingrese el nombre de la determinación"
+              placeholder="Ingrese el nombre del análisis"
             />
             {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-analysis-measureUnit">Unidad de Medida *</Label>
+            <Label htmlFor="edit-bioUnit">Unidad Bioquímica *</Label>
             <Input
-              id="edit-analysis-measureUnit"
-              value={measureUnit}
-              onChange={(e) => setMeasureUnit(e.target.value)}
-              placeholder="ej: mg/dL, UI/L, etc."
+              id="edit-bioUnit"
+              value={bioUnit}
+              onChange={(e) => setBioUnit(e.target.value)}
+              placeholder="Ingrese la unidad bioquímica"
             />
-            {errors.measureUnit && <p className="text-sm text-red-500">{errors.measureUnit}</p>}
+            {errors.bioUnit && <p className="text-sm text-red-500">{errors.bioUnit}</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="edit-analysis-formula">Fórmula (Opcional)</Label>
-            <Textarea
-              id="edit-analysis-formula"
-              value={formula}
-              onChange={(e) => setFormula(e.target.value)}
-              placeholder="Ingrese la fórmula de cálculo si aplica"
-              rows={3}
-            />
-            {errors.formula && <p className="text-sm text-red-500">{errors.formula}</p>}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <Label htmlFor="edit-isUrgent" className="font-medium">
+                Análisis Urgente
+              </Label>
+              <p className="text-sm text-gray-500">Marcar si este análisis es de carácter urgente</p>
+            </div>
+            <Switch id="edit-isUrgent" checked={isUrgent} onCheckedChange={setIsUrgent} />
           </div>
         </div>
 

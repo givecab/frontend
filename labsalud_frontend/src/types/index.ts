@@ -19,6 +19,39 @@ export interface UserReference {
 }
 
 // ============================================================================
+// AUDITORÍA COMÚN
+// ============================================================================
+
+export interface AuditUser {
+  id: number
+  username: string
+  photo: string
+}
+
+export interface CreationAudit {
+  version: number
+  action: string
+  user: AuditUser
+  date: string
+}
+
+export interface LastChangeAudit {
+  version: number
+  action: string
+  user: AuditUser
+  date: string
+  changes: string[]
+}
+
+export interface HistoryEntry {
+  version: number
+  action: string // "creacion", "actualizacion", "eliminacion"
+  user: AuditUser
+  date: string // UTC string
+  changes: string[]
+}
+
+// ============================================================================
 // USUARIOS Y AUTENTICACIÓN
 // ============================================================================
 
@@ -26,8 +59,36 @@ export interface Permission {
   id: number
   codename: string
   name: string
-  temporary: boolean
-  expires_at: string | null // UTC string si temporary es true
+  temporary?: boolean
+  expires_at?: string | null
+}
+
+export interface ActiveTempPermission {
+  permission: string
+  name: string
+  expires_at: string
+  reason: string
+}
+
+export interface AuditEntry {
+  version: number
+  action: string
+  user: AuditUser
+  date: string
+  model: {
+    app: string
+    model: string
+    display: string
+  }
+  object: string
+  changes: string[]
+}
+
+export interface Role {
+  id: number
+  name: string
+  permission_details?: Permission[]
+  permissions?: number[]
 }
 
 export interface Group {
@@ -35,65 +96,79 @@ export interface Group {
   name: string
 }
 
-export interface Role extends Group {} // Alias para compatibilidad
-
 export interface User {
   id: number
   username: string
-  email: string
+  email?: string
   first_name: string
   last_name: string
-  photo: string
-  groups: Group[]
+  photo?: string
+  groups?: Group[]
   permissions: Permission[]
-  // Propiedades adicionales para contexto de auth
-  roles?: Role[] // Alias de groups para compatibilidad
+  temporary_permissions?: number
   is_active?: boolean
   is_staff?: boolean
   is_superuser?: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
-export interface AuthTokens {
-  access: string
-  refresh: string
-}
-
-export interface LoginCredentials {
-  username: string
-  password: string
-}
-
-export interface AuthContextType {
-  user: User | null
-  token: string | null
-  login: (username: string, password: string) => Promise<boolean>
-  logout: () => void
-  refreshToken: () => Promise<boolean>
-  isLoading: boolean
-  isInitialized: boolean
-  isAuthenticated: boolean
-  hasPermission: (permission: string | number) => boolean
-  isInGroup: (groupName: string) => boolean
-  refreshUser: () => Promise<void>
+export interface TempPermission {
+  id: number
+  user_details: {
+    id: number
+    username: string
+    email: string
+    photo: string
+  }
+  permission_details: {
+    id: number
+    codename: string
+    name: string
+  }
+  expires_at: string
+  reason: string
+  granted_by_details: {
+    id: number
+    username: string
+    photo: string
+  }
+  granted_at: string
+  is_expired: boolean
+  time_remaining: string
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
 // ============================================================================
 // PACIENTES
 // ============================================================================
 
-export interface Patient extends BaseEntity {
+export interface Patient {
+  id: number
   first_name: string
   last_name: string
   dni: string
+  full_name: string
   birth_date: string
-  gender: "M" | "F"
+  age: number
+  gender: "M" | "F" | "O" | "N"
   phone_mobile: string
-  phone_landline: string
+  alt_phone: string
   email: string
   country: string
   province: string
   city: string
   address: string
+  is_active: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
 export interface PatientFormData {
@@ -103,7 +178,7 @@ export interface PatientFormData {
   birth_date: string
   gender: string
   phone_mobile: string
-  phone_landline: string
+  alt_phone: string
   email: string
   country: string
   province: string
@@ -112,47 +187,176 @@ export interface PatientFormData {
 }
 
 // ============================================================================
-// ANÁLISIS Y CONFIGURACIÓN
+// ENTIDADES MÉDICAS
 // ============================================================================
 
-export interface Medico extends BaseEntity {
+export interface Doctor {
+  id: number
   first_name: string
   last_name: string
   license: string
+  is_active: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
-export interface ObraSocial extends BaseEntity {
+// Alias for backward compatibility
+export type Medico = Doctor
+
+export interface Insurance {
+  id: number
   name: string
+  description: string
+  ub_value: string
+  private_ub_value: number
+  is_active: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
-export interface AnalysisPanel extends BaseEntity {
-  code: string | null
+// Alias for backward compatibility
+export type ObraSocial = Insurance
+
+// ============================================================================
+// CATÁLOGO DE ANÁLISIS
+// ============================================================================
+
+export interface Analysis {
+  id: number
+  code: number
   name: string
   bio_unit: string
   is_urgent: boolean
+  is_active: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
 }
 
-export interface Analysis extends BaseEntity {
+// Legacy alias - panels are now just analysis
+export type AnalysisPanel = Analysis
+
+export interface Determination {
+  id: number
+  code: string
+  analysis: number
+  name: string
+  measure_unit: string
+  formula: string
+  is_active: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+  history?: HistoryEntry[]
+  total_changes?: number
+}
+
+// ============================================================================
+// PROTOCOLOS
+// ============================================================================
+
+export interface SendMethod {
+  id: number
+  name: string
+  description: string
+  is_active: boolean
+}
+
+export interface PaymentStatus {
+  id: number
+  name: string
+}
+
+export interface ProtocolStatus {
+  id: number
+  name: string
+}
+
+export interface ProtocolDetail {
+  id: number
+  analysis: number
+  is_authorized: boolean
   code: number
   name: string
-  panel: number
-  formula: string
-  measure_unit: string
+  ub: string
+  is_urgent: boolean
+  is_active: boolean
 }
 
-// ============================================================================
-// PROTOCOLOS Y ANÁLISIS DE PROTOCOLO
-// ============================================================================
+export interface ProtocolDetailInput {
+  analysis: number
+  is_authorized: boolean
+}
 
-export interface Protocol extends BaseEntity {
+export interface Protocol {
+  id: number
+  patient: {
+    id: number
+    dni: string
+    first_name: string
+    last_name: string
+  }
+  doctor: {
+    id: number
+    first_name: string
+    last_name: string
+    license: string
+  }
+  insurance: {
+    id: number
+    name: string
+  }
+  affiliate_number: string
+  status: ProtocolStatus
+  send_method: {
+    id: number
+    name: string
+  }
+  // New payment fields
+  insurance_total_to_pay: string
+  private_total_to_pay: string
+  estimated_total_to_earn: string
+  total_earned: string
+  value_paid: string
+  payment_status: PaymentStatus
+  patient_to_lab_amount: string
+  lab_to_patient_amount: string
+  insurance_ub_value: string
+  private_ub_value: string
+  is_printed: boolean
+  is_active: boolean
+  details: ProtocolDetail[]
+  history?: HistoryEntry[]
+  total_changes?: number
+}
+
+export interface ProtocolListItem {
+  id: number
+  patient: {
+    id: number
+    first_name: string
+    last_name: string
+  }
+  status: ProtocolStatus
+  balance: string
+  payment_status: PaymentStatus
+  is_printed: boolean
+  creation?: CreationAudit
+  last_change?: LastChangeAudit
+}
+
+export interface CreateProtocolInput {
   patient: number
-  ooss: number
-  medico: number
-  contact_method?: "email" | "whatsapp" | "call"
-  state?: "pending_entry" | "pending_validation" | "completed" | "cancelled"
-  paid?: boolean
-  is_active?: boolean
-  protocol_analyses?: ProtocolAnalysis[]
+  doctor: number
+  insurance: number
+  affiliate_number?: string
+  send_method: number
+  value_paid: string
+  details: ProtocolDetailInput[]
 }
 
 export interface ProtocolSummary {
@@ -167,18 +371,91 @@ export interface ProtocolSummary {
   total_analyses_count: number
 }
 
-export interface ProtocolAnalysis extends BaseEntity {
-  protocol: number
-  analysis: number
-  is_active?: boolean
+// ============================================================================
+// RESULTADOS
+// ============================================================================
+
+export interface ResultDetermination {
+  id: number
+  name: string
+  measure_unit: string
+  formula: string
 }
 
-export interface ProtocolResult extends BaseEntity {
-  protocol_analysis: number
+export interface ResultAnalysis {
+  id: number
+  name: string
+  code: number
+  is_urgent: boolean
+  ub: string
+}
+
+export interface Result {
+  id: number
+  determination: ResultDetermination
   value: string
-  reference_value?: string
-  is_normal?: boolean
-  observations?: string
+  is_valid: boolean
+  notes: string
+  is_wrong: boolean
+  is_active: boolean
+  analysis: ResultAnalysis
+  validated_by?: {
+    id: number
+    username: string
+    first_name: string
+    last_name: string
+  } | null
+}
+
+// Response from GET /results/results/by-analysis/{id}/
+export interface ResultsByAnalysisItem {
+  id: number // protocol id
+  patient: {
+    id: number
+    first_name: string
+    last_name: string
+  }
+  status: {
+    id: number
+    name: string
+  }
+  results: Result[]
+}
+
+// Response from GET /results/results/available-analysis/
+export interface AvailableAnalysis {
+  id: number
+  code: number
+  name: string
+  bio_unit: string
+  is_urgent: boolean
+  is_active: boolean
+}
+
+export interface PreviousResult {
+  result_id: number
+  protocol_id: number
+  value: string
+  created_at: string
+  created_by: {
+    username: string
+    photo: string | null
+  }
+  date?: string
+}
+
+export interface ProtocolWithLoadedResults {
+  id: number
+  patient: {
+    id: number
+    dni: string
+    first_name: string
+    last_name: string
+  }
+  status: {
+    id: number
+    name: string
+  }
 }
 
 // ============================================================================
@@ -186,9 +463,7 @@ export interface ProtocolResult extends BaseEntity {
 // ============================================================================
 
 export interface PaginatedResponse<T> {
-  count: number
   next: string | null
-  previous: string | null
   results: T[]
 }
 
@@ -207,13 +482,13 @@ export interface FormErrors {
 // FORMULARIOS Y VALIDACIONES
 // ============================================================================
 
-export interface ValidationResult {
+export interface ValidationResultType {
   isValid: boolean
   message: string
 }
 
 export type ValidationState<T> = {
-  [K in keyof T]: ValidationResult
+  [K in keyof T]: ValidationResultType
 }
 
 // ============================================================================
@@ -242,11 +517,9 @@ export interface AppConfig {
 }
 
 // ============================================================================
-// TIPOS LEGACY PARA COMPATIBILIDAD
+// ANÁLISIS SELECCIONADO CON AUTORIZACIÓN (para UI del ingreso)
 // ============================================================================
 
-// Panel es alias de AnalysisPanel para compatibilidad
-export type Panel = AnalysisPanel
-
-// AnalysisItem es alias de Analysis para compatibilidad
-export type AnalysisItem = Analysis
+export interface SelectedAnalysis extends Analysis {
+  is_authorized: boolean
+}

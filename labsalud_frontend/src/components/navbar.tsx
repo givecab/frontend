@@ -6,6 +6,7 @@ import { Link, useLocation } from "react-router-dom"
 import { Menu, X } from "lucide-react"
 import useAuth from "@/contexts/auth-context"
 import { UserDropdown } from "./user-dropdown"
+import { PERMISSIONS } from "@/config/permissions"
 
 interface NavLinkProps {
   to: string
@@ -37,28 +38,10 @@ const NavLink: React.FC<NavLinkProps> = ({ to, children, isActive, onClick }) =>
 }
 
 export const Navbar: React.FC = () => {
-  const { user, isInGroup, hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
   const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-
-  if (!user) return null
-
-  // Definir las rutas de navegación
-  const leftNavItems = [
-    { path: "/ingreso", label: "Ingreso" },
-    { path: "/protocolos", label: "Protocolos" },
-    { path: "/pacientes", label: "Pacientes" },
-  ]
-
-  const rightNavItems = [
-    { path: "/resultados", label: "Resultados", condition: true }, // Todos pueden ver
-    {
-      path: "/validacion",
-      label: "Validación",
-      condition: isInGroup("Bioquimica") || hasPermission("validation_access"),
-    },
-  ]
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -74,6 +57,23 @@ export const Navbar: React.FC = () => {
       setIsMobileMenuOpen(false)
     }
   }, [])
+
+  if (!user) return null
+
+  const leftNavItems = [
+    { path: "/ingreso", label: "Ingreso" },
+    { path: "/protocolos", label: "Protocolos" },
+    { path: "/pacientes", label: "Pacientes" },
+  ]
+
+  const rightNavItems = [
+    { path: "/resultados", label: "Resultados", condition: true }, // Todos pueden ver
+    {
+      path: "/validacion",
+      label: "Validación",
+      condition: hasPermission(PERMISSIONS.VALIDATE_RESULTS.id),
+    },
+  ]
 
   return (
     <>
@@ -127,7 +127,7 @@ export const Navbar: React.FC = () => {
 
                 {/* User Dropdown - Pegado a la derecha */}
                 <div className="flex-shrink-0 relative">
-                  <UserDropdown onMenuToggle={handleUserMenuToggle}/>
+                  <UserDropdown onMenuToggle={handleUserMenuToggle} />
                 </div>
               </div>
             </div>

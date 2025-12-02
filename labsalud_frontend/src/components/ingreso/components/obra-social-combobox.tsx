@@ -8,20 +8,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover"
 import { cn } from "../../../lib/utils"
 import { useApi } from "../../../hooks/use-api"
 import { useDebounce } from "../../../hooks/use-debounce"
-import type { ObraSocial } from "../../../types"
-import { ANALYSIS_ENDPOINTS } from "../../../config/api"
+import type { Insurance } from "../../../types"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface ObraSocialComboboxProps {
-  obrasSociales: ObraSocial[]
-  selectedObraSocial: ObraSocial | null
-  onObraSocialSelect: (obraSocial: ObraSocial | null) => void
+  obrasSociales: Insurance[]
+  selectedObraSocial: Insurance | null
+  onObraSocialSelect: (obraSocial: Insurance | null) => void
   onShowCreateObraSocial: () => void
 }
 
 interface PaginatedResponse<T> {
-  count: number
   next: string | null
-  previous: string | null
   results: T[]
 }
 
@@ -34,10 +32,10 @@ export function ObraSocialCombobox({
   const { apiRequest } = useApi()
   const [open, setOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [allObrasSociales, setAllObrasSociales] = useState<ObraSocial[]>(initialObrasSociales)
+  const [allObrasSociales, setAllObrasSociales] = useState<Insurance[]>(initialObrasSociales)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [offset, setOffset] = useState(20) // Start from 20 since we already have the first 20
+  const [offset, setOffset] = useState(20)
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
@@ -59,11 +57,11 @@ export function ObraSocialCombobox({
     try {
       setIsLoading(true)
       const response = await apiRequest(
-        `${ANALYSIS_ENDPOINTS.OOSS}?search=${encodeURIComponent(term)}&limit=50&offset=0&is_active=true`,
+        `${MEDICAL_ENDPOINTS.INSURANCES}?search=${encodeURIComponent(term)}&limit=50&offset=0&is_active=true`,
       )
 
       if (response.ok) {
-        const data: PaginatedResponse<ObraSocial> = await response.json()
+        const data: PaginatedResponse<Insurance> = await response.json()
         setAllObrasSociales(data.results)
         setHasMore(!!data.next)
         setOffset(data.results.length)
@@ -80,10 +78,10 @@ export function ObraSocialCombobox({
 
     try {
       setIsLoading(true)
-      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.OOSS}?limit=20&offset=${offset}&is_active=true`)
+      const response = await apiRequest(`${MEDICAL_ENDPOINTS.INSURANCES}?limit=20&offset=${offset}&is_active=true`)
 
       if (response.ok) {
-        const data: PaginatedResponse<ObraSocial> = await response.json()
+        const data: PaginatedResponse<Insurance> = await response.json()
         setAllObrasSociales((prev) => [...prev, ...data.results])
         setHasMore(!!data.next)
         setOffset((prev) => prev + data.results.length)
@@ -108,6 +106,7 @@ export function ObraSocialCombobox({
             <div className="flex items-center gap-2">
               <Building className="h-4 w-4 text-[#204983]" />
               <span>{selectedObraSocial.name}</span>
+              <span className="text-xs text-gray-500 ml-1">(UB: ${selectedObraSocial.ub_value})</span>
             </div>
           ) : (
             <span className="text-gray-500">Seleccionar obra social...</span>
@@ -147,9 +146,14 @@ export function ObraSocialCombobox({
                       selectedObraSocial?.id === obraSocial.id ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-grow">
                     <Building className="h-4 w-4 text-[#204983]" />
-                    <span>{obraSocial.name}</span>
+                    <div className="flex flex-col">
+                      <span>{obraSocial.name}</span>
+                      <span className="text-xs text-gray-500">
+                        UB O.S.: ${obraSocial.ub_value} | UB Part.: ${obraSocial.private_ub_value}
+                      </span>
+                    </div>
                   </div>
                 </CommandItem>
               ))}

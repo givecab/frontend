@@ -1,7 +1,21 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Search, Plus, Filter, Calendar, User, FileText, Loader2, AlertCircle, X } from "lucide-react"
+import {
+  Search,
+  Plus,
+  Filter,
+  Calendar,
+  User,
+  FileText,
+  Loader2,
+  AlertCircle,
+  X,
+  CheckCircle,
+  Clock,
+  Ban,
+  AlertTriangle,
+} from "lucide-react"
 import { Input } from "../ui/input"
 import { Button } from "../ui/button"
 import { Card, CardContent } from "../ui/card"
@@ -11,48 +25,36 @@ import { useApi } from "../../hooks/use-api"
 import { useInfiniteScroll } from "../../hooks/use-infinite-scroll"
 import { useDebounce } from "../../hooks/use-debounce"
 import { useNavigate } from "react-router-dom"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
-
-interface HistoryEntry {
-  version: number
-  user: {
-    id: number
-    username: string
-    photo: string
-  } | null
-  created_at: string
-}
-
-interface Patient {
-  id: number
-  first_name: string
-  last_name: string
-}
-
-interface Protocol {
-  id: number
-  patient: Patient
-  state: string
-  paid: boolean
-  created_at: string
-  created_by: {
-    id: number
-    username: string
-    photo: string
-  }
-  history: HistoryEntry[]
-}
+import { PROTOCOL_ENDPOINTS, ANALYTICS_ENDPOINTS } from "@/config/api"
+import type { ProtocolListItem, SendMethod } from "@/types"
 
 interface PaginatedResponse {
   count: number
   next: string | null
   previous: string | null
-  results: Protocol[]
+  results: ProtocolListItem[]
 }
 
-interface StateStats {
-  [key: string]: number
+interface ProtocolsByStatusResponse {
+  total_protocols: number
+  states: Array<{
+    status_id: number
+    status_name: string
+    count: number
+  }>
 }
+
+const STATUS_ID_MAP: Record<number, string> = {
+  1: "pendingEntry",
+  2: "pendingValidation",
+  3: "incompletePayment",
+  4: "cancelled",
+  5: "completed",
+  6: "pendingRetiro",
+  7: "sendFailed",
+}
+
+const STATUS_FILTER_KEY = "labsalud_protocol_status_filters"
 
 export default function ProtocolosPage() {
   const { apiRequest } = useApi()
@@ -60,14 +62,23 @@ export default function ProtocolosPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Estados principales
-  const [allProtocols, setAllProtocols] = useState<Protocol[]>([])
+  const [allProtocols, setAllProtocols] = useState<ProtocolListItem[]>([])
+  const [sendMethods, setSendMethods] = useState<SendMethod[]>([])
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [stateFilter, setStateFilter] = useState<string>("all")
-  const [paidFilter, setPaidFilter] = useState<string>("all")
+  const [selectedStatuses, setSelectedStatuses] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem(STATUS_FILTER_KEY)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all")
+  const [isPrintedFilter, setIsPrintedFilter] = useState<string>("all")
   const [hasMore, setHasMore] = useState(true)
   const [nextUrl, setNextUrl] = useState<string | null>(null)
   const [totalCount, setTotalCount] = useState(0)
@@ -75,42 +86,67 @@ export default function ProtocolosPage() {
   // Estados para estadísticas
   const [stats, setStats] = useState({
     total: 0,
-    pending: 0,
+    pendingEntry: 0,
+    pendingRetiro: 0,
+    incompletePayment: 0,
+    pendingValidation: 0,
     completed: 0,
-    validated: 0,
-    finalized: 0,
     cancelled: 0,
+    sendFailed: 0, // Added new status for failed send
   })
 
   // Debounce para la búsqueda
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Función para cargar estadísticas por estado
   const fetchStateStats = useCallback(async () => {
     try {
-      const response = await apiRequest(`${ANALYSIS_ENDPOINTS.PROTOCOLS}?stats=true`)
+      const response = await apiRequest(ANALYTICS_ENDPOINTS.PROTOCOLS_BY_STATUS)
 
       if (response.ok) {
-        const stateStats: StateStats = await response.json()
+        const data: ProtocolsByStatusResponse = await response.json()
 
-        setStats({
-          total: totalCount,
-          pending: stateStats.pending_entry || 0,
-          completed: stateStats.entry_complete || 0,
-          validated: stateStats.pending_validation || 0,
-          finalized: stateStats.completed || 0,
-          cancelled: stateStats.cancelled || 0,
+        // Inicializar stats con todos en 0
+        const newStats = {
+          total: data.total_protocols,
+          pendingEntry: 0,
+          pendingRetiro: 0,
+          incompletePayment: 0,
+          pendingValidation: 0,
+          completed: 0,
+          cancelled: 0,
+          sendFailed: 0, // Added new status for failed send
+        }
+
+        // Solo asignar los que vienen en la respuesta (los que tienen 1 o más)
+        data.states.forEach((state) => {
+          const key = STATUS_ID_MAP[state.status_id]
+          if (key && key in newStats) {
+            ;(newStats as Record<string, number>)[key] = state.count
+          }
         })
+
+        setStats(newStats)
       }
     } catch (error) {
       console.error("Error fetching state stats:", error)
     }
-  }, [apiRequest, totalCount])
+  }, [apiRequest])
 
-  // Función para construir URL con parámetros
+  const fetchSendMethods = useCallback(async () => {
+    try {
+      const response = await apiRequest(PROTOCOL_ENDPOINTS.SEND_METHODS)
+      if (response.ok) {
+        const data = await response.json()
+        setSendMethods(data.results || data)
+      }
+    } catch (error) {
+      console.error("Error fetching send methods:", error)
+    }
+  }, [apiRequest])
+
   const buildUrl = useCallback(
     (search = "", offset = 0) => {
-      const baseEndpoint = ANALYSIS_ENDPOINTS.PROTOCOLS
+      const baseEndpoint = PROTOCOL_ENDPOINTS.PROTOCOLS
 
       const params = new URLSearchParams({
         limit: "20",
@@ -121,23 +157,26 @@ export default function ProtocolosPage() {
         params.append("search", search.trim())
       }
 
-      if (stateFilter !== "all") {
-        params.append("state", stateFilter)
+      if (selectedStatuses.length > 0) {
+        params.append("status__in", selectedStatuses.join(","))
       }
 
-      if (paidFilter !== "all") {
-        params.append("paid", paidFilter === "paid" ? "true" : "false")
+      if (paymentStatusFilter !== "all") {
+        params.append("payment_status", paymentStatusFilter)
+      }
+
+      if (isPrintedFilter !== "all") {
+        params.append("is_printed", isPrintedFilter)
       }
 
       return `${baseEndpoint}?${params.toString()}`
     },
-    [stateFilter, paidFilter],
+    [selectedStatuses, paymentStatusFilter, isPrintedFilter],
   )
 
   // Función para cargar protocolos desde la API
   const fetchProtocolsFromAPI = useCallback(
     async (search = "", reset = true, showSearching = false) => {
-      // Evitar múltiples llamadas simultáneas
       if (reset && !showSearching && isInitialLoading) return
       if (!reset && isLoadingMore) return
       if (reset && showSearching && isSearching) return
@@ -202,30 +241,26 @@ export default function ProtocolosPage() {
   // Efecto para carga inicial
   useEffect(() => {
     fetchProtocolsFromAPI()
+    fetchSendMethods()
+    fetchStateStats()
   }, [])
 
-  // Efecto para recargar protocolos cuando cambian los filtros
   useEffect(() => {
-    // Resetear estados antes de cargar
     setAllProtocols([])
     setNextUrl(null)
     setHasMore(true)
     fetchProtocolsFromAPI()
-  }, [stateFilter, paidFilter])
+  }, [selectedStatuses, paymentStatusFilter, isPrintedFilter])
 
-  // Efecto para búsqueda - optimizado para no perder el foco
   useEffect(() => {
-    if (debouncedSearchTerm !== searchTerm) return // Solo ejecutar cuando el debounce esté listo
+    if (debouncedSearchTerm !== searchTerm) return
 
     fetchProtocolsFromAPI(debouncedSearchTerm, true, true)
   }, [debouncedSearchTerm])
 
-  // Efecto para cargar estadísticas al inicio y después de cada búsqueda
   useEffect(() => {
-    if (totalCount > 0) {
-      fetchStateStats()
-    }
-  }, [totalCount, fetchStateStats])
+    localStorage.setItem(STATUS_FILTER_KEY, JSON.stringify(selectedStatuses))
+  }, [selectedStatuses])
 
   const clearSearch = () => {
     setSearchTerm("")
@@ -238,7 +273,20 @@ export default function ProtocolosPage() {
     navigate("/ingreso")
   }
 
-  // Estados de carga y error
+  const refreshProtocols = useCallback(() => {
+    setAllProtocols([])
+    setNextUrl(null)
+    setHasMore(true)
+    fetchProtocolsFromAPI(debouncedSearchTerm, true, true)
+    fetchStateStats()
+  }, [fetchProtocolsFromAPI, debouncedSearchTerm, fetchStateStats])
+
+  const toggleStatus = (statusId: number) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(statusId) ? prev.filter((id) => id !== statusId) : [...prev, statusId],
+    )
+  }
+
   if (isInitialLoading) {
     return (
       <div className="w-full max-w-7xl mx-auto py-4 px-4">
@@ -292,7 +340,7 @@ export default function ProtocolosPage() {
 
       {/* Stats Cards */}
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6 mb-4 md:mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-3 sm:gap-4">
           <Card>
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
@@ -305,62 +353,86 @@ export default function ProtocolosPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-yellow-50">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Pendientes</p>
-                  <p className="text-lg sm:text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                  <p className="text-xs sm:text-sm font-medium text-yellow-700">Pend. Carga</p>
+                  <p className="text-lg sm:text-2xl font-bold text-yellow-600">{stats.pendingEntry}</p>
                 </div>
-                <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" />
+                <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-purple-50">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Completos</p>
-                  <p className="text-lg sm:text-2xl font-bold text-blue-600">{stats.completed}</p>
+                  <p className="text-xs sm:text-sm font-medium text-purple-700">Pend. Retiro</p>
+                  <p className="text-lg sm:text-2xl font-bold text-purple-600">{stats.pendingRetiro}</p>
                 </div>
-                <User className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
+                <User className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-orange-50">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Validación</p>
-                  <p className="text-lg sm:text-2xl font-bold text-orange-600">{stats.validated}</p>
+                  <p className="text-xs sm:text-sm font-medium text-orange-700">Pago Incompleto</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-600">{stats.incompletePayment}</p>
                 </div>
-                <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" />
+                <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-blue-50">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Finalizados</p>
-                  <p className="text-lg sm:text-2xl font-bold text-green-600">{stats.finalized}</p>
+                  <p className="text-xs sm:text-sm font-medium text-blue-700">Pend. Validación</p>
+                  <p className="text-lg sm:text-2xl font-bold text-blue-600">{stats.pendingValidation}</p>
                 </div>
-                <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" />
+                <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-green-50">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Cancelados</p>
+                  <p className="text-xs sm:text-sm font-medium text-green-700">Completados</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-600">{stats.completed}</p>
+                </div>
+                <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-red-50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-red-700">Cancelados</p>
                   <p className="text-lg sm:text-2xl font-bold text-red-600">{stats.cancelled}</p>
                 </div>
-                <X className="h-6 w-6 sm:h-8 sm:w-8 text-red-400" />
+                <Ban className="h-6 w-6 sm:h-8 sm:w-8 text-red-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-red-50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-red-700">Envío Fallido</p>
+                  <p className="text-lg sm:text-2xl font-bold text-red-600">{stats.sendFailed}</p>
+                </div>
+                <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-400" />
               </div>
             </CardContent>
           </Card>
@@ -395,37 +467,109 @@ export default function ProtocolosPage() {
             )}
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <Select value={stateFilter} onValueChange={setStateFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="pending_entry">Carga Pendiente</SelectItem>
-                <SelectItem value="entry_complete">Carga Completa</SelectItem>
-                <SelectItem value="pending_validation">Validación Pendiente</SelectItem>
-                <SelectItem value="completed">Finalizado</SelectItem>
-                <SelectItem value="cancelled">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-700">Filtrar por estado:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedStatuses.includes(1) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(1)}
+                className={selectedStatuses.includes(1) ? "bg-yellow-500 hover:bg-yellow-600" : ""}
+              >
+                <Clock className="h-3 w-3 mr-1" />
+                Pend. Carga
+              </Button>
+              <Button
+                variant={selectedStatuses.includes(2) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(2)}
+                className={selectedStatuses.includes(2) ? "bg-blue-500 hover:bg-blue-600" : ""}
+              >
+                <Filter className="h-3 w-3 mr-1" />
+                Pend. Validación
+              </Button>
+              <Button
+                variant={selectedStatuses.includes(3) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(3)}
+                className={selectedStatuses.includes(3) ? "bg-orange-500 hover:bg-orange-600" : ""}
+              >
+                <Calendar className="h-3 w-3 mr-1" />
+                Pago Incompleto
+              </Button>
+              <Button
+                variant={selectedStatuses.includes(6) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(6)}
+                className={selectedStatuses.includes(6) ? "bg-purple-500 hover:bg-purple-600" : ""}
+              >
+                <User className="h-3 w-3 mr-1" />
+                Pend. Retiro
+              </Button>
+              <Button
+                variant={selectedStatuses.includes(5) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(5)}
+                className={selectedStatuses.includes(5) ? "bg-green-500 hover:bg-green-600" : ""}
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Completado
+              </Button>
+              <Button
+                variant={selectedStatuses.includes(4) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(4)}
+                className={selectedStatuses.includes(4) ? "bg-red-500 hover:bg-red-600" : ""}
+              >
+                <Ban className="h-3 w-3 mr-1" />
+                Cancelado
+              </Button>
+              <Button
+                variant={selectedStatuses.includes(7) ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus(7)}
+                className={selectedStatuses.includes(7) ? "bg-rose-600 hover:bg-rose-700" : ""}
+              >
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Envío Fallido
+              </Button>
+              {selectedStatuses.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedStatuses([])} className="text-gray-500">
+                  <X className="h-3 w-3 mr-1" />
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          </div>
 
-            <Select value={paidFilter} onValueChange={setPaidFilter}>
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <SelectValue placeholder="Pago" />
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap">
+            <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Estado de Pago" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="paid">Pagado</SelectItem>
-                <SelectItem value="unpaid">No Pagado</SelectItem>
+                <SelectItem value="1">Saldo en cero</SelectItem>
+                <SelectItem value="2">Paciente debe</SelectItem>
+                <SelectItem value="3">Laboratorio debe</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={isPrintedFilter} onValueChange={setIsPrintedFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Impresión" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="true">Impreso / Enviado</SelectItem>
+                <SelectItem value="false">No Impreso / No Enviado</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex items-center justify-between">
             <p className="text-xs md:text-sm text-gray-500">Búsqueda por ID, nombre de paciente o estado</p>
-            {searchTerm && (
+            {(searchTerm || selectedStatuses.length > 0) && (
               <p className="text-xs text-[#204983] font-medium">
                 {allProtocols.length} resultado{allProtocols.length !== 1 ? "s" : ""}
               </p>
@@ -441,7 +585,7 @@ export default function ProtocolosPage() {
             <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No se encontraron protocolos</h3>
             <p className="text-sm sm:text-base text-gray-600 mb-6">
-              {searchTerm || stateFilter !== "all" || paidFilter !== "all"
+              {searchTerm || selectedStatuses.length > 0 || paymentStatusFilter !== "all" || isPrintedFilter !== "all"
                 ? "Intenta ajustar los filtros de búsqueda"
                 : "Aún no hay protocolos registrados en el sistema"}
             </p>
@@ -452,7 +596,6 @@ export default function ProtocolosPage() {
           </div>
         ) : (
           <>
-            {/* Indicador de búsqueda */}
             {isSearching && (
               <div className="flex justify-center py-4">
                 <div className="flex items-center">
@@ -467,7 +610,8 @@ export default function ProtocolosPage() {
                 <ProtocolCard
                   key={protocol.id}
                   protocol={protocol}
-                  onUpdate={() => fetchProtocolsFromAPI(debouncedSearchTerm, true, true)}
+                  onUpdate={refreshProtocols}
+                  sendMethods={sendMethods}
                 />
               ))}
             </div>

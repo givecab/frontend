@@ -11,7 +11,7 @@ import { Label } from "../../ui/label"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
 import type { Medico } from "../../../types"
-import { ANALYSIS_ENDPOINTS } from "../../../config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 
 interface CreateMedicoFormProps {
   onMedicoCreated: (medico: Medico) => void
@@ -47,7 +47,7 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
       setIsCreating(true)
       console.log("Creating medico with data:", formData)
 
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.MEDICOS, {
+      const response = await apiRequest(MEDICAL_ENDPOINTS.DOCTORS, {
         method: "POST",
         body: formData,
       })

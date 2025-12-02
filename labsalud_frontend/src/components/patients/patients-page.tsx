@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -12,51 +11,21 @@ import { PatientGrid } from "./components/patient-grid"
 import { CreatePatientDialog } from "./components/create-patient-dialog"
 import DeletePatientDialog from "./components/delete-patient-dialog"
 import { PATIENT_ENDPOINTS } from "@/config/api"
-
-// Interface para usuario como viene del endpoint
-export interface User {
-  id: number
-  username: string
-  photo?: string
-}
-
-// Interface para paciente como viene del endpoint
-export interface Patient {
-  id: number
-  dni: string
-  first_name: string
-  last_name: string
-  birth_date: string
-  gender: string
-  phone_mobile: string
-  phone_landline: string
-  email: string
-  country: string
-  province: string
-  city: string
-  address: string
-  created_at: string
-  updated_at: string
-  created_by: User
-  updated_by: User[]
-}
+import type { Patient } from "@/types"
 
 // Interface para la respuesta paginada de la API
 interface PaginatedResponse {
-  count: number
   next: string | null
-  previous: string | null
   results: Patient[]
 }
 
 export default function PatientsPage() {
-  const { hasPermission } = useAuth()
   const { apiRequest } = useApi()
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Estados principales
-  const [allPatients, setAllPatients] = useState<Patient[]>([]) // Todos los pacientes cargados
-  const [displayedPatients, setDisplayedPatients] = useState<Patient[]>([]) // Pacientes mostrados (filtrados)
+  const [allPatients, setAllPatients] = useState<Patient[]>([])
+  const [displayedPatients, setDisplayedPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -74,16 +43,9 @@ export default function PatientsPage() {
   // Debounce para la búsqueda
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  // Permisos
-  const canViewPatients = hasPermission("40") // view_patient
-  const canCreatePatient = hasPermission("37") // add_patient
-  const canEditPatient = hasPermission("38") // change_patient
-  const canDeletePatient = hasPermission("39") // delete_patient
-  const canAccessPatients = canViewPatients
-
   // Función para construir URL con parámetros
   const buildUrl = useCallback((search = "", offset = 0) => {
-    const baseUrl = PATIENT_ENDPOINTS.ACTIVE_PATIENTS
+    const baseUrl = PATIENT_ENDPOINTS.PATIENTS
 
     const params = new URLSearchParams({
       limit: "20",
@@ -124,7 +86,7 @@ export default function PatientsPage() {
         }
 
         // Búsqueda por teléfonos
-        if (patient.phone_mobile.includes(searchTerm) || patient.phone_landline.includes(searchTerm)) {
+        if (patient.phone_mobile.includes(searchTerm) || patient.alt_phone.includes(searchTerm)) {
           return true
         }
 
@@ -149,8 +111,6 @@ export default function PatientsPage() {
   // Función para cargar pacientes desde la API
   const fetchPatientsFromAPI = useCallback(
     async (search = "", reset = true) => {
-      if (!canAccessPatients) return
-
       if (reset) {
         setIsInitialLoading(true)
         setError(null)
@@ -169,7 +129,7 @@ export default function PatientsPage() {
 
           if (reset) {
             setAllPatients(data.results)
-            setTotalCount(data.count)
+            setTotalCount(data.results.length)
           } else {
             setAllPatients((prev) => [...prev, ...data.results])
           }
@@ -187,7 +147,7 @@ export default function PatientsPage() {
         setIsLoadingMore(false)
       }
     },
-    [apiRequest, canAccessPatients, buildUrl, nextUrl],
+    [apiRequest, buildUrl, nextUrl],
   )
 
   // Cargar más pacientes (scroll infinito)
@@ -255,7 +215,6 @@ export default function PatientsPage() {
     handleSearch()
   }, [debouncedSearchTerm, allPatients, filterPatientsLocally, hasMore, apiRequest, buildUrl])
 
-  // Funciones para manejar pacientes
   const updatePatient = useCallback((updatedPatientData: Patient) => {
     setAllPatients((prev) => prev.map((p) => (p.id === updatedPatientData.id ? updatedPatientData : p)))
   }, [])
@@ -320,22 +279,6 @@ export default function PatientsPage() {
     )
   }
 
-  if (!canAccessPatients) {
-    return (
-      <div className="w-full max-w-7xl mx-auto py-4 px-4">
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-4">Gestión de Pacientes</h1>
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <p>No tienes permisos para acceder a esta sección.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="w-full max-w-full mx-auto py-4 px-4">
       {/* Header Container */}
@@ -348,12 +291,10 @@ export default function PatientsPage() {
               {searchTerm && ` • ${displayedPatients.length} resultados`}
             </p>
           </div>
-          {canCreatePatient && (
-            <Button className="bg-[#204983] w-full sm:w-auto" onClick={() => setIsCreating(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Paciente
-            </Button>
-          )}
+          <Button className="bg-[#204983] w-full sm:w-auto" onClick={() => setIsCreating(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Paciente
+          </Button>
         </div>
       </div>
 
@@ -397,8 +338,6 @@ export default function PatientsPage() {
         <PatientGrid
           patients={displayedPatients}
           onSelectPatient={handleSelectPatient}
-          canEdit={canEditPatient}
-          canDelete={canDeletePatient}
           updatePatient={updatePatient}
           apiRequest={apiRequest}
         />

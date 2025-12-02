@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useApi } from "@/hooks/use-api"
-import { USER_ENDPOINTS } from "@/config/api"
+import { AC_ENDPOINTS } from "@/config/api"
 import type { Permission } from "@/types"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
@@ -30,7 +30,7 @@ export function PermissionManagement({ permission }: PermissionManagementProps) 
     setLoading(true)
     try {
       const res = await apiRequest(
-        `${USER_ENDPOINTS.PERMISSIONS}?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`,
+        `${AC_ENDPOINTS.PERMISSIONS}?limit=20&offset=${reset ? 0 : offset}&search=${encodeURIComponent(search)}`,
       )
       if (res.ok) {
         const data = await res.json()

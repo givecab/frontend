@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import type { Analysis } from "@/types"
 import { useState, useEffect } from "react"
 import {
   Dialog,
@@ -19,16 +19,19 @@ import { Switch } from "@/components/ui/switch"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import type { AnalysisPanel } from "../configuration-page"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { CATALOG_ENDPOINTS } from "@/config/api"
 
-interface CreatePanelDialogProps {
+interface CreateAnalysisCatalogDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: (newPanel: AnalysisPanel) => void
+  onSuccess: (newAnalysis: Analysis) => void
 }
 
-export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOpenChange, onSuccess }) => {
+export const CreateAnalysisCatalogDialog: React.FC<CreateAnalysisCatalogDialogProps> = ({
+  open,
+  onOpenChange,
+  onSuccess,
+}) => {
   const { apiRequest } = useApi()
   const toastActions = useToast()
   const [code, setCode] = useState("")
@@ -65,22 +68,21 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
 
     setIsLoading(true)
     try {
-      const panelData = {
+      const analysisData = {
         code: Number.parseInt(code, 10),
         name,
         bio_unit: bioUnit,
         is_urgent: isUrgent,
-        is_active: true, // Siempre activo al crear
       }
-      const response = await apiRequest(ANALYSIS_ENDPOINTS.PANELS, {
+      const response = await apiRequest(CATALOG_ENDPOINTS.ANALYSIS, {
         method: "POST",
-        body: panelData,
+        body: analysisData,
       })
 
       if (response.ok) {
-        const newPanel = await response.json()
-        toastActions.success("Éxito", { description: "Panel creado correctamente." })
-        onSuccess(newPanel)
+        const newAnalysis = await response.json()
+        toastActions.success("Éxito", { description: "Análisis creado correctamente." })
+        onSuccess(newAnalysis)
         onOpenChange(false)
       } else {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
@@ -96,12 +98,12 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
           }
           setErrors(formattedErrors)
         } else {
-          setErrors({ form: backendErrors || "Error al crear el panel." })
+          setErrors({ form: backendErrors || "Error al crear el análisis." })
         }
-        toastActions.error("Error", { description: "No se pudo crear el panel." })
+        toastActions.error("Error", { description: "No se pudo crear el análisis." })
       }
     } catch (error) {
-      console.error("Error creating panel:", error)
+      console.error("Error creating analysis:", error)
       setErrors({ form: "Ocurrió un error de red o servidor." })
       toastActions.error("Error", { description: "Ocurrió un error inesperado." })
     } finally {
@@ -113,8 +115,8 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Crear Nuevo Panel de Análisis</DialogTitle>
-          <DialogDescription>Completa los datos para el nuevo panel.</DialogDescription>
+          <DialogTitle>Crear Nuevo Análisis</DialogTitle>
+          <DialogDescription>Completa los datos para el nuevo análisis.</DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
           {errors.form && (
@@ -138,7 +140,7 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ingrese el nombre del panel"
+              placeholder="Ingrese el nombre del análisis"
             />
             {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
           </div>
@@ -157,9 +159,9 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div>
               <Label htmlFor="isUrgent" className="font-medium">
-                Panel Urgente
+                Análisis Urgente
               </Label>
-              <p className="text-sm text-gray-500">Marcar si este panel es de carácter urgente</p>
+              <p className="text-sm text-gray-500">Marcar si este análisis es de carácter urgente</p>
             </div>
             <Switch id="isUrgent" checked={isUrgent} onCheckedChange={setIsUrgent} />
           </div>
@@ -178,7 +180,7 @@ export const CreatePanelDialog: React.FC<CreatePanelDialogProps> = ({ open, onOp
             style={{ backgroundColor: "#204983", color: "white" }}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Crear Panel
+            Crear Análisis
           </Button>
         </DialogFooter>
       </DialogContent>

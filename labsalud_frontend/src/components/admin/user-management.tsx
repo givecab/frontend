@@ -14,6 +14,8 @@ import { RoleRemoveDialog } from "./components/role-remove-dialog"
 import { DeleteUserDialog } from "./components/delete-user-dialog"
 import { Button } from "@/components/ui/button"
 import { Plus, AlertCircle } from "lucide-react"
+import { PERMISSIONS } from "@/config/permissions"
+import { ViewUserDialog } from "./components/view-user-dialog"
 
 interface UserManagementProps {
   users: User[]
@@ -27,21 +29,23 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
   const { hasPermission } = useAuth()
   const { apiRequest } = useApi()
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isTempPermission, setIsTempPermission] = useState(false)
+  const [isRevokeTempPermission, setIsRevokeTempPermission] = useState(false)
   const [isRoleAssign, setIsRoleAssign] = useState(false)
   const [isRoleRemove, setIsRoleRemove] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Permisos actualizados
-  const canViewUsers = hasPermission("24") // view_customuser
-  const canCreateUser = hasPermission("21") // add_customuser
-  const canEditUser = hasPermission("22") // change_customuser
-  const canDeleteUser = hasPermission("23") // delete_customuser
-  const canAssignRole = hasPermission("34") // assign_role
-  const canRemoveRole = hasPermission("35") // remove_role
-  const canAssignTempPermission = hasPermission("36") // assign_temp_permission
+  const canViewUsers = hasPermission(PERMISSIONS.MANAGE_USERS.id)
+  const canCreateUser = hasPermission(PERMISSIONS.MANAGE_USERS.id)
+  const canEditUser = hasPermission(PERMISSIONS.MANAGE_USERS.id)
+  const canDeleteUser = hasPermission(PERMISSIONS.MANAGE_USERS.id)
+  const canAssignRole = hasPermission(PERMISSIONS.MANAGE_ROLES.id)
+  const canRemoveRole = hasPermission(PERMISSIONS.MANAGE_ROLES.id)
+  const canAssignTempPermission = hasPermission(PERMISSIONS.MANAGE_TEMP_PERMISSIONS.id)
 
   const handleSelectUser = (user: User, action: string) => {
     if (!user || !user.id) {
@@ -50,12 +54,19 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
     }
 
     setSelectedUser(user)
+    setSelectedUserId(user.id)
     switch (action) {
+      case "view":
+        setIsViewing(true)
+        break
       case "edit":
         if (canEditUser) setIsEditing(true)
         break
       case "tempPermission":
         if (canAssignTempPermission) setIsTempPermission(true)
+        break
+      case "revokeTempPermission":
+        if (canAssignTempPermission) setIsRevokeTempPermission(true)
         break
       case "assignRole":
         if (canAssignRole) setIsRoleAssign(true)
@@ -71,9 +82,12 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
 
   const closeAllDialogs = () => {
     setSelectedUser(null)
+    setSelectedUserId(null)
     setIsCreating(false)
+    setIsViewing(false)
     setIsEditing(false)
     setIsTempPermission(false)
+    setIsRevokeTempPermission(false)
     setIsRoleAssign(false)
     setIsRoleRemove(false)
     setIsDeleting(false)
@@ -103,6 +117,7 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
         <UserTable
           users={validUsers}
           onSelectUser={handleSelectUser}
+          canView={canViewUsers}
           canEdit={canEditUser}
           canDelete={canDeleteUser}
           canAssignRole={canAssignRole}
@@ -128,6 +143,13 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
         refreshData={refreshData}
       />
 
+      <ViewUserDialog
+        open={isViewing}
+        onOpenChange={(open) => !open && closeAllDialogs()}
+        userId={selectedUserId}
+        apiRequest={apiRequest}
+      />
+
       <EditUserDialog
         open={isEditing}
         onOpenChange={(open) => !open && closeAllDialogs()}
@@ -145,6 +167,17 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
         permissions={validPermissions}
         setUsers={setUsers}
         apiRequest={apiRequest}
+        mode="assign"
+      />
+
+      <TempPermissionDialog
+        open={isRevokeTempPermission}
+        onOpenChange={(open) => !open && closeAllDialogs()}
+        user={selectedUser}
+        permissions={validPermissions}
+        setUsers={setUsers}
+        apiRequest={apiRequest}
+        mode="revoke"
       />
 
       <RoleAssignDialog

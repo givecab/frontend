@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Mail, Lock, Camera, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react"
+import { User, Mail, Lock, Camera, AlertCircle, CheckCircle, Eye, EyeOff, Clock, Shield, History } from "lucide-react"
 import { toast } from "sonner"
-import { AUTH_ENDPOINTS, TOAST_DURATION } from "@/config/api"
+import { USER_ENDPOINTS, TOAST_DURATION } from "@/config/api"
+import type { ProfileData } from "@/types"
+import { HistoryList } from "@/components/common/history-list"
 
 interface ProfileFormData {
   email: string
@@ -28,8 +30,9 @@ interface ValidationErrors {
 export default function ProfilePage() {
   const { user } = useAuth()
   const { apiRequest } = useApi()
+  const [profileData, setProfileData] = useState<ProfileData | null>(null)
   const [formData, setFormData] = useState<ProfileFormData>({
-    email: user?.email || "",
+    email: "",
     password: "",
   })
   const [errors, setErrors] = useState<ValidationErrors>({})
@@ -37,15 +40,41 @@ export default function ProfilePage() {
   const [showPassword, setShowPassword] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        email: user.email || "",
-      }))
+    const fetchProfile = async () => {
+      try {
+        const response = await apiRequest(USER_ENDPOINTS.ME, {
+          method: "GET",
+        })
+
+        if (response.ok) {
+          const data: ProfileData = await response.json()
+          setProfileData(data)
+          setFormData((prev) => ({
+            ...prev,
+            email: data.email || "",
+          }))
+        } else {
+          toast.error("Error al cargar el perfil", {
+            duration: TOAST_DURATION,
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+        toast.error("Error de conexión al cargar el perfil", {
+          duration: TOAST_DURATION,
+        })
+      } finally {
+        setIsLoadingProfile(false)
+      }
     }
-  }, [user])
+
+    if (user) {
+      fetchProfile()
+    }
+  }, [user, apiRequest])
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -120,7 +149,7 @@ export default function ProfilePage() {
       const formDataToSend = new FormData()
 
       // Solo enviar campos que han cambiado
-      if (formData.email !== user?.email) {
+      if (formData.email !== profileData?.email) {
         formDataToSend.append("email", formData.email)
       }
 
@@ -134,13 +163,14 @@ export default function ProfilePage() {
 
       // Solo hacer la petición si hay algo que actualizar
       if (formDataToSend.has("email") || formDataToSend.has("password") || formDataToSend.has("photo")) {
-        const response = await apiRequest(AUTH_ENDPOINTS.ME, {
+        const response = await apiRequest(USER_ENDPOINTS.ME, {
           method: "PATCH",
           body: formDataToSend,
         })
 
         if (response.ok) {
-          const updatedUser = await response.json()
+          const updatedProfile: ProfileData = await response.json()
+          setProfileData(updatedProfile)
 
           // Obtener el usuario actual del localStorage
           const currentUserData = localStorage.getItem("user")
@@ -150,8 +180,8 @@ export default function ProfilePage() {
             // Actualizar solo los campos que pueden haber cambiado
             const updatedUserData = {
               ...currentUser,
-              email: updatedUser.email || currentUser.email,
-              photo: updatedUser.photo !== undefined ? updatedUser.photo : currentUser.photo,
+              email: updatedProfile.email || currentUser.email,
+              photo: updatedProfile.photo !== undefined ? updatedProfile.photo : currentUser.photo,
             }
 
             // Guardar el objeto usuario actualizado
@@ -177,7 +207,7 @@ export default function ProfilePage() {
           setPhotoPreview(null)
         } else {
           const errorData = await response.json()
-          toast.error(errorData.message || "Error al actualizar el perfil", {
+          toast.error(errorData.detail || errorData.message || "Error al actualizar el perfil", {
             duration: TOAST_DURATION,
           })
         }
@@ -196,7 +226,18 @@ export default function ProfilePage() {
     }
   }
 
-  if (!user) {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleString("es-AR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  if (!user || isLoadingProfile) {
     return (
       <div className="w-full max-w-4xl mx-auto py-4 px-4">
         <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
@@ -207,8 +248,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-4 px-4">
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6 mb-6">
+    <div className="w-full max-w-4xl mx-auto py-4 px-4 space-y-6">
+      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6">
         <h1 className="text-xl md:text-2xl font-bold text-gray-800">Mi Perfil</h1>
         <p className="text-gray-600 mt-1">Gestiona tu información personal y configuración de cuenta</p>
       </div>
@@ -232,10 +273,10 @@ export default function ProfilePage() {
                     alt="Preview"
                     className="w-20 h-20 rounded-full object-cover border border-gray-300"
                   />
-                ) : user.photo ? (
+                ) : profileData?.photo ? (
                   <img
-                    src={user.photo || "/placeholder.svg"}
-                    alt={`${user.username} avatar`}
+                    src={profileData.photo || "/placeholder.svg"}
+                    alt={`${profileData.username} avatar`}
                     className="w-20 h-20 rounded-full object-cover border border-gray-300"
                   />
                 ) : (
@@ -264,14 +305,14 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="username">Nombre de Usuario</Label>
-                <Input id="username" value={user.username} disabled className="bg-gray-50" />
+                <Input id="username" value={profileData?.username || ""} disabled className="bg-gray-50" />
                 <p className="text-xs text-gray-500 mt-1">No se puede modificar</p>
               </div>
               <div>
                 <Label htmlFor="full_name">Nombre Completo</Label>
                 <Input
                   id="full_name"
-                  value={`${user.first_name || ""} ${user.last_name || ""}`.trim()}
+                  value={`${profileData?.first_name || ""} ${profileData?.last_name || ""}`.trim()}
                   disabled
                   className="bg-gray-50"
                 />
@@ -361,6 +402,52 @@ export default function ProfilePage() {
             </CardContent>
           )}
         </Card>
+
+        {profileData && profileData.active_temp_permissions.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="h-5 w-5" />
+                <span>Permisos Temporales Activos</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {profileData.active_temp_permissions.map((perm, index) => (
+                  <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{perm.name}</p>
+                        <p className="text-sm text-gray-600 mt-1">{perm.reason}</p>
+                      </div>
+                      <div className="flex items-center space-x-1 text-sm text-gray-500">
+                        <Clock className="h-4 w-4" />
+                        <span>Expira: {formatDate(perm.expires_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {profileData && profileData.history.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <History className="h-5 w-5" />
+                  <span>Historial de Cambios</span>
+                </div>
+                <span className="text-sm text-gray-500">{profileData.total_changes} cambios totales</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HistoryList history={profileData.history} maxItems={5} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Botón de Guardar */}
         <div className="flex justify-end">

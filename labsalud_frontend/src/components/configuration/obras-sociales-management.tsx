@@ -3,10 +3,10 @@
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/hooks/use-api"
-import { ANALYSIS_ENDPOINTS } from "@/config/api"
+import { MEDICAL_ENDPOINTS } from "@/config/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, Search, AlertCircle, ShieldCheckIcon, Plus } from "lucide-react"
+import { Loader2, Search, ShieldCheckIcon, Plus } from "lucide-react"
 import type { ObraSocial } from "./configuration-page"
 import { CreateObraSocialDialog } from "./components/create-obra-social-dialog"
 import { EditObraSocialDialog } from "./components/edit-obra-social-dialog"
@@ -15,21 +15,11 @@ import { useToast } from "@/hooks/use-toast"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
 import { useDebounce } from "@/hooks/use-debounce"
 
-interface ObrasSocialesManagementProps {
-  canView: boolean
-  canCreate: boolean
-  canEdit: boolean
-  canDelete: boolean
-}
+type ObrasSocialesManagementProps = {}
 
 const PAGE_LIMIT = 20
 
-export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = ({
-  canView,
-  canCreate,
-  canEdit,
-  canDelete,
-}) => {
+export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = () => {
   const { apiRequest } = useApi()
   const { success, error } = useToast()
 
@@ -49,7 +39,7 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
 
   const buildUrl = useCallback(
     (offset = 0, search = debouncedSearchTerm) => {
-      let url = `${ANALYSIS_ENDPOINTS.OOSS}?limit=${PAGE_LIMIT}&offset=${offset}`
+      let url = `${MEDICAL_ENDPOINTS.INSURANCES}?limit=${PAGE_LIMIT}&offset=${offset}`
       if (search) {
         url += `&search=${encodeURIComponent(search)}`
       }
@@ -60,12 +50,6 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
 
   const fetchObrasSociales = useCallback(
     async (isNewSearchOrFilter = false) => {
-      if (!canView) {
-        setErrorState("No tienes permiso para ver obras sociales.")
-        setIsLoadingInitial(false)
-        return
-      }
-
       let currentUrlToFetch: string
       if (isNewSearchOrFilter) {
         setObrasSociales([])
@@ -104,14 +88,12 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
         setIsLoadingMore(false)
       }
     },
-    [apiRequest, canView, error, buildUrl, nextUrl, obrasSociales.length],
+    [apiRequest, error, buildUrl, nextUrl, obrasSociales.length],
   )
 
   useEffect(() => {
-    if (canView) {
-      fetchObrasSociales(true)
-    }
-  }, [canView, debouncedSearchTerm])
+    fetchObrasSociales(true)
+  }, [debouncedSearchTerm])
 
   const hasMore = !!nextUrl && obrasSociales.length < totalObrasSociales
 
@@ -143,11 +125,6 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
   }
 
   const handleToggleActive = async (obraSocialToToggle: ObraSocial, newStatus: boolean) => {
-    if (!((obraSocialToToggle.is_active && canDelete) || (!obraSocialToToggle.is_active && canEdit))) {
-      error("Permiso denegado", { description: "No tienes permisos para cambiar el estado." })
-      return
-    }
-
     setSwitchLoading(obraSocialToToggle.id)
     const originalStatus = obraSocialToToggle.is_active
 
@@ -159,14 +136,12 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
     try {
       let response: Response
       if (newStatus) {
-        // Activar: PATCH con is_active: true
-        response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS_DETAIL(obraSocialToToggle.id), {
+        response = await apiRequest(MEDICAL_ENDPOINTS.INSURANCE_DETAIL(obraSocialToToggle.id), {
           method: "PATCH",
           body: { is_active: true },
         })
       } else {
-        // Desactivar: DELETE sin body
-        response = await apiRequest(ANALYSIS_ENDPOINTS.OOSS_DETAIL(obraSocialToToggle.id), {
+        response = await apiRequest(MEDICAL_ENDPOINTS.INSURANCE_DETAIL(obraSocialToToggle.id), {
           method: "DELETE",
         })
       }
@@ -207,37 +182,6 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
     }
   }
 
-  if (!canView && !canCreate) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        <div className="flex items-center">
-          <AlertCircle className="h-5 w-5 mr-2" />
-          <p>No tienes permisos para gestionar Obras Sociales.</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isLoadingInitial && obrasSociales.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-[#204983]" />
-        <span className="ml-2">Cargando obras sociales...</span>
-      </div>
-    )
-  }
-
-  if (errorState && obrasSociales.length === 0) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        <div className="flex items-center">
-          <AlertCircle className="h-5 w-5 mr-2" />
-          <p>{errorState}</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -245,12 +189,10 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
           <h3 className="text-lg font-medium text-gray-900">Obras Sociales</h3>
           <p className="text-sm text-gray-500">Gestiona las obras sociales del sistema</p>
         </div>
-        {canCreate && (
-          <Button className="bg-[#204983] hover:bg-[#1a3d6f]" onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Obra Social
-          </Button>
-        )}
+        <Button className="bg-[#204983] hover:bg-[#1a3d6f]" onClick={() => setIsCreateModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva Obra Social
+        </Button>
       </div>
 
       <div className="flex items-center justify-between">
@@ -261,7 +203,6 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
-            disabled={!canView}
           />
         </div>
       </div>
@@ -280,10 +221,8 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
             <ObraSocialCard
               key={os.id}
               obraSocial={os}
-              onEdit={canEdit ? handleEdit : undefined}
+              onEdit={handleEdit}
               onToggleActive={handleToggleActive}
-              canEdit={canEdit}
-              canDelete={canDelete}
               isToggling={switchLoading === os.id}
             />
           ))}

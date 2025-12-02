@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Pencil, Trash, Shield, UserPlus, UserMinus, Clock, AlertCircle } from "lucide-react"
+import { Pencil, Trash, Shield, UserPlus, UserMinus, Clock, AlertCircle, Eye, ShieldX } from "lucide-react"
 
 interface UserTableProps {
   users: User[]
@@ -15,6 +15,7 @@ interface UserTableProps {
   canAssignRole: boolean
   canRemoveRole: boolean
   canManageTempPermissions: boolean
+  canView: boolean
 }
 
 export function UserTable({
@@ -25,6 +26,7 @@ export function UserTable({
   canAssignRole,
   canRemoveRole,
   canManageTempPermissions,
+  canView,
 }: UserTableProps) {
   const getInitials = (firstName: string, lastName: string, username: string) => {
     if (firstName && lastName) {
@@ -35,7 +37,7 @@ export function UserTable({
 
   const getRoleColor = (roleName: string): "default" | "secondary" | "destructive" | "outline" => {
     const roleColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      Administrador: "destructive",
+      Administradora: "destructive",
       Bioquimica: "default",
       Tecnica: "secondary",
       Secretaria: "outline",
@@ -64,8 +66,8 @@ export function UserTable({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm">
-      <div className="rounded-md border bg-white">
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="rounded-lg border bg-white overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50/50">
@@ -76,12 +78,16 @@ export function UserTable({
             </TableRow>
           </TableHeader>
           <TableBody className="bg-white">
-            {users.map((user) => {
+            {users.map((user, index) => {
               const activeRoles = getActiveRoles(user)
               const hasTemp = hasTemporaryPermissions(user)
+              const isLast = index === users.length - 1
 
               return (
-                <TableRow key={user.id} className="bg-white hover:bg-gray-50/50 border-gray-200">
+                <TableRow
+                  key={user.id}
+                  className={`bg-white hover:bg-gray-50/50 border-gray-200 ${isLast ? "[&>td]:border-b-0" : ""}`}
+                >
                   <TableCell className="bg-white">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-8 w-8">
@@ -142,6 +148,13 @@ export function UserTable({
 
                   <TableCell className="text-right bg-white">
                     <div className="flex justify-end space-x-2">
+                      {/* Ver detalles */}
+                      {canView && (
+                        <Button variant="outline" size="sm" onClick={() => onSelectUser(user, "view")}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+
                       {/* Editar usuario */}
                       {canEdit && (
                         <Button variant="outline" size="sm" onClick={() => onSelectUser(user, "edit")}>
@@ -149,22 +162,38 @@ export function UserTable({
                         </Button>
                       )}
 
-                      {/* Permisos temporales */}
-                      {canManageTempPermissions && user.is_active && (
-                        <Button variant="outline" size="sm" onClick={() => onSelectUser(user, "tempPermission")}>
+                      {/* Asignar permisos temporales */}
+                      {canManageTempPermissions && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onSelectUser(user, "tempPermission")}
+                          title="Asignar permiso temporal"
+                        >
                           <Shield className="h-4 w-4" />
                         </Button>
                       )}
 
+                      {canManageTempPermissions && hasTemp && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onSelectUser(user, "revokeTempPermission")}
+                          title="Revocar permiso temporal"
+                        >
+                          <ShieldX className="h-4 w-4" />
+                        </Button>
+                      )}
+
                       {/* Asignar rol */}
-                      {canAssignRole && user.is_active && (
+                      {canAssignRole && (
                         <Button variant="outline" size="sm" onClick={() => onSelectUser(user, "assignRole")}>
                           <UserPlus className="h-4 w-4" />
                         </Button>
                       )}
 
                       {/* Quitar rol */}
-                      {canRemoveRole && activeRoles.length > 0 && user.is_active && (
+                      {canRemoveRole && activeRoles.length > 0 && (
                         <Button variant="outline" size="sm" onClick={() => onSelectUser(user, "removeRole")}>
                           <UserMinus className="h-4 w-4" />
                         </Button>
@@ -175,7 +204,7 @@ export function UserTable({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="border-red-200 hover:bg-red-50"
+                          className="border-red-200 hover:bg-red-50 bg-transparent"
                           onClick={() => onSelectUser(user, "delete")}
                         >
                           <Trash className="h-4 w-4 text-red-500" />
