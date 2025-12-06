@@ -1,6 +1,6 @@
 "use client"
 
-import type { Patient } from "../patients-page"
+import type { Patient } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Mail, Phone, MapPin, User, Clock, CreditCard } from "lucide-react"
@@ -131,7 +131,7 @@ export function PatientDetailsDialog({ isOpen, onClose, patient }: PatientDetail
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Género</p>
-              <Badge variant={patient.gender === "M" || patient.gender === "Masculino" ? "default" : "secondary"}>
+              <Badge variant={patient.gender === "M" ? "default" : "secondary"}>
                 {getGenderDisplay(patient.gender)}
               </Badge>
             </div>
@@ -152,12 +152,12 @@ export function PatientDetailsDialog({ isOpen, onClose, patient }: PatientDetail
                 </div>
               )}
 
-              {patient.phone_landline && (
+              {patient.alt_phone && (
                 <div className="flex items-center space-x-2">
                   <Phone className="h-4 w-4 text-gray-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Teléfono fijo</p>
-                    <p>{patient.phone_landline}</p>
+                    <p className="text-sm font-medium text-gray-500">Teléfono alternativo</p>
+                    <p>{patient.alt_phone}</p>
                   </div>
                 </div>
               )}
@@ -202,35 +202,39 @@ export function PatientDetailsDialog({ isOpen, onClose, patient }: PatientDetail
           </div>
 
           {/* Información de auditoría */}
-          <div className="space-y-3 border-t pt-4">
-            <h3 className="text-lg font-semibold flex items-center space-x-2">
-              <Clock className="h-5 w-5" />
-              <span>Información de Auditoría</span>
-            </h3>
+          {(patient.creation || patient.last_change) && (
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-lg font-semibold flex items-center space-x-2">
+                <Clock className="h-5 w-5" />
+                <span>Información de Auditoría</span>
+              </h3>
 
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Creado por</p>
-                <p>{patient.created_by.username}</p>
-                <p className="text-xs text-gray-400">{formatDateTime(patient.created_at)}</p>
+              <div className="grid grid-cols-1 gap-4">
+                {patient.creation && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Creado por</p>
+                    <p>{patient.creation.user.username}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(patient.creation.date)}</p>
+                  </div>
+                )}
+
+                {patient.last_change && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Última modificación</p>
+                    <p>{patient.last_change.user.username}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(patient.last_change.date)}</p>
+                    {patient.last_change.changes && patient.last_change.changes.length > 0 && (
+                      <div className="mt-1 text-xs text-gray-500">
+                        {patient.last_change.changes.map((change: string, index: number) => (
+                          <p key={index}>• {change}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {patient.updated_by.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Última modificación</p>
-                  {patient.updated_by.slice(0, 3).map((updater, index) => (
-                    <div key={index} className="text-sm">
-                      <p>{updater.username}</p>
-                      <p className="text-xs text-gray-400">{formatDateTime(patient.updated_at)}</p>
-                    </div>
-                  ))}
-                  {patient.updated_by.length > 3 && (
-                    <p className="text-xs text-gray-400">... y {patient.updated_by.length - 3} más</p>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

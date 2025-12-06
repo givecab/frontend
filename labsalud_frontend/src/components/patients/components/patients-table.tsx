@@ -1,6 +1,6 @@
 "use client"
 
-import type { Patient } from "../patients-page"
+import type { Patient } from "@/types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -100,12 +100,12 @@ export function PatientTable({ patients, onSelectPatient, canEdit, canDelete }: 
                     <TableCell className="bg-white">{calculateAge(patient.birth_date)} años</TableCell>
                     <TableCell className="bg-white">
                       <Badge
-                        variant={patient.gender === "M" || patient.gender === "Masculino" ? "default" : "secondary"}
+                        variant={patient.gender === "M" ? "default" : "secondary"}
                       >
                         {getGenderDisplay(patient.gender)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="bg-white">{patient.phone_mobile || patient.phone_landline}</TableCell>
+                    <TableCell className="bg-white">{patient.phone_mobile || patient.alt_phone}</TableCell>
                     <TableCell className="max-w-[200px] truncate bg-white">{patient.email}</TableCell>
                     <TableCell className="bg-white">{patient.city}</TableCell>
                     <TableCell className="text-right bg-white">
@@ -127,7 +127,7 @@ export function PatientTable({ patients, onSelectPatient, canEdit, canDelete }: 
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-red-200 hover:bg-red-50"
+                            className="border-red-200 hover:bg-red-50 bg-transparent"
                             onClick={() => onSelectPatient(patient, "delete")}
                           >
                             <Trash className="h-4 w-4 text-red-500" />

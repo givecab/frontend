@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import type { Patient } from "../patients-page"
+import type { Patient } from "@/types"
 import {
   AlertDialog,
   AlertDialogAction,

@@ -103,22 +103,6 @@ export function PatientCard({ patient, onSelectPatient, updatePatient, apiReques
     return dni.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
   }
 
-  const formatDateTime = (dateString: string) => {
-    if (!dateString) return ""
-
-    // Parsear el string ISO sin conversión de timezone
-    // Formato esperado: "2024-03-15T14:30:00Z" o "2024-03-15T14:30:00"
-    const cleanDate = dateString.replace("Z", "").replace("T", " ")
-    const [datePart, timePart] = cleanDate.split(" ")
-
-    if (!datePart || !timePart) return dateString
-
-    const [year, month, day] = datePart.split("-")
-    const [hour, minute] = timePart.split(":")
-
-    return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year} ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`
-  }
-
   // Función para mapear género correctamente
   const getGenderDisplay = (gender: string) => {
     if (gender === "M" || gender === "Masculino") return "Masculino"
