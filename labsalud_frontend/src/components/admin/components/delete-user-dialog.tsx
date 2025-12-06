@@ -8,6 +8,21 @@ import type { User } from "@/types"
 import type { ApiRequestOptions } from "@/hooks/use-api"
 import { USER_ENDPOINTS } from "@/config/api"
 
+const extractErrorMessage = (errorData: unknown): string => {
+  if (!errorData || typeof errorData !== "object") return "Error desconocido"
+  const err = errorData as Record<string, unknown>
+  if (typeof err.detail === "string") return err.detail
+  if (typeof err.error === "string") return err.error
+  if (typeof err.message === "string") return err.message
+  for (const key of Object.keys(err)) {
+    const val = err[key]
+    if (Array.isArray(val) && val.length > 0) {
+      return `${key}: ${val[0]}`
+    }
+  }
+  return "Error desconocido"
+}
+
 interface DeleteUserDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -45,7 +60,7 @@ export function DeleteUserDialog({
       } else {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         error("Error al eliminar usuario", {
-          description: errorData.detail || "Ha ocurrido un error al eliminar el usuario.",
+          description: extractErrorMessage(errorData),
         })
       }
     } catch (err) {
@@ -60,23 +75,23 @@ export function DeleteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-[95vw] sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Eliminar Usuario</DialogTitle>
         </DialogHeader>
         <div className="py-4">
-          <p>
+          <p className="text-sm sm:text-base">
             ¿Estás seguro de que deseas eliminar al usuario <strong>{user.username}</strong>? Esta acción no se puede
             deshacer.
           </p>
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <DialogClose asChild>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" className="w-full sm:w-auto bg-transparent">
               Cancelar
             </Button>
           </DialogClose>
-          <Button className="bg-red-600 hover:bg-red-700" onClick={handleDeleteUser}>
+          <Button className="bg-red-600 hover:bg-red-700 w-full sm:w-auto" onClick={handleDeleteUser}>
             Eliminar
           </Button>
         </DialogFooter>

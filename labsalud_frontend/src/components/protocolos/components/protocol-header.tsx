@@ -73,74 +73,64 @@ export function ProtocolHeader({
   const statusId = status?.id ?? 0
   const statusName = status?.name ?? "Desconocido"
 
-  const auditCreation = creation
-    ? {
-        user: creation.user ? { username: creation.user.username, photo: creation.user.photo } : null,
-        date: creation.date,
-      }
-    : { user: null, date: "" }
-
-  const auditLastChange = lastChange
-    ? {
-        user: lastChange.user ? { username: lastChange.user.username, photo: lastChange.user.photo } : null,
-        date: lastChange.date,
-      }
-    : { user: null, date: "" }
-
   const isCancelled = statusId === 4
 
   return (
     <>
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-3">
-            <div className={`flex-shrink-0 p-2 rounded-full ${isCancelled ? "bg-red-500" : "bg-[#204983]"}`}>
+          {/* // Improved responsive layout */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className={`flex-shrink-0 p-2 rounded-full ${isCancelled ? "bg-red-500" : "bg-[#204983]"} self-start`}>
               <div className="h-5 w-5 bg-white rounded-sm flex items-center justify-center">
                 <span className={`text-xs font-bold ${isCancelled ? "text-red-500" : "text-[#204983]"}`}>P</span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
                 <h3 className="text-base font-semibold truncate text-gray-800" title={`Protocolo #${protocolId}`}>
                   Protocolo #{protocolId}
                 </h3>
-                {canRegisterPayment && (
-                  <Button
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRegisterPayment()
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 h-6"
-                    data-no-expand
-                  >
-                    <DollarSign className="h-3 w-3 mr-1" />
-                    Registrar Pago
-                  </Button>
-                )}
-                {labOwesPatient && (
-                  <Button
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSettleDebt()
-                    }}
-                    className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-2 py-1 h-6"
-                    data-no-expand
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Saldar Deuda
-                  </Button>
-                )}
+                {/* // Responsive button layout */}
+                <div className="flex flex-wrap gap-1">
+                  {canRegisterPayment && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onRegisterPayment()
+                      }}
+                      className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 h-6"
+                      data-no-expand
+                    >
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      <span className="hidden xs:inline">Registrar</span> Pago
+                    </Button>
+                  )}
+                  {labOwesPatient && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSettleDebt()
+                      }}
+                      className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-2 py-1 h-6"
+                      data-no-expand
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      <span className="hidden xs:inline">Saldar</span> Deuda
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center space-x-2 flex-wrap gap-1">
+              <div className="flex items-center flex-wrap gap-1">
                 <Badge className={getStateColor(statusId)} variant="secondary">
                   {statusName}
                 </Badge>
                 {isPrinted && (
                   <Badge variant="outline" className="text-xs">
                     <Printer className="h-3 w-3 mr-1" />
-                    Impreso / Enviado
+                    <span className="hidden sm:inline">Impreso / </span>Enviado
                   </Badge>
                 )}
               </div>
@@ -157,8 +147,9 @@ export function ProtocolHeader({
       {/* Info cuando está cerrada */}
       {!isExpanded && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+          {/* // Improved responsive layout for collapsed view */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
                 <span className="text-sm text-gray-600 truncate" title={patientName}>
@@ -180,7 +171,30 @@ export function ProtocolHeader({
             </div>
           </div>
           <div className="flex items-center justify-end">
-            <AuditAvatars creation={auditCreation} lastChange={auditLastChange} size="sm" />
+            {/* // Fixed AuditAvatars props to pass data directly */}
+            {(creation || lastChange) && (
+              <AuditAvatars
+                creation={
+                  creation
+                    ? {
+                        user: creation.user ? { username: creation.user.username, photo: creation.user.photo } : null,
+                        date: creation.date,
+                      }
+                    : undefined
+                }
+                lastChange={
+                  lastChange
+                    ? {
+                        user: lastChange.user
+                          ? { username: lastChange.user.username, photo: lastChange.user.photo }
+                          : null,
+                        date: lastChange.date,
+                      }
+                    : undefined
+                }
+                size="sm"
+              />
+            )}
           </div>
         </div>
       )}

@@ -44,6 +44,7 @@ export interface LastChangeAudit {
 }
 
 export interface HistoryEntry {
+  created_at: any
   version: number
   action: string // "creacion", "actualizacion", "eliminacion"
   user: AuditUser
@@ -103,7 +104,7 @@ export interface User {
   first_name: string
   last_name: string
   photo?: string
-  groups?: Group[]
+  roles?: Role[] | undefined
   permissions: Permission[]
   temporary_permissions?: number
   is_active?: boolean
@@ -226,6 +227,8 @@ export type ObraSocial = Insurance
 // ============================================================================
 
 export interface Analysis {
+  created_at: string
+  created_by: null
   id: number
   code: number
   name: string

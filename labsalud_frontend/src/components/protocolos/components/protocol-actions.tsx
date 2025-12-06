@@ -39,24 +39,25 @@ export function ProtocolActions({
 }: ProtocolActionsProps) {
   return (
     <div className="pt-4 border-t border-gray-100" data-no-expand>
-      <div className="flex flex-wrap gap-2">
+      {/* // Improved responsive button layout */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
         <Button
           size="sm"
           variant="outline"
-          className="flex-1 text-[#204983] border-[#204983] hover:bg-[#204983] hover:text-white bg-transparent"
+          className="text-[#204983] border-[#204983] hover:bg-[#204983] hover:text-white bg-transparent"
           onClick={(e) => {
             e.stopPropagation()
             onViewAnalysis()
           }}
         >
           <TestTube className="h-4 w-4 mr-1" />
-          Ver Análisis
+          <span className="hidden xs:inline">Ver </span>Análisis
         </Button>
         {isEditable && (
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 bg-transparent"
+            className="bg-transparent"
             onClick={(e) => {
               e.stopPropagation()
               onEdit()
@@ -70,7 +71,7 @@ export function ProtocolActions({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-purple-600 border-purple-600 hover:bg-purple-600 hover:text-white bg-transparent"
+            className="text-purple-600 border-purple-600 hover:bg-purple-600 hover:text-white bg-transparent"
             onClick={(e) => {
               e.stopPropagation()
               onReports()
@@ -86,14 +87,14 @@ export function ProtocolActions({
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1 text-red-600 border-red-600 hover:bg-red-600 hover:text-white bg-transparent"
+                className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white bg-transparent"
                 onClick={(e) => e.stopPropagation()}
               >
                 <X className="h-4 w-4 mr-1" />
                 Cancelar
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogContent className="w-[95vw] max-w-md" onClick={(e) => e.stopPropagation()}>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -104,12 +105,12 @@ export function ProtocolActions({
                   protocolo pasará al estado "Cancelado".
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                <AlertDialogCancel className="w-full sm:w-auto">Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={onCancel}
                   disabled={isCancelling}
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
                 >
                   {isCancelling ? (
                     <>

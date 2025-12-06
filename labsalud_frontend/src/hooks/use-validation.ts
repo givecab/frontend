@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import type { ValidationResult, ValidationState } from "@/types"
+import type { ValidationResultType, ValidationState } from "@/types"
 
 // ============================================================================
 // FUNCIONES DE VALIDACIÓN PURAS
@@ -9,7 +9,7 @@ import type { ValidationResult, ValidationState } from "@/types"
 
 export const validators = {
   // Validación de DNI
-  dni: (value: string): ValidationResult => {
+  dni: (value: string): ValidationResultType => {
     if (!value.trim()) {
       return { isValid: false, message: "El DNI es obligatorio" }
     }
@@ -23,7 +23,7 @@ export const validators = {
   },
 
   // Validación de nombres
-  name: (value: string, fieldName = "El campo"): ValidationResult => {
+  name: (value: string, fieldName = "El campo"): ValidationResultType => {
     if (!value.trim()) {
       return { isValid: false, message: `${fieldName} es obligatorio` }
     }
@@ -37,7 +37,7 @@ export const validators = {
   },
 
   // Validación de email
-  email: (value: string, required = false): ValidationResult => {
+  email: (value: string, required = false): ValidationResultType => {
     if (!value.trim()) {
       return required ? { isValid: false, message: "El email es obligatorio" } : { isValid: true, message: "" }
     }
@@ -49,7 +49,7 @@ export const validators = {
   },
 
   // Validación de teléfono
-  phone: (value: string, fieldName = "El teléfono"): ValidationResult => {
+  phone: (value: string, fieldName = "El teléfono"): ValidationResultType => {
     if (!value.trim()) {
       return { isValid: true, message: "" } // Teléfonos opcionales
     }
@@ -63,7 +63,7 @@ export const validators = {
   },
 
   // Validación de fecha de nacimiento
-  birthDate: (value: string): ValidationResult => {
+  birthDate: (value: string): ValidationResultType => {
     if (!value) {
       return { isValid: false, message: "La fecha de nacimiento es obligatoria" }
     }
@@ -84,7 +84,7 @@ export const validators = {
   },
 
   // Validación de matrícula profesional
-  license: (value: string): ValidationResult => {
+  license: (value: string): ValidationResultType => {
     if (!value.trim()) {
       return { isValid: false, message: "La matrícula es obligatoria" }
     }
@@ -95,7 +95,7 @@ export const validators = {
   },
 
   // Validación de código
-  code: (value: string): ValidationResult => {
+  code: (value: string): ValidationResultType => {
     if (!value.trim()) {
       return { isValid: false, message: "El código es obligatorio" }
     }
@@ -106,7 +106,7 @@ export const validators = {
   },
 
   // Validación de contraseña
-  password: (value: string, minLength = 8): ValidationResult => {
+  password: (value: string, minLength = 8): ValidationResultType => {
     if (!value) {
       return { isValid: false, message: "La contraseña es obligatoria" }
     }
@@ -125,14 +125,17 @@ export function useValidation<T extends Record<string, any>>(initialState: Valid
   const [validation, setValidation] = useState<ValidationState<T>>(initialState)
   const [touched, setTouched] = useState<Record<keyof T, boolean>>({} as Record<keyof T, boolean>)
 
-  const validateField = useCallback((fieldName: keyof T, value: any, validator: (value: any) => ValidationResult) => {
-    const result = validator(value)
-    setValidation((prev) => ({
-      ...prev,
-      [fieldName]: result,
-    }))
-    return result
-  }, [])
+  const validateField = useCallback(
+    (fieldName: keyof T, value: any, validator: (value: any) => ValidationResultType) => {
+      const result = validator(value)
+      setValidation((prev) => ({
+        ...prev,
+        [fieldName]: result,
+      }))
+      return result
+    },
+    [],
+  )
 
   const setFieldTouched = useCallback((fieldName: keyof T, isTouched = true) => {
     setTouched((prev) => ({
@@ -147,7 +150,7 @@ export function useValidation<T extends Record<string, any>>(initialState: Valid
 
   const getFieldError = useCallback(
     (fieldName: keyof T) => {
-      const field = validation[fieldName] as ValidationResult
+      const field = validation[fieldName] as ValidationResultType
       const isTouched = touched[fieldName]
       return isTouched && !field.isValid ? field.message : null
     },
@@ -156,7 +159,7 @@ export function useValidation<T extends Record<string, any>>(initialState: Valid
 
   const getFieldSuccess = useCallback(
     (fieldName: keyof T) => {
-      const field = validation[fieldName] as ValidationResult
+      const field = validation[fieldName] as ValidationResultType
       const isTouched = touched[fieldName]
       return isTouched && field.isValid && field.message ? field.message : null
     },
@@ -169,7 +172,7 @@ export function useValidation<T extends Record<string, any>>(initialState: Valid
   }, [initialState])
 
   const validateAllFields = useCallback(
-    (data: T, validatorMap: Record<keyof T, (value: any) => ValidationResult>) => {
+    (data: T, validatorMap: Record<keyof T, (value: any) => ValidationResultType>) => {
       const newValidation = { ...validation }
       const newTouched = {} as Record<keyof T, boolean>
 

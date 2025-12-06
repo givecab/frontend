@@ -22,8 +22,10 @@ import type { Determination } from "@/types"
 import { CATALOG_ENDPOINTS } from "@/config/api"
 
 interface EditDeterminationDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  isOpen?: boolean
+  onClose?: () => void
   onSuccess: (updatedDetermination: Determination) => void
   determination: Determination
   analysisId?: number
@@ -32,6 +34,8 @@ interface EditDeterminationDialogProps {
 export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = ({
   open,
   onOpenChange,
+  isOpen,
+  onClose,
   onSuccess,
   determination,
 }) => {
@@ -44,8 +48,17 @@ export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = (
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const isDialogOpen = open ?? isOpen ?? false
+  const handleOpenChange = (newOpen: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(newOpen)
+    } else if (!newOpen && onClose) {
+      onClose()
+    }
+  }
+
   useEffect(() => {
-    if (determination && open) {
+    if (determination && isDialogOpen) {
       setCode(determination.code || "")
       setName(determination.name)
       setMeasureUnit(determination.measure_unit)
@@ -53,7 +66,7 @@ export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = (
       setErrors({})
       setIsLoading(false)
     }
-  }, [determination, open])
+  }, [determination, isDialogOpen])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -81,7 +94,7 @@ export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = (
 
       if (Object.keys(determinationUpdateData).length === 0) {
         toastActions.info("Sin cambios", { description: "No se realizaron modificaciones." })
-        onOpenChange(false)
+        handleOpenChange(false)
         return
       }
 
@@ -94,29 +107,34 @@ export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = (
         const updatedDetermination = await response.json()
         toastActions.success("Éxito", { description: "Determinación actualizada correctamente." })
         onSuccess(updatedDetermination)
-        onOpenChange(false)
+        handleOpenChange(false)
       } else {
         const errorData = await response.json()
-        const backendErrors = errorData.errors || errorData.detail || errorData
-        if (typeof backendErrors === "object" && backendErrors !== null) {
+        const backendErrors = errorData.detail || errorData.errors || errorData.error || errorData
+        if (typeof backendErrors === "string") {
+          setErrors({ form: backendErrors })
+          toastActions.error("Error", { description: backendErrors })
+        } else if (typeof backendErrors === "object" && backendErrors !== null) {
           const formattedErrors: Record<string, string> = {}
           for (const key in backendErrors) {
             if (Array.isArray(backendErrors[key])) {
               formattedErrors[key] = backendErrors[key].join(", ")
             } else {
-              formattedErrors[key] = backendErrors[key]
+              formattedErrors[key] = String(backendErrors[key])
             }
           }
           setErrors(formattedErrors)
+          toastActions.error("Error", { description: "No se pudo actualizar la determinación." })
         } else {
-          setErrors({ form: String(backendErrors) || "Error al actualizar la determinación." })
+          setErrors({ form: "Error al actualizar la determinación." })
+          toastActions.error("Error", { description: "No se pudo actualizar la determinación." })
         }
-        toastActions.error("Error", { description: "No se pudo actualizar la determinación." })
       }
     } catch (error) {
       console.error("Error updating determination:", error)
-      setErrors({ form: "Ocurrió un error de red o servidor." })
-      toastActions.error("Error", { description: "Ocurrió un error inesperado." })
+      const errorMessage = error instanceof Error ? error.message : "Ocurrió un error de red o servidor."
+      setErrors({ form: errorMessage })
+      toastActions.error("Error", { description: errorMessage })
     } finally {
       setIsLoading(false)
     }
@@ -125,66 +143,86 @@ export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = (
   if (!determination) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Determinación: {determination.name}</DialogTitle>
-          <DialogDescription>Modifica los datos de la determinación.</DialogDescription>
+          <DialogTitle className="text-base md:text-lg">Editar Determinación: {determination.name}</DialogTitle>
+          <DialogDescription className="text-xs md:text-sm">Modifica los datos de la determinación.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 md:space-y-6 py-4">
           {errors.form && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{errors.form}</div>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs md:text-sm">
+              {errors.form}
+            </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="edit-determination-code">Código *</Label>
+            <Label htmlFor="edit-determination-code" className="text-sm">
+              Código *
+            </Label>
             <Input
               id="edit-determination-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Ingrese el código de la determinación"
+              className="text-sm"
             />
-            {errors.code && <p className="text-sm text-red-500">{errors.code}</p>}
+            {errors.code && <p className="text-xs md:text-sm text-red-500">{errors.code}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-determination-name">Nombre *</Label>
+            <Label htmlFor="edit-determination-name" className="text-sm">
+              Nombre *
+            </Label>
             <Input
               id="edit-determination-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ingrese el nombre de la determinación"
+              className="text-sm"
             />
-            {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+            {errors.name && <p className="text-xs md:text-sm text-red-500">{errors.name}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-determination-measureUnit">Unidad de Medida *</Label>
+            <Label htmlFor="edit-determination-measureUnit" className="text-sm">
+              Unidad de Medida *
+            </Label>
             <Input
               id="edit-determination-measureUnit"
               value={measureUnit}
               onChange={(e) => setMeasureUnit(e.target.value)}
               placeholder="ej: mg/dL, UI/L, etc."
+              className="text-sm"
             />
-            {errors.measureUnit && <p className="text-sm text-red-500">{errors.measureUnit}</p>}
+            {errors.measureUnit && <p className="text-xs md:text-sm text-red-500">{errors.measureUnit}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-determination-formula">Fórmula (Opcional)</Label>
+            <Label htmlFor="edit-determination-formula" className="text-sm">
+              Fórmula (Opcional)
+            </Label>
             <Textarea
               id="edit-determination-formula"
               value={formula}
               onChange={(e) => setFormula(e.target.value)}
               placeholder="Ingrese la fórmula de cálculo si aplica"
               rows={3}
+              className="text-sm"
             />
-            {errors.formula && <p className="text-sm text-red-500">{errors.formula}</p>}
+            {errors.formula && <p className="text-xs md:text-sm text-red-500">{errors.formula}</p>}
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
           <DialogClose asChild>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isLoading}
+              className="w-full sm:w-auto bg-transparent"
+            >
               Cancelar
             </Button>
           </DialogClose>
@@ -192,7 +230,7 @@ export const EditDeterminationDialog: React.FC<EditDeterminationDialogProps> = (
             type="submit"
             onClick={handleSubmit}
             disabled={isLoading}
-            style={{ backgroundColor: "#204983", color: "white" }}
+            className="w-full sm:w-auto bg-[#204983] hover:bg-[#1a3d6f] text-white"
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Guardar Cambios

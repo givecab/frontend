@@ -45,8 +45,14 @@ export function MedicoDetailsDialog({ isOpen, medico, onClose }: MedicoDetailsDi
 
   const medicoData = fullMedico || medico
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose()
+    }
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalles del Médico</DialogTitle>
@@ -58,7 +64,6 @@ export function MedicoDetailsDialog({ isOpen, medico, onClose }: MedicoDetailsDi
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Información Personal */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Personal</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -80,7 +85,7 @@ export function MedicoDetailsDialog({ isOpen, medico, onClose }: MedicoDetailsDi
             {fullMedico?.history && fullMedico.history.length > 0 ? (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Historial de Cambios</h3>
-                <HistoryList history={fullMedico.history} totalChanges={fullMedico.total_changes} />
+                <HistoryList history={fullMedico.history} />
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg p-4">

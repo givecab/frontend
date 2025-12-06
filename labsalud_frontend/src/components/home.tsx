@@ -4,15 +4,8 @@ import useAuth from "@/contexts/auth-context"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { ANALYTICS_ENDPOINTS } from "@/config/api"
+import type { Permission } from "@/types"
 import { User, Shield, Clock, TestTube, Users, TrendingUp, CheckCircle, AlertCircle } from "lucide-react"
-
-interface Permission {
-  id: number
-  codename: string
-  name: string
-  temporary: boolean
-  expires_at: string | null
-}
 
 interface Stats {
   analysisToday: number
@@ -24,39 +17,8 @@ interface Stats {
   avgResultLoadTimeHuman: string
 }
 
-const parseTimeToHours = (timeString: string): string => {
-  if (!timeString || timeString === "0 min") return "0 h"
-
-  try {
-    // Format: "D days, H:MM:SS.microseconds" or "H:MM:SS.microseconds"
-    let totalHours = 0
-
-    // Check if there are days
-    const daysMatch = timeString.match(/(\d+)\s+days?/)
-    if (daysMatch) {
-      totalHours += Number.parseInt(daysMatch[1]) * 24
-    }
-
-    // Extract time part (H:MM:SS)
-    const timeMatch = timeString.match(/(\d+):(\d+):(\d+)/)
-    if (timeMatch) {
-      const hours = Number.parseInt(timeMatch[1])
-      const minutes = Number.parseInt(timeMatch[2])
-      const seconds = Number.parseInt(timeMatch[3])
-
-      totalHours += hours + minutes / 60 + seconds / 3600
-    }
-
-    // Round to 1 decimal place
-    return `${totalHours.toFixed(1)} h`
-  } catch (error) {
-    console.error("Error parsing time:", error)
-    return timeString
-  }
-}
-
 export default function Home() {
-  const { user, hasPermission, isInGroup } = useAuth()
+  const { user, hasPermission, } = useAuth()
   const { apiRequest } = useApi()
   const { error: showErrorToast } = useToast()
 
@@ -75,7 +37,7 @@ export default function Home() {
     if (!user || !user.permissions) return []
     const now = new Date()
     return user.permissions.filter(
-      (perm: Permission) => perm.temporary && perm.expires_at && new Date(perm.expires_at) > now,
+      (perm: Permission) => perm.temporary === true && perm.expires_at && new Date(perm.expires_at) > now,
     )
   }
 

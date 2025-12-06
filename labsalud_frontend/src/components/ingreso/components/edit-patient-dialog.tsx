@@ -48,7 +48,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, onPatientUpdated }
         birth_date: patient.birth_date ? patient.birth_date.split("T")[0] : "",
         gender: patient.gender || "",
         phone_mobile: patient.phone_mobile || "",
-        phone_landline: patient.phone_landline || "",
+        phone_landline: patient.alt_phone || "",
         email: patient.email || "",
         country: patient.country || "",
         province: patient.province || "",

@@ -18,20 +18,7 @@ import { AlertCircle, CheckCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { toast } from "sonner"
 import { MEDICAL_ENDPOINTS } from "@/config/api"
-
-interface User {
-  id: number
-  username: string
-  photo?: string
-}
-
-interface ObraSocial {
-  id: number
-  name: string
-  description?: string
-  ub_value?: string
-  is_active: boolean
-}
+import type { ObraSocial } from "@/types"
 
 interface EditObraSocialDialogProps {
   open: boolean
@@ -92,12 +79,12 @@ export function EditObraSocialDialog({ open, onOpenChange, obraSocial, onSuccess
         message = isValid ? "Nombre válido" : "El nombre debe tener al menos 3 caracteres"
         break
       case "description":
-        isValid = true // Optional field
+        isValid = true
         message = ""
         break
       case "ub_value":
         if (value.trim() === "") {
-          isValid = true // Optional field
+          isValid = true
           message = ""
         } else {
           const numValue = Number.parseFloat(value)
@@ -123,7 +110,7 @@ export function EditObraSocialDialog({ open, onOpenChange, obraSocial, onSuccess
   }
 
   const getChangedFields = () => {
-    const changes: Partial<Record<keyof FormData, any>> = {}
+    const changes: Partial<Record<keyof FormData, string | number | undefined>> = {}
     if (formData.name !== obraSocial.name) changes.name = formData.name
     if (formData.description !== (obraSocial.description || "")) changes.description = formData.description || undefined
     if (formData.ub_value !== (obraSocial.ub_value || "")) {

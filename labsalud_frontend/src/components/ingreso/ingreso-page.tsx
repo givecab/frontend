@@ -119,6 +119,23 @@ export default function IngresoPage() {
     }
   }, [isAnimating, animationResult, pendingSuccessData])
 
+  // Extract mensaje de error del backend
+  const extractErrorMessage = (errorData: unknown): string => {
+    if (typeof errorData === "string") return errorData
+    if (errorData && typeof errorData === "object") {
+      const err = errorData as Record<string, unknown>
+      if (err.detail) return String(err.detail)
+      if (err.error) return String(err.error)
+      if (err.message) return String(err.message)
+      // Si es un objeto con múltiples campos de error
+      const firstKey = Object.keys(err)[0]
+      if (firstKey && Array.isArray(err[firstKey])) {
+        return `${firstKey}: ${err[firstKey][0]}`
+      }
+    }
+    return "Ha ocurrido un error inesperado"
+  }
+
   const loadInitialData = async () => {
     try {
       setIsLoading(true)
@@ -131,11 +148,17 @@ export default function IngresoPage() {
       if (doctorsResponse.ok) {
         const doctorsData: PaginatedResponse<Doctor> = await doctorsResponse.json()
         setDoctors(doctorsData.results)
+      } else {
+        const errorData = await doctorsResponse.json().catch(() => ({}))
+        toast.error("Error al cargar médicos", { description: extractErrorMessage(errorData) })
       }
 
       if (insurancesResponse.ok) {
         const insurancesData: PaginatedResponse<Insurance> = await insurancesResponse.json()
         setInsurances(insurancesData.results)
+      } else {
+        const errorData = await insurancesResponse.json().catch(() => ({}))
+        toast.error("Error al cargar obras sociales", { description: extractErrorMessage(errorData) })
       }
 
       if (sendMethodsResponse.ok) {
@@ -144,6 +167,9 @@ export default function IngresoPage() {
         if (sendMethodsData.results.length > 0) {
           setSelectedSendMethod(sendMethodsData.results[0])
         }
+      } else {
+        const errorData = await sendMethodsResponse.json().catch(() => ({}))
+        toast.error("Error al cargar métodos de envío", { description: extractErrorMessage(errorData) })
       }
     } catch (error) {
       console.error("Error loading initial data:", error)
@@ -276,7 +302,6 @@ export default function IngresoPage() {
     const sendMethodForSuccess = selectedSendMethod
 
     try {
-      const totals = calculateTotals()
       const patientPaid = Number.parseFloat(valuePaid) || 0
       const totalValuePaid = patientPaid
 
@@ -304,6 +329,7 @@ export default function IngresoPage() {
       if (!protocolResponse.ok) {
         const errorData = await protocolResponse.json()
         console.error("Protocol creation error:", errorData)
+        toast.error("Error al crear el protocolo", { description: extractErrorMessage(errorData) })
         setAnimationResult("error")
         setIsAnimating(true)
         return
@@ -322,6 +348,7 @@ export default function IngresoPage() {
       setIsAnimating(true)
     } catch (error) {
       console.error("Error creating protocol:", error)
+      toast.error("Error al crear el protocolo", { description: "Error de conexión con el servidor" })
       setAnimationResult("error")
       setIsAnimating(true)
     }
@@ -335,7 +362,7 @@ export default function IngresoPage() {
     )
   }
 
-  const showRightPanel = currentPatient || patientNotFound
+  const showRightPanel = currentPatient || patientNotFound || showCreateMedico || showCreateObraSocial
   const isFormValid =
     currentPatient &&
     selectedDoctor &&
@@ -402,30 +429,28 @@ export default function IngresoPage() {
               }
             `}
           >
-            {currentPatient && (
-              <div className="space-y-4">
-                <PatientInfo patient={currentPatient} onEdit={handleEditPatient} />
+            <div className="space-y-4">
+              {currentPatient && <PatientInfo patient={currentPatient} onEdit={handleEditPatient} />}
 
-                {showCreateMedico && (
-                  <CreateMedicoForm onMedicoCreated={handleDoctorCreated} onCancel={() => setShowCreateMedico(false)} />
-                )}
+              {patientNotFound && (
+                <CreatePatientForm
+                  initialDni={searchedDni}
+                  onPatientCreated={handlePatientCreated}
+                  onCancel={() => setPatientNotFound(false)}
+                />
+              )}
 
-                {showCreateObraSocial && (
-                  <CreateObraSocialForm
-                    onObraSocialCreated={handleInsuranceCreated}
-                    onCancel={() => setShowCreateObraSocial(false)}
-                  />
-                )}
-              </div>
-            )}
+              {showCreateMedico && (
+                <CreateMedicoForm onMedicoCreated={handleDoctorCreated} onCancel={() => setShowCreateMedico(false)} />
+              )}
 
-            {patientNotFound && (
-              <CreatePatientForm
-                initialDni={searchedDni}
-                onPatientCreated={handlePatientCreated}
-                onCancel={() => setPatientNotFound(false)}
-              />
-            )}
+              {showCreateObraSocial && (
+                <CreateObraSocialForm
+                  onObraSocialCreated={handleInsuranceCreated}
+                  onCancel={() => setShowCreateObraSocial(false)}
+                />
+              )}
+            </div>
           </div>
         </div>
 

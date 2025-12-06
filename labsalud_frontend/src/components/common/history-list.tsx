@@ -61,38 +61,40 @@ export function HistoryList({ history, emptyMessage = "No hay historial disponib
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5 sm:space-y-2">
       {history.map((entry, index) => {
         const user = entry.user || { username: "Sistema", photo: null }
 
         return (
           <Card key={index} className={`border-l-4 ${getActionBorderColor(entry.action || "")}`}>
-            <CardContent className="p-3">
-              <div className="flex items-start gap-2">
-                <Avatar className="h-8 w-8">
+            <CardContent className="p-2 sm:p-3">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                <Avatar className="h-6 w-6 sm:h-8 sm:w-8 shrink-0">
                   <AvatarImage src={user.photo || "/placeholder.svg"} alt={user.username} />
                   <AvatarFallback>
-                    <User className="h-4 w-4" />
+                    <User className="h-3 w-3 sm:h-4 sm:w-4" />
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-medium truncate">{user.username}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 text-sm">
+                    <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
+                      <span className="font-medium truncate text-xs sm:text-sm">{user.username}</span>
                       {entry.version && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0">
+                        <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-1.5 py-0">
                           v{entry.version}
                         </Badge>
                       )}
                       {entry.action && (
-                        <Badge className={`text-xs px-1.5 py-0 ${getActionBadgeVariant(entry.action)}`}>
+                        <Badge
+                          className={`text-[10px] sm:text-xs px-1 sm:px-1.5 py-0 ${getActionBadgeVariant(entry.action)}`}
+                        >
                           {entry.action}
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                      <Clock className="h-3 w-3" />
+                    <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
+                      <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       {new Date(entry.date).toLocaleString("es-AR", {
                         dateStyle: "short",
                         timeStyle: "short",
@@ -101,9 +103,9 @@ export function HistoryList({ history, emptyMessage = "No hay historial disponib
                   </div>
 
                   {entry.changes && entry.changes.length > 0 && (
-                    <div className="text-sm text-muted-foreground space-y-0.5">
+                    <div className="text-xs sm:text-sm text-muted-foreground space-y-0.5">
                       {entry.changes.map((change, idx) => (
-                        <div key={idx} className="leading-snug">
+                        <div key={idx} className="leading-snug break-words">
                           • {change}
                         </div>
                       ))}

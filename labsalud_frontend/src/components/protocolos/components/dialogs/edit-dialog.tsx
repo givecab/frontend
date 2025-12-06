@@ -40,7 +40,8 @@ export function EditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      {/* // Improved responsive width */}
+      <DialogContent className="w-[95vw] max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit className="h-5 w-5 text-[#204983]" />
@@ -79,11 +80,12 @@ export function EditDialog({
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        {/* // Responsive footer buttons */}
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Cancelar
           </Button>
-          <Button onClick={onSave} disabled={isSaving} className="bg-[#204983] hover:bg-[#1a3a6a]">
+          <Button onClick={onSave} disabled={isSaving} className="bg-[#204983] hover:bg-[#1a3a6a] w-full sm:w-auto">
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

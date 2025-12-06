@@ -4,7 +4,6 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Loader2,
@@ -14,11 +13,8 @@ import {
   Pencil,
   ChevronDown,
   ChevronRight,
-  Clock,
   TestTube2,
   Plus,
-  User,
-  Settings,
   History,
 } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
@@ -29,6 +25,7 @@ import { CreateDeterminationDialog } from "./create-determination-dialog"
 import { EditDeterminationDialog } from "./edit-determination-dialog"
 import { DeleteDeterminationDialog } from "./delete-determination-dialog"
 import { DeterminationHistoryDialog } from "./determination-history-dialog"
+import { AuditAvatars } from "@/components/common/audit-avatars"
 import type { Determination } from "@/types"
 import { CATALOG_ENDPOINTS } from "@/config/api"
 
@@ -46,139 +43,14 @@ interface AnalysisListProps {
 
 const PAGE_LIMIT = 10
 
-const formatFullDate = (dateString: string | null): string => {
-  if (!dateString) return "Fecha no disponible"
-
-  try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return "Fecha inválida"
-
-    return date.toLocaleString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch {
-    return "Fecha inválida"
-  }
-}
-
-const UserAvatar = ({ user, date }: { user: any; date: string }) => {
-  if (user === null || !user) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="bg-gray-100">
-                <Settings className="h-3 w-3 text-gray-600" />
-              </AvatarFallback>
-            </Avatar>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Creado por el sistema</p>
-            <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    )
-  }
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger className="cursor-help">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={user.photo || "/placeholder.svg"} />
-            <AvatarFallback className="bg-blue-100">
-              {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-3 w-3" />}
-            </AvatarFallback>
-          </Avatar>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Creado por: {user.username}</p>
-          <p className="text-xs text-gray-500">{formatFullDate(date)}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
-
-const UpdatedByAvatars = ({ updatedBy }: { updatedBy: Determination["updated_by"] }) => {
-  if (!updatedBy || updatedBy.length === 0) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <div className="flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 text-gray-500 text-xs">
-              <Settings className="h-3 w-3 text-gray-600" />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Sin modificaciones</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    )
-  }
-
-  const displayUsers = updatedBy.slice(0, 3)
-  const remainingCount = updatedBy.length - 3
-
-  return (
-    <div className="flex -space-x-1">
-      {displayUsers.map((user) => (
-        <TooltipProvider key={user.id}>
-          <Tooltip>
-            <TooltipTrigger className="cursor-help">
-              <Avatar className="h-6 w-6 border-2 border-white">
-                <AvatarImage src={user.photo || "/placeholder.svg"} />
-                <AvatarFallback className="bg-blue-100">
-                  {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-3 w-3" />}
-                </AvatarFallback>
-              </Avatar>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Modificado por: {user.username}</p>
-              <p className="text-xs text-gray-500 flex items-center gap-1">
-                <Clock className="h-2 w-2" />
-                {formatFullDate(new Date().toISOString())}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ))}
-      {remainingCount > 0 && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger className="cursor-help">
-              <div className="flex items-center justify-center h-6 w-6 rounded-full bg-gray-200 text-gray-600 text-xs border-2 border-white">
-                +{remainingCount}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {remainingCount} modificación{remainingCount > 1 ? "es" : ""} adicional{remainingCount > 1 ? "es" : ""}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-    </div>
-  )
-}
-
 export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInactive, refreshKey }) => {
   const { apiRequest } = useApi()
-  const { error } = useToast()
+  const toastActions = useToast()
 
   const [analyses, setAnalyses] = useState<Determination[]>([])
   const [totalAnalyses, setTotalAnalyses] = useState(0)
   const [analysesNextUrl, setAnalysesNextUrl] = useState<string | null>(null)
   const [expandedDeterminations, setExpandedDeterminations] = useState<Set<number>>(new Set())
-  const [expandedAnalyses, setExpandedAnalyses] = useState<Set<number>>(new Set())
 
   const [isLoadingInitial, setIsLoadingInitial] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -240,23 +112,24 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
           setTotalAnalyses(data.count || 0)
           setAnalysesNextUrl(data.next || null)
         } else {
-          setError("Error al cargar las determinaciones.")
-          if (error) {
-            error("Error", { description: "No se pudieron cargar las determinaciones." })
-          }
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage =
+            errorData.detail || errorData.error || errorData.message || "Error al cargar las determinaciones."
+          setError(errorMessage)
+          toastActions.error("Error", { description: errorMessage })
         }
-      } catch (err) {
-        console.error("Error fetching analyses:", err)
-        setError("Ocurrió un error inesperado al cargar determinaciones.")
-        if (error) {
-          error("Error", { description: "Error de conexión o servidor (determinaciones)." })
-        }
+      } catch (fetchErr) {
+        console.error("Error fetching analyses:", fetchErr)
+        const errorMessage =
+          fetchErr instanceof Error ? fetchErr.message : "Ocurrió un error inesperado al cargar determinaciones."
+        setError(errorMessage)
+        toastActions.error("Error", { description: errorMessage })
       } finally {
         setIsLoadingInitial(false)
         setIsLoadingMore(false)
       }
     },
-    [apiRequest, error, buildAnalysesUrl, analysesNextUrl, debouncedSearchTerm, analysis.id],
+    [apiRequest, toastActions, buildAnalysesUrl, analysesNextUrl, debouncedSearchTerm, analysis.id],
   )
 
   const toggleDetermination = (determinationId: number) => {
@@ -279,11 +152,6 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
     setSelectedAnalysis(null)
   }
 
-  const handleDialogClose = (setter: React.Dispatch<React.SetStateAction<boolean>>) => {
-    setter(false)
-    setSelectedAnalysis(null)
-  }
-
   useEffect(() => {
     fetchAnalyses(true)
   }, [analysis.id, debouncedSearchTerm, showInactive, refreshKey])
@@ -303,8 +171,10 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
 
   return (
     <div className="space-y-3 pt-3">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4">
-        <h4 className="text-sm font-semibold text-gray-700 flex-shrink-0">Determinaciones ({totalAnalyses})</h4>
+      <div className="flex flex-col gap-2 px-2 md:px-4 sm:flex-row sm:justify-between sm:items-center">
+        <h4 className="text-xs md:text-sm font-semibold text-gray-700 flex-shrink-0">
+          Determinaciones ({totalAnalyses})
+        </h4>
         <div className="relative w-full sm:w-auto flex-grow sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -312,13 +182,18 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9 text-sm h-8 w-full"
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
         <Button
           variant="outline"
-          className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white bg-transparent"
+          className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white bg-transparent w-full sm:w-auto"
           size="sm"
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            setIsCreateModalOpen(true)
+          }}
         >
           <Plus className="mr-1 h-4 w-4" /> Nueva Determinación
         </Button>
@@ -342,7 +217,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
       )}
 
       {analyses.length > 0 && (
-        <div className="space-y-2 px-4">
+        <div className="space-y-2 px-2 md:px-4">
           {analyses.map((analysisItem) => {
             const isExpanded = expandedDeterminations.has(analysisItem.id)
 
@@ -353,16 +228,15 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
                   isExpanded ? "ring-2 ring-blue-200" : ""
                 }`}
               >
-                <div className="flex justify-between items-center p-2">
-                  {/* Left side: clickable area to expand/collapse */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 gap-2">
                   <div
-                    className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-50 transition-colors rounded-md p-1 -m-1"
+                    className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-50 transition-colors rounded-md p-1 -m-1 min-w-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       toggleDetermination(analysisItem.id)
                     }}
                   >
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       {isExpanded ? (
                         <ChevronDown className="h-3 w-3 text-gray-500" />
                       ) : (
@@ -370,76 +244,30 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
                       )}
                       <TestTube2 className="h-4 w-4 text-green-600" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{analysisItem.name}</p>
-                      <p className="text-xs text-gray-500">Unidad: {analysisItem.measure_unit}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        {analysisItem.creation && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-help">
-                                  <Avatar className="h-4 w-4">
-                                    <AvatarImage src={analysisItem.creation.user.photo || "/placeholder.svg"} />
-                                    <AvatarFallback className="text-[8px]">
-                                      {analysisItem.creation.user.username.charAt(0).toUpperCase()}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-[10px] text-gray-500">Creado</span>
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="text-xs">
-                                  <p className="font-semibold">{analysisItem.creation.user.username}</p>
-                                  <p className="text-gray-500">
-                                    {new Date(analysisItem.creation.date).toLocaleString()}
-                                  </p>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs md:text-sm font-medium text-gray-800 truncate">{analysisItem.name}</p>
+                      <p className="text-[10px] md:text-xs text-gray-500">Unidad: {analysisItem.measure_unit}</p>
+                      <p className="text-[10px] md:text-xs text-gray-500">
+                        Fórmula:{" "}
+                        {analysisItem.formula ? (
+                          <span className="font-mono text-blue-600">{analysisItem.formula}</span>
+                        ) : (
+                          <span className="italic text-gray-400">Sin fórmula</span>
                         )}
-                        {analysisItem.last_change && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-help">
-                                  <Avatar className="h-4 w-4">
-                                    <AvatarImage src={analysisItem.last_change.user.photo || "/placeholder.svg"} />
-                                    <AvatarFallback className="text-[8px]">
-                                      {analysisItem.last_change.user.username.charAt(0).toUpperCase()}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-[10px] text-gray-500">Modificado</span>
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="text-xs">
-                                  <p className="font-semibold">{analysisItem.last_change.user.username}</p>
-                                  <p className="text-gray-500">
-                                    {new Date(analysisItem.last_change.date).toLocaleString()}
-                                  </p>
-                                  {analysisItem.last_change.changes && analysisItem.last_change.changes.length > 0 && (
-                                    <div className="mt-1">
-                                      <p className="font-medium">Cambios:</p>
-                                      <ul className="list-disc list-inside">
-                                        {analysisItem.last_change.changes.map((change, idx) => (
-                                          <li key={idx}>{change}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                      </p>
+                      <div className="mt-1">
+                        {(analysisItem.creation || analysisItem.last_change) && (
+                          <AuditAvatars
+                            creation={analysisItem.creation}
+                            lastChange={analysisItem.last_change}
+                            size="sm"
+                          />
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right side: action buttons (not clickable for expand/collapse) */}
-                  <div className="flex items-center space-x-1 flex-shrink-0">
+                  <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <TooltipProvider delayDuration={100}>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -448,10 +276,11 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation()
+                              e.preventDefault()
                               setSelectedAnalysis(analysisItem)
                               setIsEditModalOpen(true)
                             }}
-                            className="h-7 w-7 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
+                            className="h-7 w-7 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -467,6 +296,7 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation()
+                              e.preventDefault()
                               setSelectedAnalysis(analysisItem)
                               setIsDeleteModalOpen(true)
                             }}
@@ -478,35 +308,17 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
                         <TooltipContent>Eliminar Determinación</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <TooltipProvider delayDuration={100}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedHistoryAnalysis({ id: analysisItem.id, name: analysisItem.name })
-                              setIsHistoryDialogOpen(true)
-                            }}
-                            className="h-7 w-7 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                          >
-                            <History className="h-3.5 w-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Ver Historial</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t p-4 bg-gray-50">
+                  <div className="border-t p-4 bg-gray-50" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
+                        e.preventDefault()
                         setSelectedHistoryAnalysis({ id: analysisItem.id, name: analysisItem.name })
                         setIsHistoryDialogOpen(true)
                       }}
@@ -532,20 +344,23 @@ export const AnalysisList: React.FC<AnalysisListProps> = ({ analysis, showInacti
         <p className="text-center text-xs text-gray-400 mt-3">Fin de las determinaciones.</p>
       )}
 
-      {isCreateModalOpen && (
-        <CreateDeterminationDialog
-          analysis={analysis}
-          isOpen={isCreateModalOpen}
-          onClose={() => handleDialogClose(setIsCreateModalOpen)}
-          onSuccess={handleSuccess}
-        />
-      )}
+      <CreateDeterminationDialog
+        analysisId={analysis.id}
+        open={isCreateModalOpen}
+        onOpenChange={(open) => {
+          setIsCreateModalOpen(open)
+        }}
+        onSuccess={handleSuccess}
+      />
 
-      {isEditModalOpen && selectedAnalysis && (
+      {selectedAnalysis && (
         <EditDeterminationDialog
           determination={selectedAnalysis}
-          isOpen={isEditModalOpen}
-          onClose={() => handleDialogClose(setIsEditModalOpen)}
+          open={isEditModalOpen}
+          onOpenChange={(open) => {
+            setIsEditModalOpen(open)
+            if (!open) setSelectedAnalysis(null)
+          }}
           onSuccess={handleSuccess}
         />
       )}

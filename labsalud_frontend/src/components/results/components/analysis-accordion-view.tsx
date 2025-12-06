@@ -129,6 +129,23 @@ const getStatusColor = (statusId: number): string => {
   }
 }
 
+const extractErrorMessage = (errorData: any): string => {
+  if (typeof errorData === "string") return errorData
+  if (errorData?.detail) return errorData.detail
+  if (errorData?.error) return errorData.error
+  if (errorData?.message) return errorData.message
+  if (typeof errorData === "object") {
+    const firstKey = Object.keys(errorData)[0]
+    if (firstKey && Array.isArray(errorData[firstKey])) {
+      return `${firstKey}: ${errorData[firstKey][0]}`
+    }
+    if (firstKey && typeof errorData[firstKey] === "string") {
+      return `${firstKey}: ${errorData[firstKey]}`
+    }
+  }
+  return "Error desconocido"
+}
+
 export function AnalysisAccordionView() {
   const { apiRequest } = useApi()
   const { success, error: showError } = useToast()
@@ -188,7 +205,8 @@ export function AnalysisAccordionView() {
         const data: AvailableAnalysis[] = await response.json()
         setAvailableAnalysis(data)
       } else {
-        showError("Error al cargar análisis disponibles")
+        const errorData = await response.json().catch(() => ({}))
+        showError(extractErrorMessage(errorData) || "Error al cargar análisis disponibles")
       }
     } catch (error) {
       showError("Error al cargar análisis")
@@ -263,7 +281,8 @@ export function AnalysisAccordionView() {
             setHasMore(false)
           }
         } else {
-          showError("Error al cargar resultados")
+          const errorData = await response.json().catch(() => ({}))
+          showError(extractErrorMessage(errorData) || "Error al cargar resultados")
         }
       } catch (error) {
         showError("Error al cargar resultados")
@@ -369,8 +388,8 @@ export function AnalysisAccordionView() {
             },
           }))
         } else {
-          const errorData = await response.json()
-          showError(errorData.detail || "Error al guardar resultado")
+          const errorData = await response.json().catch(() => ({}))
+          showError(extractErrorMessage(errorData) || "Error al guardar resultado")
         }
       } catch (error) {
         showError("Error al guardar resultado")
@@ -440,10 +459,24 @@ export function AnalysisAccordionView() {
     [apiRequest, previousResults, loadingPrevious],
   )
 
+  const scrollToInput = (inputElement: HTMLInputElement | null) => {
+    if (inputElement) {
+      const container = inputElement.closest(".p-4.bg-white.border")
+      if (container) {
+        container.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        })
+      }
+    }
+  }
+
   const handleInputFocus = useCallback(
     (resultId: number, patientId: number, determinationId: number) => {
       loadPreviousResults(resultId, patientId, determinationId)
       setExpandedHistory((prev) => new Set(prev).add(resultId))
+      const input = inputRefs.current[resultId]
+      scrollToInput(input)
     },
     [loadPreviousResults],
   )
@@ -503,8 +536,8 @@ export function AnalysisAccordionView() {
   if (!selectedAnalysis) {
     return (
       <div className="space-y-4">
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-gray-700">
+        <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <p className="text-xs sm:text-sm text-gray-700">
             Selecciona un análisis para ver todos los protocolos que lo contienen y cargar sus resultados
           </p>
         </div>
@@ -522,30 +555,30 @@ export function AnalysisAccordionView() {
         {filteredAnalysis.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <AlertCircle className="h-12 w-12 mb-3 text-gray-400" />
-            <p className="text-lg font-medium">
+            <p className="text-base sm:text-lg font-medium">
               {analysisSearchTerm ? "No se encontraron análisis" : "No hay análisis disponibles"}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredAnalysis.map((analysis) => (
               <button
                 key={analysis.id}
                 onClick={() => handleSelectAnalysis(analysis)}
-                className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-[#204983] transition-all text-left group"
+                className="p-4 sm:p-6 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-[#204983] transition-all text-left group"
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <FlaskConical className="h-6 w-6 text-[#204983] group-hover:scale-110 transition-transform" />
-                  <h3 className="font-semibold text-lg text-gray-900 group-hover:text-[#204983] transition-colors line-clamp-2">
+                <div className="flex items-start gap-2 sm:gap-3 mb-2">
+                  <FlaskConical className="h-5 w-5 sm:h-6 sm:w-6 text-[#204983] group-hover:scale-110 transition-transform flex-shrink-0 mt-0.5" />
+                  <h3 className="font-semibold text-sm sm:text-lg text-gray-900 group-hover:text-[#204983] transition-colors line-clamp-2">
                     {analysis.name}
                   </h3>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="bg-gray-50">
+                  <Badge variant="outline" className="bg-gray-50 text-xs">
                     Código: {analysis.code}
                   </Badge>
                   {analysis.is_urgent && (
-                    <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-300">
+                    <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-300 text-xs">
                       Urgente
                     </Badge>
                   )}
@@ -561,30 +594,30 @@ export function AnalysisAccordionView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-        <Button variant="outline" size="sm" onClick={handleBackToAnalysis} className="bg-white">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+        <Button variant="outline" size="sm" onClick={handleBackToAnalysis} className="bg-white w-fit">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Análisis
+          Volver
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <FlaskConical className="h-5 w-5 text-[#204983]" />
-          <span className="font-semibold text-[#204983]">{selectedAnalysis.name}</span>
-          <Badge variant="outline" className="bg-white">
+          <span className="font-semibold text-[#204983] text-sm sm:text-base">{selectedAnalysis.name}</span>
+          <Badge variant="outline" className="bg-white text-xs">
             Código: {selectedAnalysis.code}
           </Badge>
           {selectedAnalysis.is_urgent && (
-            <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-300">
+            <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-300 text-xs">
               Urgente
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 p-4 bg-white rounded-lg border border-gray-200">
+      <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-lg border border-gray-200">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Buscar por paciente o número de protocolo..."
+            placeholder="Buscar por paciente o protocolo..."
             value={protocolSearchTerm}
             onChange={(e) => setProtocolSearchTerm(e.target.value)}
             className="pl-10 bg-white"
@@ -592,61 +625,67 @@ export function AnalysisAccordionView() {
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700">Filtrar por estado:</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="text-xs sm:text-sm font-medium text-gray-700">Filtrar por estado:</p>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <Button
               variant={selectedStatuses.includes(1) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(1)}
-              className={selectedStatuses.includes(1) ? "bg-yellow-500 hover:bg-yellow-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(1) ? "bg-yellow-500 hover:bg-yellow-600" : ""}`}
             >
               <Clock className="h-3 w-3 mr-1" />
-              Pend. Carga
+              <span className="hidden sm:inline">Pend.</span> Carga
             </Button>
             <Button
               variant={selectedStatuses.includes(2) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(2)}
-              className={selectedStatuses.includes(2) ? "bg-blue-500 hover:bg-blue-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(2) ? "bg-blue-500 hover:bg-blue-600" : ""}`}
             >
               <Filter className="h-3 w-3 mr-1" />
-              Pend. Validación
+              <span className="hidden sm:inline">Pend.</span> Valid.
             </Button>
             <Button
               variant={selectedStatuses.includes(3) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(3)}
-              className={selectedStatuses.includes(3) ? "bg-orange-500 hover:bg-orange-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(3) ? "bg-orange-500 hover:bg-orange-600" : ""}`}
             >
               <Clock className="h-3 w-3 mr-1" />
-              Pago Incompleto
+              Pago <span className="hidden sm:inline">Incomp.</span>
             </Button>
             <Button
               variant={selectedStatuses.includes(6) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(6)}
-              className={selectedStatuses.includes(6) ? "bg-purple-500 hover:bg-purple-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(6) ? "bg-purple-500 hover:bg-purple-600" : ""}`}
             >
               <User className="h-3 w-3 mr-1" />
-              Pend. Retiro
+              <span className="hidden sm:inline">Pend.</span> Retiro
             </Button>
             <Button
               variant={selectedStatuses.includes(5) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(5)}
-              className={selectedStatuses.includes(5) ? "bg-green-500 hover:bg-green-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(5) ? "bg-green-500 hover:bg-green-600" : ""}`}
             >
               <CheckCircle className="h-3 w-3 mr-1" />
-              Completado
+              <span className="hidden sm:inline">Completado</span>
+              <span className="sm:hidden">Compl.</span>
             </Button>
             {selectedStatuses.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedStatuses([])} className="text-gray-500">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedStatuses([])}
+                className="text-gray-500 text-xs"
+              >
                 <X className="h-3 w-3 mr-1" />
                 Limpiar
               </Button>
             )}
           </div>
-          <p className="text-xs text-gray-500">Los protocolos cancelados no se muestran en esta vista.</p>
+          <p className="text-xs text-gray-500">Los protocolos cancelados no se muestran.</p>
         </div>
       </div>
 

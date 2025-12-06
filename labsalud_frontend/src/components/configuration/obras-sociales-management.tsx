@@ -7,7 +7,7 @@ import { MEDICAL_ENDPOINTS } from "@/config/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Search, ShieldCheckIcon, Plus } from "lucide-react"
-import type { ObraSocial } from "./configuration-page"
+import type { ObraSocial } from "@/types"
 import { CreateObraSocialDialog } from "./components/create-obra-social-dialog"
 import { EditObraSocialDialog } from "./components/edit-obra-social-dialog"
 import { ObraSocialCard } from "./components/obra-social-card"
@@ -76,13 +76,18 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
           setTotalObrasSociales(data.count)
           setNextUrl(data.next)
         } else {
-          setErrorState("Error al cargar las obras sociales.")
-          error("Error", { description: "No se pudieron cargar las obras sociales." })
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage =
+            errorData.detail || errorData.error || errorData.message || "Error al cargar las obras sociales."
+          setErrorState(errorMessage)
+          error("Error", { description: errorMessage })
         }
       } catch (err) {
         console.error("Error fetching OOSS:", err)
-        setErrorState("Ocurrió un error inesperado al cargar las obras sociales.")
-        error("Error", { description: "Error de conexión o servidor." })
+        const errorMessage =
+          err instanceof Error ? err.message : "Ocurrió un error inesperado al cargar las obras sociales."
+        setErrorState(errorMessage)
+        error("Error", { description: errorMessage })
       } finally {
         setIsLoadingInitial(false)
         setIsLoadingMore(false)
@@ -128,7 +133,6 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
     setSwitchLoading(obraSocialToToggle.id)
     const originalStatus = obraSocialToToggle.is_active
 
-    // Optimistic update - cambio inmediato en tiempo real
     setObrasSociales((prevObrasSociales) =>
       prevObrasSociales.map((os) => (os.id === obraSocialToToggle.id ? { ...os, is_active: newStatus } : os)),
     )
@@ -151,7 +155,6 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
           description: `Obra Social ${obraSocialToToggle.name} ${newStatus ? "activada" : "desactivada"}.`,
         })
 
-        // Si la respuesta incluye datos actualizados, los usamos
         if (response.ok && newStatus) {
           try {
             const updatedOS = await response.json()
@@ -163,19 +166,19 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
           }
         }
       } else {
-        // Revertir el cambio optimista
         setObrasSociales((prevObrasSociales) =>
           prevObrasSociales.map((os) => (os.id === obraSocialToToggle.id ? { ...os, is_active: originalStatus } : os)),
         )
         const errorData = await response.json().catch(() => ({ detail: "Error al actualizar." }))
-        error("Error al actualizar", { description: errorData.detail || "No se pudo cambiar el estado." })
+        const errorMessage = errorData.detail || errorData.error || errorData.message || "No se pudo cambiar el estado."
+        error("Error al actualizar", { description: errorMessage })
       }
     } catch (errorCatch) {
-      // Revertir el cambio optimista
       setObrasSociales((prevObrasSociales) =>
         prevObrasSociales.map((os) => (os.id === obraSocialToToggle.id ? { ...os, is_active: originalStatus } : os)),
       )
-      error("Error de red", { description: "No se pudo conectar con el servidor." })
+      const errorMessage = errorCatch instanceof Error ? errorCatch.message : "No se pudo conectar con el servidor."
+      error("Error de red", { description: errorMessage })
       console.error("Error toggling active state:", errorCatch)
     } finally {
       setSwitchLoading(null)
@@ -183,20 +186,20 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
-          <h3 className="text-lg font-medium text-gray-900">Obras Sociales</h3>
-          <p className="text-sm text-gray-500">Gestiona las obras sociales del sistema</p>
+          <h3 className="text-base md:text-lg font-medium text-gray-900">Obras Sociales</h3>
+          <p className="text-xs md:text-sm text-gray-500">Gestiona las obras sociales del sistema</p>
         </div>
-        <Button className="bg-[#204983] hover:bg-[#1a3d6f]" onClick={() => setIsCreateModalOpen(true)}>
+        <Button className="bg-[#204983] hover:bg-[#1a3d6f] w-full sm:w-auto" onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva Obra Social
         </Button>
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Buscar obra social..."
@@ -208,15 +211,15 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
       </div>
 
       {obrasSociales.length === 0 && !isLoadingInitial && !errorState ? (
-        <div className="text-center py-12">
-          <ShieldCheckIcon className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <h3 className="text-lg font-medium text-gray-900">No se encontraron Obras Sociales</h3>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="text-center py-8 md:py-12">
+          <ShieldCheckIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-gray-400 mb-3" />
+          <h3 className="text-base md:text-lg font-medium text-gray-900">No se encontraron Obras Sociales</h3>
+          <p className="mt-1 text-xs md:text-sm text-gray-500">
             {searchTerm ? "Ninguna obra social coincide con tu búsqueda." : "No hay obras sociales registradas."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 items-start">
           {obrasSociales.map((os) => (
             <ObraSocialCard
               key={os.id}
@@ -236,10 +239,9 @@ export const ObrasSocialesManagement: React.FC<ObrasSocialesManagementProps> = (
       )}
 
       {!hasMore && obrasSociales.length > 0 && !isLoadingInitial && (
-        <p className="text-center text-sm text-gray-500 py-4">Fin de los resultados.</p>
+        <p className="text-center text-xs md:text-sm text-gray-500 py-4">Fin de los resultados.</p>
       )}
 
-      {/* Dialogs */}
       {isCreateModalOpen && (
         <CreateObraSocialDialog
           open={isCreateModalOpen}

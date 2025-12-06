@@ -5,7 +5,32 @@ import { useToast } from "@/hooks/use-toast"
 import { IdleWarningModal } from "@/components/idle-warning-modal"
 import useIdleTimeout from "@/hooks/use-idle-timeout"
 import { AUTH_ENDPOINTS } from "@/config/api"
-import type { User, AuthResponse, TokenRefreshResponse, AuthContextType } from "@/types"
+import type { User } from "@/types"
+
+export interface TokenRefreshResponse {
+  access: string
+  refresh?: string
+}
+
+export interface AuthResponse {
+  access: string
+  refresh: string
+  user: User
+}
+
+interface AuthContextType {
+  user: User | null
+  token: string | null
+  isAuthenticated: boolean
+  isInitialized: boolean
+  isLoading: boolean
+  login: (username: string, password: string) => Promise<boolean>
+  logout: (showToast?: boolean) => void
+  hasPermission: (permission: number | string) => boolean
+  isInGroup: (groupName: string) => boolean
+  refreshUser: () => Promise<void>
+  refreshToken: () => Promise<boolean>
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -67,7 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isInGroup = useCallback(
     (groupName: string): boolean => {
       if (!user) return false
-      return user.roles.some((role) => role.name === groupName)
+      return !!user.roles?.some((role) => role.name === groupName)
     },
     [user],
   )

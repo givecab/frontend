@@ -194,10 +194,11 @@ export function CreateObraSocialDialog({ open, onOpenChange, onSuccess }: Create
                   step="0.01"
                   value={formData.ub_value}
                   onChange={(e) => handleInputChange("ub_value", e.target.value)}
-                  placeholder="Ingresa el valor UB (opcional)"
+                  placeholder="Ingresa el valor UB"
                   className={`pr-10 ${
                     formData.ub_value && !validation.ub_value.isValid ? "border-red-500 focus:border-red-500" : ""
                   }`}
+                  required
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                   {renderValidationIcon("ub_value")}

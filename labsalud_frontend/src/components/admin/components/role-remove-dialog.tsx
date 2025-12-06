@@ -2,13 +2,28 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo, useCallback } from "react"
-import type { User, Role } from "@/types"
+import type { User, Role, Group } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
 import { AC_ENDPOINTS } from "@/config/api"
+
+const extractErrorMessage = (errorData: unknown): string => {
+  if (!errorData || typeof errorData !== "object") return "Error desconocido"
+  const err = errorData as Record<string, unknown>
+  if (typeof err.detail === "string") return err.detail
+  if (typeof err.error === "string") return err.error
+  if (typeof err.message === "string") return err.message
+  for (const key of Object.keys(err)) {
+    const val = err[key]
+    if (Array.isArray(val) && val.length > 0) {
+      return `${key}: ${val[0]}`
+    }
+  }
+  return "Error desconocido"
+}
 
 interface RoleRemoveDialogProps {
   open: boolean
@@ -39,13 +54,9 @@ export function RoleRemoveDialog({
     if (!user || !roles || !Array.isArray(roles)) {
       return []
     }
-
-    const userGroups = user.groups || user.roles || []
-    const userRoleIds = userGroups.map((group) => group.id)
-
-    const filteredRoles = roles.filter((role) => userRoleIds.includes(role.id))
-
-    return filteredRoles
+    const userGroups = user.roles || []
+    const userRoleIds = userGroups.map((group: Group) => group.id)
+    return roles.filter((role) => userRoleIds.includes(role.id))
   }, [user, roles])
 
   useEffect(() => {
@@ -94,8 +105,10 @@ export function RoleRemoveDialog({
     setIsSubmitting(true)
 
     try {
-      const currentGroups = user.groups || []
-      const remainingRoleIds = currentGroups.filter((g) => g.id !== Number.parseInt(roleData.role_id)).map((g) => g.id)
+      const currentGroups = user.roles || []
+      const remainingRoleIds = currentGroups
+        .filter((g: Group) => g.id !== Number.parseInt(roleData.role_id))
+        .map((g: Group) => g.id)
 
       const response = await apiRequest(AC_ENDPOINTS.ROLE_ASSIGN, {
         method: "POST",
@@ -124,7 +137,7 @@ export function RoleRemoveDialog({
       } else {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         showError("Error al eliminar rol", {
-          description: errorData.detail || "Ha ocurrido un error al eliminar el rol.",
+          description: extractErrorMessage(errorData),
         })
       }
     } catch (err) {
@@ -139,14 +152,14 @@ export function RoleRemoveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="w-[95vw] sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Quitar Rol</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Quitar Rol</DialogTitle>
         </DialogHeader>
         <div className="py-4">
           {userRoles.length > 1 ? (
             <div className="space-y-4">
-              <p>Selecciona el rol que deseas quitar:</p>
+              <p className="text-sm sm:text-base">Selecciona el rol que deseas quitar:</p>
               <Select
                 value={roleData.role_id}
                 onValueChange={(value) => setRoleData((prev) => ({ ...prev, role_id: value }))}
@@ -165,24 +178,24 @@ export function RoleRemoveDialog({
               </Select>
             </div>
           ) : userRoles.length === 1 ? (
-            <p>
+            <p className="text-sm sm:text-base">
               ¿Estás seguro de que deseas quitar el rol <strong>{userRoles[0].name}</strong> del usuario{" "}
               <strong>{user?.username}</strong>?
             </p>
           ) : (
             <div className="space-y-2">
-              <p>Este usuario no tiene roles asignados.</p>
+              <p className="text-sm sm:text-base">Este usuario no tiene roles asignados.</p>
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <DialogClose asChild>
-            <Button type="button" variant="outline" disabled={isSubmitting}>
+            <Button type="button" variant="outline" disabled={isSubmitting} className="w-full sm:w-auto bg-transparent">
               Cancelar
             </Button>
           </DialogClose>
           <Button
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
             onClick={handleRemoveRole}
             disabled={isSubmitting || userRoles.length === 0}
           >

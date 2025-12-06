@@ -9,11 +9,24 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { User, Mail, Lock, Camera, AlertCircle, CheckCircle, Eye, EyeOff, Clock, Shield, History } from "lucide-react"
 import { toast } from "sonner"
 import { USER_ENDPOINTS, TOAST_DURATION } from "@/config/api"
-import type { ProfileData } from "@/types"
+import type { HistoryEntry, ActiveTempPermission } from "@/types"
 import { HistoryList } from "@/components/common/history-list"
+
+interface ProfileData {
+  id: number
+  username: string
+  email: string
+  first_name: string
+  last_name: string
+  photo?: string
+  history: HistoryEntry[]
+  total_changes: number
+  active_temp_permissions: ActiveTempPermission[]
+}
 
 interface ProfileFormData {
   email: string
@@ -25,6 +38,23 @@ interface ValidationErrors {
   email?: string
   password?: string
   photo?: string
+}
+
+const extractErrorMessage = (error: unknown): string => {
+  if (error && typeof error === "object") {
+    const err = error as Record<string, unknown>
+    if (typeof err.detail === "string") return err.detail
+    if (typeof err.error === "string") return err.error
+    if (typeof err.message === "string") return err.message
+    // Check for field-specific errors
+    for (const key in err) {
+      const value = err[key]
+      if (Array.isArray(value) && value.length > 0) {
+        return `${key}: ${value[0]}`
+      }
+    }
+  }
+  return "Error desconocido"
 }
 
 export default function ProfilePage() {
@@ -39,8 +69,8 @@ export default function ProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [showAuditDialog, setShowAuditDialog] = useState(false)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -57,7 +87,8 @@ export default function ProfilePage() {
             email: data.email || "",
           }))
         } else {
-          toast.error("Error al cargar el perfil", {
+          const errorData = await response.json().catch(() => ({}))
+          toast.error(extractErrorMessage(errorData), {
             duration: TOAST_DURATION,
           })
         }
@@ -153,7 +184,7 @@ export default function ProfilePage() {
         formDataToSend.append("email", formData.email)
       }
 
-      if (isChangingPassword && formData.password.trim()) {
+      if (formData.password.trim()) {
         formDataToSend.append("password", formData.password)
       }
 
@@ -197,17 +228,16 @@ export default function ProfilePage() {
             window.location.reload()
           }, 1000)
 
-          // Limpiar campos de contraseña
+          // Limpiar campos de contraseña y foto
           setFormData((prev) => ({
             ...prev,
             password: "",
             photo: undefined,
           }))
-          setIsChangingPassword(false)
           setPhotoPreview(null)
         } else {
-          const errorData = await response.json()
-          toast.error(errorData.detail || errorData.message || "Error al actualizar el perfil", {
+          const errorData = await response.json().catch(() => ({}))
+          toast.error(extractErrorMessage(errorData), {
             duration: TOAST_DURATION,
           })
         }
@@ -239,8 +269,8 @@ export default function ProfilePage() {
 
   if (!user || isLoadingProfile) {
     return (
-      <div className="w-full max-w-4xl mx-auto py-4 px-4">
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
+      <div className="w-full max-w-4xl mx-auto py-4 px-2 sm:px-4">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6">
           <p className="text-gray-600">Cargando perfil...</p>
         </div>
       </div>
@@ -248,52 +278,68 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-4 px-4 space-y-6">
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 md:p-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-800">Mi Perfil</h1>
-        <p className="text-gray-600 mt-1">Gestiona tu información personal y configuración de cuenta</p>
+    <div className="w-full max-w-4xl mx-auto py-4 px-2 sm:px-4 space-y-4 sm:space-y-6">
+      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">Mi Perfil</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">
+          Gestiona tu información personal y configuración de cuenta
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Información Personal */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="h-5 w-5" />
-              <span>Información Personal</span>
-            </CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+                <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span>Información Personal</span>
+              </CardTitle>
+              {profileData && profileData.history.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAuditDialog(true)}
+                  className="text-xs sm:text-sm flex items-center gap-1"
+                >
+                  <History className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Ver Auditoría</span>
+                  <span className="sm:hidden">Auditoría</span>
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Foto de Perfil */}
-            <div className="flex items-center space-x-4">
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
               <div className="relative">
                 {photoPreview ? (
                   <img
                     src={photoPreview || "/placeholder.svg"}
                     alt="Preview"
-                    className="w-20 h-20 rounded-full object-cover border border-gray-300"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border border-gray-300"
                   />
                 ) : profileData?.photo ? (
                   <img
                     src={profileData.photo || "/placeholder.svg"}
                     alt={`${profileData.username} avatar`}
-                    className="w-20 h-20 rounded-full object-cover border border-gray-300"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border border-gray-300"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-[#204983] flex items-center justify-center">
-                    <User className="w-10 h-10 text-white" />
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#204983] flex items-center justify-center">
+                    <User className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                   </div>
                 )}
-                <label className="absolute bottom-0 right-0 bg-[#204983] text-white p-2 rounded-full cursor-pointer hover:bg-[#1a3d6f] transition-colors">
-                  <Camera className="w-4 h-4" />
+                <label className="absolute bottom-0 right-0 bg-[#204983] text-white p-1.5 sm:p-2 rounded-full cursor-pointer hover:bg-[#1a3d6f] transition-colors">
+                  <Camera className="w-3 h-3 sm:w-4 sm:h-4" />
                   <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                 </label>
               </div>
-              <div>
+              <div className="text-center sm:text-left">
                 <p className="text-sm font-medium text-gray-700">Foto de Perfil</p>
                 <p className="text-xs text-gray-500">JPG, PNG o GIF. Máximo 5MB.</p>
                 {errors.photo && (
-                  <div className="flex items-center space-x-1 mt-1">
+                  <div className="flex items-center justify-center sm:justify-start space-x-1 mt-1">
                     <AlertCircle className="h-4 w-4 text-red-500" />
                     <span className="text-sm text-red-600">{errors.photo}</span>
                   </div>
@@ -301,15 +347,18 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Campos de solo lectura */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <Label htmlFor="username">Nombre de Usuario</Label>
+                <Label htmlFor="username" className="text-sm">
+                  Nombre de Usuario
+                </Label>
                 <Input id="username" value={profileData?.username || ""} disabled className="bg-gray-50" />
                 <p className="text-xs text-gray-500 mt-1">No se puede modificar</p>
               </div>
               <div>
-                <Label htmlFor="full_name">Nombre Completo</Label>
+                <Label htmlFor="full_name" className="text-sm">
+                  Nombre Completo
+                </Label>
                 <Input
                   id="full_name"
                   value={`${profileData?.first_name || ""} ${profileData?.last_name || ""}`.trim()}
@@ -322,7 +371,9 @@ export default function ProfilePage() {
 
             {/* Email editable */}
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm">
+                Email
+              </Label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-4 w-4 text-gray-400" />
@@ -341,87 +392,78 @@ export default function ProfilePage() {
                   <AlertCircle className="h-4 w-4 text-red-500" />
                   <span className="text-sm text-red-600">{errors.email}</span>
                 </div>
-              ) : (
+              ) : formData.email && validateEmail(formData.email) ? (
                 <div className="flex items-center space-x-1 mt-1">
                   <CheckCircle className="h-4 w-4 text-green-500" />
                   <span className="text-sm text-green-600">Email válido</span>
                 </div>
-              )}
+              ) : null}
             </div>
+
+            <div>
+              <Label htmlFor="password" className="text-sm">
+                Nueva Contraseña (opcional)
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-4 w-4 text-gray-400" />
+                </div>
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => handleInputChange("password", e.target.value)}
+                  className="pl-10 pr-10"
+                  placeholder="Dejar vacío para no cambiar"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Deja el campo vacío si no deseas cambiar tu contraseña</p>
+            </div>
+
+            <Button type="submit" disabled={isSubmitting} className="w-full bg-[#204983] hover:bg-[#1a3d6f] mt-4">
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Guardando...
+                </>
+              ) : (
+                "Guardar Cambios"
+              )}
+            </Button>
           </CardContent>
         </Card>
 
-        {/* Cambio de Contraseña */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Lock className="h-5 w-5" />
-                <span>Cambiar Contraseña</span>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsChangingPassword(!isChangingPassword)}
-              >
-                {isChangingPassword ? "Cancelar" : "Cambiar"}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          {isChangingPassword && (
-            <CardContent className="space-y-4">
-              {/* Nueva Contraseña */}
-              <div>
-                <Label htmlFor="password">Nueva Contraseña</Label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => handleInputChange("password", e.target.value)}
-                    className="pl-10 pr-10"
-                    placeholder="Nueva contraseña"
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-
+        {/* Permisos Temporales */}
         {profileData && profileData.active_temp_permissions.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="h-5 w-5" />
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>Permisos Temporales Activos</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
               <div className="space-y-3">
-                {profileData.active_temp_permissions.map((perm, index) => (
+                {profileData.active_temp_permissions.map((perm: ActiveTempPermission, index: number) => (
                   <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{perm.name}</p>
-                        <p className="text-sm text-gray-600 mt-1">{perm.reason}</p>
+                        <p className="font-medium text-gray-900 text-sm sm:text-base">{perm.name}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1">{perm.reason}</p>
                       </div>
-                      <div className="flex items-center space-x-1 text-sm text-gray-500">
-                        <Clock className="h-4 w-4" />
+                      <div className="flex items-center space-x-1 text-xs sm:text-sm text-gray-500">
+                        <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
                         <span>Expira: {formatDate(perm.expires_at)}</span>
                       </div>
                     </div>
@@ -431,38 +473,26 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         )}
-
-        {profileData && profileData.history.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <History className="h-5 w-5" />
-                  <span>Historial de Cambios</span>
-                </div>
-                <span className="text-sm text-gray-500">{profileData.total_changes} cambios totales</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HistoryList history={profileData.history} maxItems={5} />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Botón de Guardar */}
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting} className="bg-[#204983] hover:bg-[#1a3d6f]">
-            {isSubmitting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                Guardando...
-              </>
-            ) : (
-              "Guardar Cambios"
-            )}
-          </Button>
-        </div>
       </form>
+
+      <Dialog open={showAuditDialog} onOpenChange={setShowAuditDialog}>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <History className="h-4 w-4 sm:h-5 sm:w-5" />
+              Historial Completo de Cambios
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {profileData && (
+              <>
+                <p className="text-xs sm:text-sm text-gray-500 mb-4">Total de cambios: {profileData.total_changes}</p>
+                <HistoryList history={profileData.history} />
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -135,6 +135,23 @@ const getStatusColor = (statusId: number): string => {
   }
 }
 
+const extractErrorMessage = (errorData: any): string => {
+  if (typeof errorData === "string") return errorData
+  if (errorData?.detail) return errorData.detail
+  if (errorData?.error) return errorData.error
+  if (errorData?.message) return errorData.message
+  if (typeof errorData === "object") {
+    const firstKey = Object.keys(errorData)[0]
+    if (firstKey && Array.isArray(errorData[firstKey])) {
+      return `${firstKey}: ${errorData[firstKey][0]}`
+    }
+    if (firstKey && typeof errorData[firstKey] === "string") {
+      return `${firstKey}: ${errorData[firstKey]}`
+    }
+  }
+  return "Error desconocido"
+}
+
 export function ProtocolAccordionView() {
   const { apiRequest } = useApi()
   const { success, error: showError } = useToast()
@@ -174,7 +191,7 @@ export function ProtocolAccordionView() {
   const [previousResults, setPreviousResults] = useState<Record<number, PreviousResultData[]>>({})
   const [loadingPrevious, setLoadingPrevious] = useState<Set<number>>(new Set())
   const [expandedHistory, setExpandedHistory] = useState<Set<number>>(new Set())
-  const [focusedInput, setFocusedInput] = useState<number | null>(null)
+  const [, setFocusedInput] = useState<number | null>(null)
 
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
@@ -230,7 +247,8 @@ export function ProtocolAccordionView() {
           setNextUrl(data.next)
           setHasMore(!!data.next)
         } else {
-          showError("Error al cargar protocolos")
+          const errorData = await response.json().catch(() => ({}))
+          showError(extractErrorMessage(errorData) || "Error al cargar protocolos")
         }
       } catch (error) {
         showError("Error al cargar protocolos")
@@ -296,7 +314,8 @@ export function ProtocolAccordionView() {
             [protocolId]: analysisKeys,
           }))
         } else {
-          showError("Error al cargar resultados del protocolo")
+          const errorData = await response.json().catch(() => ({}))
+          showError(extractErrorMessage(errorData) || "Error al cargar resultados del protocolo")
         }
       } catch (error) {
         showError("Error al cargar resultados")
@@ -358,8 +377,8 @@ export function ProtocolAccordionView() {
             },
           }))
         } else {
-          const errorData = await response.json()
-          showError(errorData.detail || "Error al guardar resultado")
+          const errorData = await response.json().catch(() => ({}))
+          showError(extractErrorMessage(errorData) || "Error al guardar resultado")
         }
       } catch (error) {
         showError("Error al guardar resultado")
@@ -475,6 +494,8 @@ export function ProtocolAccordionView() {
       setFocusedInput(resultId)
       loadPreviousResults(resultId, patientId, determinationId)
       setExpandedHistory((prev) => new Set(prev).add(resultId))
+      const input = inputRefs.current[resultId]
+      scrollToInput(input)
     },
     [loadPreviousResults],
   )
@@ -504,23 +525,16 @@ export function ProtocolAccordionView() {
     )
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const getInitials = (username: string) => {
-    return username
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
+  const scrollToInput = (inputElement: HTMLInputElement | null) => {
+    if (inputElement) {
+      const container = inputElement.closest(".p-4.bg-white.border")
+      if (container) {
+        container.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        })
+      }
+    }
   }
 
   if (loadingProtocols && protocols.length === 0) {
@@ -536,11 +550,11 @@ export function ProtocolAccordionView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Buscar por paciente o número de protocolo..."
+            placeholder="Buscar por paciente o protocolo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-white"
@@ -548,61 +562,67 @@ export function ProtocolAccordionView() {
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700">Filtrar por estado:</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="text-xs sm:text-sm font-medium text-gray-700">Filtrar por estado:</p>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <Button
               variant={selectedStatuses.includes(1) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(1)}
-              className={selectedStatuses.includes(1) ? "bg-yellow-500 hover:bg-yellow-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(1) ? "bg-yellow-500 hover:bg-yellow-600" : ""}`}
             >
               <Clock className="h-3 w-3 mr-1" />
-              Pend. Carga
+              <span className="hidden sm:inline">Pend.</span> Carga
             </Button>
             <Button
               variant={selectedStatuses.includes(2) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(2)}
-              className={selectedStatuses.includes(2) ? "bg-blue-500 hover:bg-blue-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(2) ? "bg-blue-500 hover:bg-blue-600" : ""}`}
             >
               <Filter className="h-3 w-3 mr-1" />
-              Pend. Validación
+              <span className="hidden sm:inline">Pend.</span> Valid.
             </Button>
             <Button
               variant={selectedStatuses.includes(3) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(3)}
-              className={selectedStatuses.includes(3) ? "bg-orange-500 hover:bg-orange-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(3) ? "bg-orange-500 hover:bg-orange-600" : ""}`}
             >
               <Clock className="h-3 w-3 mr-1" />
-              Pago Incompleto
+              Pago <span className="hidden sm:inline">Incomp.</span>
             </Button>
             <Button
               variant={selectedStatuses.includes(6) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(6)}
-              className={selectedStatuses.includes(6) ? "bg-purple-500 hover:bg-purple-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(6) ? "bg-purple-500 hover:bg-purple-600" : ""}`}
             >
               <User className="h-3 w-3 mr-1" />
-              Pend. Retiro
+              <span className="hidden sm:inline">Pend.</span> Retiro
             </Button>
             <Button
               variant={selectedStatuses.includes(5) ? "default" : "outline"}
               size="sm"
               onClick={() => toggleStatus(5)}
-              className={selectedStatuses.includes(5) ? "bg-green-500 hover:bg-green-600" : ""}
+              className={`text-xs ${selectedStatuses.includes(5) ? "bg-green-500 hover:bg-green-600" : ""}`}
             >
               <CheckCircle className="h-3 w-3 mr-1" />
-              Completado
+              <span className="hidden sm:inline">Completado</span>
+              <span className="sm:hidden">Compl.</span>
             </Button>
             {selectedStatuses.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedStatuses([])} className="text-gray-500">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedStatuses([])}
+                className="text-gray-500 text-xs"
+              >
                 <X className="h-3 w-3 mr-1" />
                 Limpiar
               </Button>
             )}
           </div>
-          <p className="text-xs text-gray-500">Los protocolos cancelados no se muestran en esta vista.</p>
+          <p className="text-xs text-gray-500">Los protocolos cancelados no se muestran.</p>
         </div>
       </div>
 

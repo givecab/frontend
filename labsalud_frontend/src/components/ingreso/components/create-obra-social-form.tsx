@@ -19,12 +19,26 @@ interface CreateObraSocialFormProps {
   onCancel: () => void
 }
 
+const extractErrorMessage = (errorData: unknown): string => {
+  if (typeof errorData === "string") return errorData
+  if (errorData && typeof errorData === "object") {
+    const err = errorData as Record<string, unknown>
+    if (err.detail) return String(err.detail)
+    if (err.error) return String(err.error)
+    if (err.message) return String(err.message)
+    const firstKey = Object.keys(err)[0]
+    if (firstKey && Array.isArray(err[firstKey])) {
+      return `${firstKey}: ${err[firstKey][0]}`
+    }
+  }
+  return "Ha ocurrido un error inesperado"
+}
+
 export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateObraSocialFormProps) {
   const { apiRequest } = useApi()
   const [formData, setFormData] = useState({
     name: "",
     ub_value: "",
-    private_ub_value: "",
     description: "",
   })
   const [isCreating, setIsCreating] = useState(false)
@@ -48,18 +62,12 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
       return
     }
 
-    if (!formData.private_ub_value || Number.parseFloat(formData.private_ub_value) <= 0) {
-      toast.error("Ingrese un valor de UB particular válido")
-      return
-    }
-
     try {
       setIsCreating(true)
 
       const dataToSend = {
         name: formData.name,
         ub_value: formData.ub_value,
-        private_ub_value: formData.private_ub_value,
         ...(formData.description && { description: formData.description }),
       }
 
@@ -79,12 +87,12 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
         const errorData = await response.json()
         console.error("Obra social creation error:", errorData)
         toast.error("Error al crear obra social", {
-          description: errorData.detail || "Ha ocurrido un error al crear la obra social.",
+          description: extractErrorMessage(errorData),
         })
       }
     } catch (error) {
       console.error("Error creating obra social:", error)
-      toast.error("Error al crear la obra social")
+      toast.error("Error al crear la obra social", { description: "Error de conexión con el servidor" })
     } finally {
       setIsCreating(false)
     }
@@ -111,35 +119,19 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="ub_value">Valor UB Obra Social *</Label>
-            <Input
-              id="ub_value"
-              name="ub_value"
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.ub_value}
-              onChange={handleInputChange}
-              placeholder="0.00"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="private_ub_value">Valor UB Particular *</Label>
-            <Input
-              id="private_ub_value"
-              name="private_ub_value"
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.private_ub_value}
-              onChange={handleInputChange}
-              placeholder="0.00"
-              required
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="ub_value">Valor UB *</Label>
+          <Input
+            id="ub_value"
+            name="ub_value"
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.ub_value}
+            onChange={handleInputChange}
+            placeholder="0.00"
+            required
+          />
         </div>
 
         <div className="space-y-2">
@@ -154,7 +146,7 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
           />
         </div>
 
-        <div className="flex gap-2 pt-4">
+        <div className="flex flex-col sm:flex-row gap-2 pt-4">
           <Button
             onClick={handleCreateObraSocial}
             disabled={isCreating}
@@ -167,7 +159,7 @@ export function CreateObraSocialForm({ onObraSocialCreated, onCancel }: CreateOb
             )}
             {isCreating ? "Creando..." : "Crear Obra Social"}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" onClick={onCancel} className="sm:w-auto bg-transparent">
             <X className="h-4 w-4 mr-2" />
             Cancelar
           </Button>

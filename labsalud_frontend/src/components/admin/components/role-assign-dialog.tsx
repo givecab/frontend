@@ -2,13 +2,28 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo, useCallback } from "react"
-import type { User, Role } from "@/types"
+import type { User, Role, Group } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
 import { AC_ENDPOINTS } from "@/config/api"
+
+const extractErrorMessage = (errorData: unknown): string => {
+  if (!errorData || typeof errorData !== "object") return "Error desconocido"
+  const err = errorData as Record<string, unknown>
+  if (typeof err.detail === "string") return err.detail
+  if (typeof err.error === "string") return err.error
+  if (typeof err.message === "string") return err.message
+  for (const key of Object.keys(err)) {
+    const val = err[key]
+    if (Array.isArray(val) && val.length > 0) {
+      return `${key}: ${val[0]}`
+    }
+  }
+  return "Error desconocido"
+}
 
 interface RoleAssignDialogProps {
   open: boolean
@@ -39,8 +54,8 @@ export function RoleAssignDialog({
     if (!user || !roles || !Array.isArray(roles)) {
       return []
     }
-    const userGroups = user.groups || user.roles || []
-    const userRoleIds = userGroups.map((group) => group.id)
+    const userGroups = user.roles || []
+    const userRoleIds = userGroups.map((group: Group) => group.id)
     return roles.filter((role) => !userRoleIds.includes(role.id))
   }, [user, roles])
 
@@ -90,7 +105,7 @@ export function RoleAssignDialog({
     setIsSubmitting(true)
 
     try {
-      const currentRoleIds = (user.groups || user.roles || []).map((group) => group.id)
+      const currentRoleIds = (user.roles || []).map((group: Group) => group.id)
       const newRoleId = Number.parseInt(roleData.role_id)
       const allRoleIds = [...currentRoleIds, newRoleId]
 
@@ -106,7 +121,7 @@ export function RoleAssignDialog({
         const data = await response.json()
         const updatedUser = {
           ...user,
-          groups: [...(user.groups || []), ...data.assigned_roles],
+          groups: [...(user.roles || []), ...data.assigned_roles],
         }
         setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
         if (refreshData) {
@@ -117,7 +132,7 @@ export function RoleAssignDialog({
       } else {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         showError("Error al asignar rol", {
-          description: errorData.detail || "Ha ocurrido un error al asignar el rol.",
+          description: extractErrorMessage(errorData),
         })
       }
     } catch (err) {
@@ -132,14 +147,14 @@ export function RoleAssignDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="w-[95vw] sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Asignar Rol</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Asignar Rol</DialogTitle>
         </DialogHeader>
         <div className="py-4">
           {availableRoles.length > 0 ? (
             <div className="space-y-4">
-              <p>
+              <p className="text-sm sm:text-base">
                 Selecciona el rol que deseas asignar a <strong>{user.username}</strong>:
               </p>
               <Select
@@ -161,17 +176,21 @@ export function RoleAssignDialog({
             </div>
           ) : (
             <div className="space-y-2">
-              <p>Este usuario ya tiene todos los roles disponibles asignados.</p>
+              <p className="text-sm sm:text-base">Este usuario ya tiene todos los roles disponibles asignados.</p>
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <DialogClose asChild>
-            <Button type="button" variant="outline" disabled={isSubmitting}>
+            <Button type="button" variant="outline" disabled={isSubmitting} className="w-full sm:w-auto bg-transparent">
               Cancelar
             </Button>
           </DialogClose>
-          <Button onClick={handleAssignRole} disabled={isSubmitting || availableRoles.length === 0}>
+          <Button
+            onClick={handleAssignRole}
+            disabled={isSubmitting || availableRoles.length === 0}
+            className="w-full sm:w-auto"
+          >
             {isSubmitting ? "Asignando..." : "Asignar Rol"}
           </Button>
         </DialogFooter>

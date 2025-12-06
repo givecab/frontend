@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
 import { USER_ENDPOINTS, AC_ENDPOINTS } from "@/config/api"
+import { Eye, EyeOff } from "lucide-react"
 
 interface CreateUserDialogProps {
   open: boolean
@@ -19,6 +20,22 @@ interface CreateUserDialogProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>
   apiRequest: (url: string, options?: ApiRequestOptions) => Promise<Response>
   refreshData: () => Promise<void>
+}
+
+const extractErrorMessage = (errorData: unknown): string => {
+  if (!errorData || typeof errorData !== "object") return "Error desconocido"
+  const err = errorData as Record<string, unknown>
+  if (typeof err.detail === "string") return err.detail
+  if (typeof err.error === "string") return err.error
+  if (typeof err.message === "string") return err.message
+  // Buscar errores de campo
+  for (const key of Object.keys(err)) {
+    const val = err[key]
+    if (Array.isArray(val) && val.length > 0) {
+      return `${key}: ${val[0]}`
+    }
+  }
+  return "Error desconocido"
 }
 
 export function CreateUserDialog({
@@ -36,10 +53,14 @@ export function CreateUserDialog({
     first_name: "",
     last_name: "",
     password: "",
+    confirmPassword: "",
     photo: null as File | null,
     selectedRoles: [] as number[],
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
 
   useEffect(() => {
     if (open) {
@@ -47,7 +68,7 @@ export function CreateUserDialog({
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData)
-          setUserData({ ...userData, ...parsed, password: "", photo: null }) // Don't save password or photo
+          setUserData({ ...userData, ...parsed, password: "", confirmPassword: "", photo: null })
         } catch (e) {
           console.error("Error parsing saved user data:", e)
         }
@@ -59,16 +80,20 @@ export function CreateUserDialog({
         first_name: "",
         last_name: "",
         password: "",
+        confirmPassword: "",
         photo: null,
         selectedRoles: [],
       })
       setIsSubmitting(false)
+      setShowPassword(false)
+      setShowConfirmPassword(false)
+      setPasswordError("")
       localStorage.removeItem("create-user-form")
     }
   }, [open])
 
   const saveUserData = useCallback((data: typeof userData) => {
-    const { password, photo, ...dataToSave } = data
+    const { password, confirmPassword, photo, ...dataToSave } = data
     localStorage.setItem("create-user-form", JSON.stringify(dataToSave))
   }, [])
 
@@ -77,6 +102,14 @@ export function CreateUserDialog({
       saveUserData(userData)
     }
   }, [userData, saveUserData])
+
+  useEffect(() => {
+    if (userData.confirmPassword && userData.password !== userData.confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden")
+    } else {
+      setPasswordError("")
+    }
+  }, [userData.password, userData.confirmPassword])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
@@ -105,12 +138,17 @@ export function CreateUserDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (userData.password !== userData.confirmPassword) {
+      showError("Error de validación", {
+        description: "Las contraseñas no coinciden.",
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      console.log("[v0] Creating user with data:", userData)
-
-      // Step 1: Create user
       const formData = new FormData()
       formData.append("username", userData.username)
       formData.append("password", userData.password)
@@ -124,28 +162,23 @@ export function CreateUserDialog({
       const createResponse = await apiRequest(USER_ENDPOINTS.USERS, {
         method: "POST",
         body: formData,
-        isFormData: true,
       })
 
       if (!createResponse.ok) {
         const errorData = await createResponse.json().catch(() => ({ detail: "Error desconocido" }))
         showError("Error al crear usuario", {
-          description: errorData.detail || "Ha ocurrido un error al crear el usuario.",
+          description: extractErrorMessage(errorData),
         })
         setIsSubmitting(false)
         return
       }
 
       const newUser = await createResponse.json()
-      console.log("[v0] User created successfully:", newUser)
 
-      // Step 2: Assign roles if any selected
       let roleAssignmentSuccess = true
       let roleAssignmentMessage = ""
 
       if (userData.selectedRoles.length > 0) {
-        console.log("[v0] Attempting to assign roles:", userData.selectedRoles)
-
         try {
           const roleResponse = await apiRequest(AC_ENDPOINTS.ROLE_ASSIGN, {
             method: "POST",
@@ -156,21 +189,16 @@ export function CreateUserDialog({
           })
 
           if (roleResponse.ok) {
-            console.log("[v0] Roles assigned successfully")
             roleAssignmentMessage = "Usuario creado y roles asignados exitosamente."
           } else if (roleResponse.status === 401 || roleResponse.status === 403) {
-            // Permission denied for role assignment
-            console.log("[v0] Permission denied for role assignment")
             roleAssignmentSuccess = false
             roleAssignmentMessage = "Usuario creado exitosamente, pero no tiene permisos para asignar roles."
           } else {
-            const errorData = await roleResponse.json().catch(() => ({}))
-            console.log("[v0] Role assignment failed:", errorData)
             roleAssignmentSuccess = false
             roleAssignmentMessage = "Usuario creado exitosamente, pero hubo un error al asignar los roles."
           }
         } catch (roleError) {
-          console.error("[v0] Error assigning roles:", roleError)
+          console.error("Error assigning roles:", roleError)
           roleAssignmentSuccess = false
           roleAssignmentMessage = "Usuario creado exitosamente, pero hubo un error al asignar los roles."
         }
@@ -178,11 +206,9 @@ export function CreateUserDialog({
         roleAssignmentMessage = "Usuario creado exitosamente."
       }
 
-      // Update user list
       setUsers((prev) => [newUser, ...prev])
       await refreshData()
 
-      // Show appropriate message
       if (roleAssignmentSuccess || userData.selectedRoles.length === 0) {
         success("Usuario creado", {
           description: roleAssignmentMessage,
@@ -195,7 +221,7 @@ export function CreateUserDialog({
 
       onOpenChange(false)
     } catch (err) {
-      console.error("[v0] Error creating user:", err)
+      console.error("Error creating user:", err)
       showError("Error", {
         description: "Ha ocurrido un error de red o inesperado.",
       })
@@ -206,12 +232,12 @@ export function CreateUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Usuario</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username">Nombre de usuario *</Label>
               <Input
@@ -237,7 +263,7 @@ export function CreateUserDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Nombre *</Label>
               <Input
@@ -262,17 +288,52 @@ export function CreateUserDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña *</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              value={userData.password}
-              onChange={handleChange}
-              required
-              placeholder="••••••••"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña *</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={userData.password}
+                  onChange={handleChange}
+                  required
+                  placeholder="••••••••"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={userData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  placeholder="••••••••"
+                  className={`pr-10 ${passwordError ? "border-red-500" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -285,7 +346,7 @@ export function CreateUserDialog({
 
           <div className="space-y-2">
             <Label>Roles</Label>
-            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
               {Array.isArray(roles) && roles.length > 0 ? (
                 roles.map((role) => (
                   <div key={role.id} className="flex items-center space-x-2">
@@ -305,13 +366,22 @@ export function CreateUserDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isSubmitting}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto bg-transparent"
+              >
                 Cancelar
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !!passwordError}
+              className="w-full sm:w-auto bg-[#204983] hover:bg-[#1a3d6f]"
+            >
               {isSubmitting ? "Creando..." : "Crear Usuario"}
             </Button>
           </DialogFooter>

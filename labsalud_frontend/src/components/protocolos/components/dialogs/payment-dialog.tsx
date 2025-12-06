@@ -31,7 +31,8 @@ export function PaymentDialog({
 }: PaymentDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      {/* // Improved responsive width */}
+      <DialogContent className="w-[95vw] max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-green-600" />
@@ -64,14 +65,15 @@ export function PaymentDialog({
             <p className="text-xs text-gray-500">Ingrese un monto entre $0.01 y ${Math.abs(balance).toFixed(2)}</p>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        {/* // Responsive footer buttons */}
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Cancelar
           </Button>
           <Button
             onClick={onConfirm}
             disabled={isProcessing || !paymentAmount}
-            className="bg-green-600 hover:bg-green-700"
+            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
           >
             {isProcessing ? (
               <>

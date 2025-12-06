@@ -35,15 +35,6 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      const validTypes = [
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      ]
-      if (!validTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(xls|xlsx)$/i)) {
-        setError("Por favor selecciona un archivo Excel válido (.xls o .xlsx)")
-        setFile(null)
-        return
-      }
       setFile(selectedFile)
       setError(null)
     }
@@ -62,22 +53,19 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
       const formData = new FormData()
       formData.append("file", file)
 
-      const response = await apiRequest(CATALOG_ENDPOINTS.IMPORT_XLSX, {
+      const response = await apiRequest(CATALOG_ENDPOINTS.ANALYSIS_IMPORT, {
         method: "POST",
         body: formData,
-        // Don't set Content-Type header, let browser set it with boundary for multipart/form-data
       })
 
       if (response.ok) {
         const data = await response.json()
         toast.success(data.message || "Los datos se importaron correctamente")
         onOpenChange(false)
-        setTimeout(() => {
-          window.location.reload()
-        }, 500)
+        onSuccess()
       } else {
-        const errorData = await response.json()
-        const errorMessage = errorData.detail || errorData.error || "Error al importar el catálogo"
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.detail || errorData.error || errorData.message || "Error al importar el catálogo"
         setError(errorMessage)
         toast.error(errorMessage)
       }
@@ -100,35 +88,35 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5" />
-            Importar Catálogo de Paneles y Análisis
+          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+            <FileSpreadsheet className="h-4 w-4 md:h-5 md:w-5" />
+            Importar Catálogo de Análisis y Determinaciones
           </DialogTitle>
-          <DialogDescription>
-            Selecciona un archivo Excel (.xls o .xlsx) con el formato correcto para importar paneles y análisis.
+          <DialogDescription className="text-xs md:text-sm">
+            Selecciona un archivo Excel (.xls o .xlsx) con el formato correcto para importar análisis y determinaciones.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <Alert className="bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-sm text-blue-900">
+            <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <AlertDescription className="text-xs md:text-sm text-blue-900">
               <strong className="block mb-2">Formato requerido del archivo Excel:</strong>
               <div className="space-y-3">
                 <div>
-                  <p className="font-semibold">Tabla 1: "paneles"</p>
-                  <p className="text-xs mt-1">Debe contener las siguientes columnas:</p>
-                  <ul className="list-disc list-inside text-xs mt-1 ml-2 space-y-0.5">
+                  <p className="font-semibold">Tabla 1: "Analisis"</p>
+                  <p className="text-[10px] md:text-xs mt-1">Debe contener las siguientes columnas:</p>
+                  <ul className="list-disc list-inside text-[10px] md:text-xs mt-1 ml-2 space-y-0.5">
                     <li>
-                      <code className="bg-blue-100 px-1 rounded">id</code> - Identificador único del panel
+                      <code className="bg-blue-100 px-1 rounded">id</code> - Identificador único del análisis
                     </li>
                     <li>
-                      <code className="bg-blue-100 px-1 rounded">codigo</code> - Código del panel
+                      <code className="bg-blue-100 px-1 rounded">codigo</code> - Código del análisis
                     </li>
                     <li>
-                      <code className="bg-blue-100 px-1 rounded">nombre</code> - Nombre del panel
+                      <code className="bg-blue-100 px-1 rounded">nombre</code> - Nombre del análisis
                     </li>
                     <li>
                       <code className="bg-blue-100 px-1 rounded">urgencia</code> - Indica si es urgente (true/false)
@@ -139,17 +127,27 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
                   </ul>
                 </div>
                 <div>
-                  <p className="font-semibold">Tabla 2: "analisis"</p>
-                  <p className="text-xs mt-1">Debe contener las siguientes columnas:</p>
-                  <ul className="list-disc list-inside text-xs mt-1 ml-2 space-y-0.5">
+                  <p className="font-semibold">Tabla 2: "Determinaciones"</p>
+                  <p className="text-[10px] md:text-xs mt-1">Debe contener las siguientes columnas:</p>
+                  <ul className="list-disc list-inside text-[10px] md:text-xs mt-1 ml-2 space-y-0.5">
                     <li>
-                      <code className="bg-blue-100 px-1 rounded">nombre</code> - Nombre del análisis
+                      <code className="bg-blue-100 px-1 rounded">id</code> - Identificador único de la determinación
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">nombre</code> - Nombre de la determinación
                     </li>
                     <li>
                       <code className="bg-blue-100 px-1 rounded">unidad_medida</code> - Unidad de medida
                     </li>
                     <li>
-                      <code className="bg-blue-100 px-1 rounded">panelid</code> - ID del panel al que pertenece
+                      <code className="bg-blue-100 px-1 rounded">analisis_id</code> - ID del análisis al que pertenece
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">formula</code> - Fórmula de cálculo (opcional)
+                    </li>
+                    <li>
+                      <code className="bg-blue-100 px-1 rounded">valores_referencia</code> - Valores de referencia
+                      (JSON)
                     </li>
                   </ul>
                 </div>
@@ -158,18 +156,14 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
           </Alert>
 
           <div className="space-y-2">
-            <Label htmlFor="file">Archivo Excel</Label>
-            <Input
-              id="file"
-              type="file"
-              accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              onChange={handleFileChange}
-              disabled={isLoading}
-            />
+            <Label htmlFor="file" className="text-sm">
+              Archivo
+            </Label>
+            <Input id="file" type="file" onChange={handleFileChange} disabled={isLoading} className="text-sm" />
             {file && (
-              <p className="text-sm text-gray-600 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                {file.name}
+              <p className="text-xs md:text-sm text-gray-600 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                <span className="truncate">{file.name}</span>
               </p>
             )}
           </div>
@@ -177,16 +171,25 @@ export function ImportDataDialog({ open, onOpenChange, onSuccess }: ImportDataDi
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="text-xs md:text-sm">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="w-full sm:w-auto bg-transparent"
+          >
             Cancelar
           </Button>
-          <Button onClick={handleImport} disabled={!file || isLoading} className="bg-[#204983] hover:bg-[#1a3d6f]">
+          <Button
+            onClick={handleImport}
+            disabled={!file || isLoading}
+            className="bg-[#204983] hover:bg-[#1a3d6f] w-full sm:w-auto"
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

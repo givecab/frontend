@@ -81,7 +81,6 @@ export function ProtocolForm({
   const remaining = Math.max(0, totals.patientOwes - patientPaid)
 
   const handleValuePaidChange = (value: string) => {
-    const numValue = Number.parseFloat(value) || 0
     onValuePaidChange(value)
   }
 

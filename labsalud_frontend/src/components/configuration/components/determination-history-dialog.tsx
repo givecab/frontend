@@ -23,7 +23,6 @@ export function DeterminationHistoryDialog({
 }: DeterminationHistoryDialogProps) {
   const { apiRequest } = useApi()
   const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [totalChanges, setTotalChanges] = useState(0)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -41,7 +40,6 @@ export function DeterminationHistoryDialog({
       if (response.ok) {
         const data = await response.json()
         setHistory(data.history || [])
-        setTotalChanges(data.total_changes || 0)
       }
     } catch (error) {
       console.error("Error al cargar historial:", error)
@@ -62,7 +60,7 @@ export function DeterminationHistoryDialog({
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
             </div>
           ) : (
-            <HistoryList history={history} totalChanges={totalChanges} />
+            <HistoryList history={history} />
           )}
         </div>
       </DialogContent>

@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import type { User } from "@/types"
+import type { User, HistoryEntry, Group } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,8 +10,22 @@ import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
 import { USER_ENDPOINTS } from "@/config/api"
 import { HistoryList } from "@/components/common/history-list"
-import type { HistoryEntry } from "@/types"
 import { Clock, Mail, UserIcon, Shield, Calendar } from "lucide-react"
+
+const extractErrorMessage = (errorData: unknown): string => {
+  if (!errorData || typeof errorData !== "object") return "Error desconocido"
+  const err = errorData as Record<string, unknown>
+  if (typeof err.detail === "string") return err.detail
+  if (typeof err.error === "string") return err.error
+  if (typeof err.message === "string") return err.message
+  for (const key of Object.keys(err)) {
+    const val = err[key]
+    if (Array.isArray(val) && val.length > 0) {
+      return `${key}: ${val[0]}`
+    }
+  }
+  return "Error desconocido"
+}
 
 interface ViewUserDialogProps {
   open: boolean
@@ -24,6 +38,7 @@ interface UserDetailData extends User {
   history: HistoryEntry[]
   total_changes: number
   temporary_permissions: number
+  groups: Group[]
 }
 
 export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewUserDialogProps) {
@@ -54,7 +69,7 @@ export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewU
       } else {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         showError("Error al cargar usuario", {
-          description: errorData.detail || "No se pudo obtener la información del usuario.",
+          description: extractErrorMessage(errorData),
         })
       }
     } catch (err) {
@@ -88,29 +103,28 @@ export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewU
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Detalles del Usuario</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Detalles del Usuario</DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
-          <div className="py-8 text-center text-gray-500">Cargando información del usuario...</div>
+          <div className="py-8 text-center text-gray-500 text-sm sm:text-base">Cargando información del usuario...</div>
         ) : userData ? (
-          <div className="space-y-6">
-            {/* Header con avatar e info básica */}
-            <div className="flex items-start space-x-4">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
               <Avatar className="h-16 w-16">
                 <AvatarImage src={userData.photo || "/placeholder.svg"} alt={userData.username} />
                 <AvatarFallback className="bg-[#204983] text-white text-lg">
                   {getInitials(userData.first_name, userData.last_name, userData.username)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900">
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
                   {`${userData.first_name} ${userData.last_name}`.trim() || userData.username}
                 </h3>
                 <p className="text-sm text-gray-500">@{userData.username}</p>
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-2">
                   {userData.is_superuser && (
                     <Badge variant="destructive" className="text-xs">
                       Superusuario
@@ -133,28 +147,28 @@ export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewU
 
             {/* Información de contacto */}
             <div className="space-y-3">
-              <h4 className="font-semibold text-gray-900 flex items-center">
+              <h4 className="font-semibold text-gray-900 flex items-center text-sm sm:text-base">
                 <Mail className="h-4 w-4 mr-2" />
                 Información de Contacto
               </h4>
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                <div className="flex items-center text-sm">
-                  <span className="text-gray-600 w-24">Email:</span>
-                  <span className="text-gray-900">{userData.email}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center text-sm">
+                  <span className="text-gray-600 sm:w-24">Email:</span>
+                  <span className="text-gray-900 break-all">{userData.email}</span>
                 </div>
               </div>
             </div>
 
             {/* Roles */}
             <div className="space-y-3">
-              <h4 className="font-semibold text-gray-900 flex items-center">
+              <h4 className="font-semibold text-gray-900 flex items-center text-sm sm:text-base">
                 <UserIcon className="h-4 w-4 mr-2" />
                 Roles Asignados
               </h4>
               <div className="flex flex-wrap gap-2">
                 {userData.groups && userData.groups.length > 0 ? (
-                  userData.groups.map((role) => (
-                    <Badge key={role.id} variant="outline" className="text-sm">
+                  userData.groups.map((role: Group) => (
+                    <Badge key={role.id} variant="outline" className="text-xs sm:text-sm">
                       {role.name}
                     </Badge>
                   ))
@@ -166,20 +180,23 @@ export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewU
 
             {/* Permisos */}
             <div className="space-y-3">
-              <h4 className="font-semibold text-gray-900 flex items-center">
+              <h4 className="font-semibold text-gray-900 flex items-center text-sm sm:text-base">
                 <Shield className="h-4 w-4 mr-2" />
                 Permisos
               </h4>
               <div className="space-y-2">
                 {userData.permissions && userData.permissions.length > 0 ? (
                   userData.permissions.map((permission) => (
-                    <div key={permission.id} className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+                    <div
+                      key={permission.id}
+                      className="bg-gray-50 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                    >
                       <div>
                         <p className="text-sm font-medium text-gray-900">{permission.name}</p>
                         <p className="text-xs text-gray-500">{permission.codename}</p>
                       </div>
                       {permission.temporary && permission.expires_at && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs w-fit">
                           <Clock className="h-3 w-3 mr-1" />
                           Expira: {formatDate(permission.expires_at)}
                         </Badge>
@@ -200,7 +217,7 @@ export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewU
             {/* Historial de cambios */}
             {userData.history && userData.history.length > 0 && (
               <div className="space-y-3">
-                <h4 className="font-semibold text-gray-900 flex items-center">
+                <h4 className="font-semibold text-gray-900 flex items-center text-sm sm:text-base">
                   <Calendar className="h-4 w-4 mr-2" />
                   Historial de Cambios ({userData.total_changes || userData.history.length})
                 </h4>
@@ -209,12 +226,16 @@ export function ViewUserDialog({ open, onOpenChange, userId, apiRequest }: ViewU
             )}
           </div>
         ) : (
-          <div className="py-8 text-center text-gray-500">No se pudo cargar la información del usuario.</div>
+          <div className="py-8 text-center text-gray-500 text-sm sm:text-base">
+            No se pudo cargar la información del usuario.
+          </div>
         )}
 
         <div className="flex justify-end mt-4">
           <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
+            <Button variant="outline" className="w-full sm:w-auto bg-transparent">
+              Cerrar
+            </Button>
           </DialogClose>
         </div>
       </DialogContent>

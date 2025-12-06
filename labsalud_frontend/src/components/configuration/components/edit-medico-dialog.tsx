@@ -9,16 +9,7 @@ import { Label } from "@/components/ui/label"
 import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { MEDICAL_ENDPOINTS } from "@/config/api"
-
-interface Medico {
-  id: number
-  first_name: string
-  last_name: string
-  license: string
-  is_active: boolean
-  created_at: string
-  created_by: any
-}
+import type { Medico } from "@/types"
 
 interface EditMedicoDialogProps {
   isOpen: boolean

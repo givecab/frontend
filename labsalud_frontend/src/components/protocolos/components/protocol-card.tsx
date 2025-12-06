@@ -102,6 +102,23 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
   const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
 
+  // Helper function to extract error messages from backend responses
+  const extractErrorMessage = (error: unknown, defaultMessage: string): string => {
+    if (error && typeof error === "object") {
+      const err = error as Record<string, unknown>
+      if (typeof err.detail === "string") return err.detail
+      if (typeof err.error === "string") return err.error
+      if (typeof err.message === "string") return err.message
+      // Check for field-specific errors
+      for (const key in err) {
+        if (Array.isArray(err[key]) && err[key].length > 0) {
+          return `${key}: ${err[key][0]}`
+        }
+      }
+    }
+    return defaultMessage
+  }
+
   const refreshProtocolDetail = useCallback(async () => {
     try {
       const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id))
@@ -125,11 +142,13 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         const data: ProtocolDetailResponse = await response.json()
         setProtocolDetail(data)
       } else {
-        throw new Error("Error fetching protocol detail")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(extractErrorMessage(errorData, "Error fetching protocol detail"))
       }
     } catch (error) {
       console.error("Error fetching protocol detail:", error)
-      toast.error("Error al cargar los detalles del protocolo", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al cargar los detalles del protocolo"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setLoadingDetail(false)
     }
@@ -159,11 +178,13 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
           const data: ProtocolDetailType[] = await response.json()
           setProtocolDetails(data)
         } else {
-          throw new Error("Error fetching protocol details")
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(extractErrorMessage(errorData, "Error fetching protocol details"))
         }
       } catch (error) {
         console.error("Error fetching protocol details:", error)
-        toast.error("Error al cargar los análisis del protocolo", { duration: TOAST_DURATION })
+        const message = error instanceof Error ? error.message : "Error al cargar los análisis del protocolo"
+        toast.error(message, { duration: TOAST_DURATION })
         return
       } finally {
         setLoadingAnalyses(false)
@@ -183,11 +204,13 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         toast.success("Protocolo cancelado exitosamente", { duration: TOAST_DURATION })
         onUpdate()
       } else {
-        throw new Error("Error cancelling protocol")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(extractErrorMessage(errorData, "Error cancelling protocol"))
       }
     } catch (error) {
       console.error("Error cancelling protocol:", error)
-      toast.error("Error al cancelar el protocolo", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al cancelar el protocolo"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setIsCancelling(false)
     }
@@ -235,11 +258,12 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         onUpdate()
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || "Error processing payment")
+        throw new Error(extractErrorMessage(errorData, "Error processing payment"))
       }
     } catch (error) {
       console.error("Error processing payment:", error)
-      toast.error("Error al procesar el pago", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al procesar el pago"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setIsProcessingPayment(false)
     }
@@ -252,8 +276,6 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
 
     setIsProcessingPayment(true)
     try {
-      // To refund/settle, we set value_paid to private_total_to_pay
-      // This makes lab_to_patient_amount = 0 and settles the balance
       const privateTotalToPay = protocolDetail ? Number.parseFloat(protocolDetail.private_total_to_pay) : 0
 
       const response = await apiRequest(PROTOCOL_ENDPOINTS.PROTOCOL_DETAIL(protocol.id), {
@@ -270,11 +292,12 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         onUpdate()
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || "Error settling debt")
+        throw new Error(extractErrorMessage(errorData, "Error settling debt"))
       }
     } catch (error) {
       console.error("Error settling debt:", error)
-      toast.error("Error al realizar el reembolso", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al realizar el reembolso"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setIsProcessingPayment(false)
     }
@@ -323,11 +346,12 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         onUpdate()
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || "Error updating protocol")
+        throw new Error(extractErrorMessage(errorData, "Error updating protocol"))
       }
     } catch (error) {
       console.error("Error updating protocol:", error)
-      toast.error("Error al actualizar el protocolo", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al actualizar el protocolo"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setIsSavingEdit(false)
     }
@@ -351,11 +375,13 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         }
         toast.success("Reporte generado exitosamente", { duration: TOAST_DURATION })
       } else {
-        throw new Error("Error generating report")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(extractErrorMessage(errorData, "Error generating report"))
       }
     } catch (error) {
       console.error("Error generating report:", error)
-      toast.error("Error al generar el reporte", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al generar el reporte"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setIsGeneratingReport(false)
     }
@@ -374,11 +400,12 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         setReportDialogOpen(false)
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || "Error sending email")
+        throw new Error(extractErrorMessage(errorData, "Error sending email"))
       }
     } catch (error) {
       console.error("Error sending email:", error)
-      toast.error("Error al enviar el email", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al enviar el email"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setIsSendingEmail(false)
     }
@@ -393,8 +420,6 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
       })
 
       if (response.ok) {
-        const updatedDetail = await response.json()
-        // Update local state immediately for responsive UI
         setProtocolDetails((prev) =>
           prev.map((d) => (d.id === detail.id ? { ...d, is_authorized: !d.is_authorized } : d)),
         )
@@ -403,11 +428,12 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         })
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || "Error updating authorization")
+        throw new Error(extractErrorMessage(errorData, "Error updating authorization"))
       }
     } catch (error) {
       console.error("Error updating authorization:", error)
-      toast.error("Error al actualizar la autorización", { duration: TOAST_DURATION })
+      const message = error instanceof Error ? error.message : "Error al actualizar la autorización"
+      toast.error(message, { duration: TOAST_DURATION })
     } finally {
       setUpdatingDetailId(null)
     }
@@ -560,6 +586,7 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         open={analysisDialogOpen}
         onOpenChange={handleAnalysisDialogClose}
         protocolId={protocol.id}
+        protocolNumber={protocol.id}
         details={protocolDetails}
         isLoading={loadingAnalyses}
         updatingDetailId={updatingDetailId}
@@ -572,6 +599,7 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         open={auditDialogOpen}
         onOpenChange={setAuditDialogOpen}
         protocolId={protocol.id}
+        protocolNumber={protocol.id}
         history={protocolDetail?.history}
         totalChanges={protocolDetail?.total_changes}
         isLoading={loadingDetail}
@@ -605,6 +633,7 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         open={historyDialogOpen}
         onOpenChange={setHistoryDialogOpen}
         protocolId={protocol.id}
+        protocolNumber={protocol.id}
         history={protocolDetail?.history}
         totalChanges={protocolDetail?.total_changes}
         isLoading={loadingDetail}

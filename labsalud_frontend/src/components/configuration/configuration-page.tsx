@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import useAuth from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2 } from "lucide-react"
 import { MedicosManagement } from "./medicos-management"
@@ -9,90 +8,7 @@ import { ObrasSocialesManagement } from "./obras-sociales-management"
 import { AnalysisManagement } from "./analysis-management"
 import { AuditManagement } from "./audit-management"
 
-// Interfaces (sin cambios)
-export interface User {
-  id: number
-  username: string
-  first_name: string
-  last_name: string
-  photo: string
-}
-
-export interface Medico {
-  id: number
-  first_name: string
-  last_name: string
-  license: string
-  is_active: boolean
-  created_by: {
-    id: number
-    username: string
-    photo: string
-  } | null
-  created_at: string
-  history: HistoryEntry[]
-}
-
-export interface HistoryEntry {
-  version: number
-  user: {
-    id: number
-    username: string
-    photo: string
-  } | null
-  created_at: string
-}
-
-export interface ObraSocial {
-  id: number
-  name: string
-  code?: string
-  is_active: boolean
-  created_by: User | null
-  updated_by: User[]
-  created_at: string
-  updated_at: string
-}
-
-export interface AnalysisPanel {
-  id: number
-  code: number
-  name: string
-  bio_unit: string
-  is_urgent: boolean
-  created_by: {
-    id: number
-    username: string
-    photo?: string
-  } | null
-  created_at: string
-  history?: HistoryEntry[]
-  analyses?: AnalysisItem[]
-}
-
-export interface AnalysisItem {
-  id: number
-  panel: number
-  created_by: {
-    id: number
-    username: string
-    photo?: string
-  } | null
-  updated_by: Array<{
-    id: number
-    username: string
-    photo?: string
-  }> | null
-  code: string
-  name: string
-  measure_unit: string
-  formula?: string
-  created_at: string | null
-  updated_at: string | null
-}
-
-export default function ConfigurationPage({ medico }: { medico?: Medico }) {
-  const { hasPermission } = useAuth()
+export default function ConfigurationPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -139,7 +55,7 @@ export default function ConfigurationPage({ medico }: { medico?: Medico }) {
           </TabsList>
 
           <TabsContent value="medicos">
-            <MedicosManagement medico={medico} />
+            <MedicosManagement />
           </TabsContent>
 
           <TabsContent value="obras-sociales">

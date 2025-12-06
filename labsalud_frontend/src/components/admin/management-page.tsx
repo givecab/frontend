@@ -32,16 +32,10 @@ export default function ManagementPage() {
     setError(null)
 
     try {
-      console.log("[v0] Cargando datos de gestión...")
-
       if (canManageUsers) {
         let usersUrl = USER_ENDPOINTS.USERS
         if (!currentUser?.is_superuser) {
-          // Usuarios normales solo ven usuarios activos y no superusuarios
           usersUrl = `${USER_ENDPOINTS.USERS}?is_superuser=false&is_active=True`
-          console.log("[v0] Usuario normal: cargando solo usuarios activos y no superusuarios")
-        } else {
-          console.log("[v0] Usuario superusuario: cargando todos los usuarios")
         }
 
         const usersResponse = await apiRequest(usersUrl)
@@ -49,10 +43,7 @@ export default function ManagementPage() {
           const usersData = await usersResponse.json()
           if (usersData && Array.isArray(usersData.results)) {
             setUsers(usersData.results)
-            console.log("[v0] Usuarios cargados:", usersData.results.length)
           }
-        } else {
-          console.error("[v0] Error al cargar usuarios:", usersResponse.status)
         }
       }
 
@@ -62,10 +53,7 @@ export default function ManagementPage() {
           const rolesData = await rolesResponse.json()
           if (rolesData && Array.isArray(rolesData.results)) {
             setRoles(rolesData.results)
-            console.log("[v0] Roles cargados:", rolesData.results.length)
           }
-        } else {
-          console.error("[v0] Error al cargar roles:", rolesResponse.status)
         }
       }
 
@@ -75,14 +63,11 @@ export default function ManagementPage() {
           const permissionsData = await permissionsResponse.json()
           if (permissionsData && Array.isArray(permissionsData.results)) {
             setPermissions(permissionsData.results)
-            console.log("[v0] Permisos cargados:", permissionsData.results.length)
           }
-        } else {
-          console.error("[v0] Error al cargar permisos:", permissionsResponse.status)
         }
       }
     } catch (err) {
-      console.error("[v0] Error al cargar datos:", err)
+      console.error("Error al cargar datos:", err)
       setError("Error al cargar los datos. Por favor, intenta nuevamente.")
     } finally {
       setIsLoading(false)
@@ -97,11 +82,11 @@ export default function ManagementPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto py-6">
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6 flex justify-center items-center min-h-[300px]">
+      <div className="max-w-6xl mx-auto py-4 sm:py-6 px-3 sm:px-4">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6 flex justify-center items-center min-h-[300px]">
           <div className="flex flex-col items-center">
             <Loader2 className="h-8 w-8 text-[#204983] animate-spin mb-2" />
-            <p className="text-gray-600">Cargando datos...</p>
+            <p className="text-gray-600 text-sm sm:text-base">Cargando datos...</p>
           </div>
         </div>
       </div>
@@ -110,10 +95,12 @@ export default function ManagementPage() {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto py-6">
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Gestión de Usuarios y Permisos</h1>
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>
+      <div className="max-w-6xl mx-auto py-4 sm:py-6 px-3 sm:px-4">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Gestión de Usuarios y Permisos</h1>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm sm:text-base">
+            {error}
+          </div>
         </div>
       </div>
     )
@@ -121,13 +108,13 @@ export default function ManagementPage() {
 
   if (!canAccessManagement) {
     return (
-      <div className="max-w-6xl mx-auto py-6">
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Gestión de Usuarios y Permisos</h1>
+      <div className="max-w-6xl mx-auto py-4 sm:py-6 px-3 sm:px-4">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Gestión de Usuarios y Permisos</h1>
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <p>No tienes permisos para acceder a esta sección.</p>
+              <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+              <p className="text-sm sm:text-base">No tienes permisos para acceder a esta sección.</p>
             </div>
           </div>
         </div>
@@ -136,14 +123,26 @@ export default function ManagementPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-6">
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Gestión de Usuarios y Permisos</h1>
+    <div className="max-w-6xl mx-auto py-4 sm:py-6 px-3 sm:px-4">
+      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Gestión de Usuarios y Permisos</h1>
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="mb-6">
-            {canManageUsers && <TabsTrigger value="users">Usuarios</TabsTrigger>}
-            {canManageRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
-            {canManageRoles && <TabsTrigger value="permissions">Permisos</TabsTrigger>}
+          <TabsList className="mb-4 sm:mb-6 inline-flex overflow-x-auto">
+            {canManageUsers && (
+              <TabsTrigger value="users" className="text-sm">
+                Usuarios
+              </TabsTrigger>
+            )}
+            {canManageRoles && (
+              <TabsTrigger value="roles" className="text-sm">
+                Roles
+              </TabsTrigger>
+            )}
+            {canManageRoles && (
+              <TabsTrigger value="permissions" className="text-sm">
+                Permisos
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {canManageUsers && (

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import type { User, Role } from "@/types"
+import type { User, Role, Group } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import type { ApiRequestOptions } from "@/hooks/use-api"
 import { USER_ENDPOINTS, AC_ENDPOINTS } from "@/config/api"
+
+const extractErrorMessage = (errorData: unknown): string => {
+  if (!errorData || typeof errorData !== "object") return "Error desconocido"
+  const err = errorData as Record<string, unknown>
+  if (typeof err.detail === "string") return err.detail
+  if (typeof err.error === "string") return err.error
+  if (typeof err.message === "string") return err.message
+  for (const key of Object.keys(err)) {
+    const val = err[key]
+    if (Array.isArray(val) && val.length > 0) {
+      return `${key}: ${val[0]}`
+    }
+  }
+  return "Error desconocido"
+}
 
 interface EditUserDialogProps {
   open: boolean
@@ -43,14 +58,14 @@ export function EditUserDialog({
 
   useEffect(() => {
     if (open && user) {
-      const userGroups = user.groups || user.roles || []
+      const userGroups = user.roles || []
       setUserData({
         username: user.username,
-        email: user.email,
+        email: user.email || "",
         first_name: user.first_name || "",
         last_name: user.last_name || "",
       })
-      setSelectedRoles(userGroups.map((group) => group.id))
+      setSelectedRoles(userGroups.map((group: Group) => group.id))
     } else if (!open) {
       setUserData({
         username: "",
@@ -90,7 +105,7 @@ export function EditUserDialog({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }))
         showError("Error al actualizar usuario", {
-          description: errorData.detail || "Ha ocurrido un error al actualizar el usuario.",
+          description: extractErrorMessage(errorData),
         })
         setIsSubmitting(false)
         return
@@ -98,7 +113,7 @@ export function EditUserDialog({
 
       const updatedUser = await response.json()
 
-      const currentRoles = (user.groups || user.roles || []).map((r) => r.id)
+      const currentRoles = (user.roles || []).map((r: Group) => r.id)
       const rolesChanged =
         selectedRoles.length !== currentRoles.length || selectedRoles.some((id) => !currentRoles.includes(id))
 
@@ -138,12 +153,12 @@ export function EditUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Usuario: {user?.username}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username">Nombre de usuario *</Label>
               <Input
@@ -169,7 +184,7 @@ export function EditUserDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Nombre</Label>
               <Input
@@ -194,7 +209,7 @@ export function EditUserDialog({
 
           <div className="space-y-2">
             <Label>Roles</Label>
-            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-2">
               {Array.isArray(roles) && roles.length > 0 ? (
                 roles.map((role) => (
                   <div key={role.id} className="flex items-center space-x-2">
@@ -214,13 +229,18 @@ export function EditUserDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isSubmitting}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto bg-transparent"
+              >
                 Cancelar
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
               {isSubmitting ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogFooter>

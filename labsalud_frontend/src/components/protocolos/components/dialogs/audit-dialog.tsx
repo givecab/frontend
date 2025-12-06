@@ -7,19 +7,29 @@ interface AuditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   protocolId: number
+  protocolNumber: number
   history?: HistoryEntry[]
   totalChanges?: number
   isLoading: boolean
 }
 
-export function AuditDialog({ open, onOpenChange, protocolId, history, totalChanges, isLoading }: AuditDialogProps) {
+export function AuditDialog({
+  open,
+  onOpenChange,
+  protocolNumber,
+  history,
+  totalChanges,
+  isLoading,
+}: AuditDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      {/* // Mejor responsive */}
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History className="h-5 w-5 text-[#204983]" />
-            Historial de Auditoría - Protocolo #{protocolId}
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <History className="h-5 w-5 text-[#204983] flex-shrink-0" />
+            {/* // Usando protocolNumber en lugar de protocolId */}
+            <span>Historial de Auditoría - Protocolo #{protocolNumber}</span>
           </DialogTitle>
         </DialogHeader>
         <div className="mt-4">
@@ -29,9 +39,11 @@ export function AuditDialog({ open, onOpenChange, protocolId, history, totalChan
             </div>
           ) : history && history.length > 0 ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Total de cambios: {totalChanges || history.length}</span>
-              </div>
+              {totalChanges !== undefined && totalChanges > 0 && (
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Total de cambios: {totalChanges}</span>
+                </div>
+              )}
               <HistoryList history={history} emptyMessage="No hay historial disponible para este protocolo" />
             </div>
           ) : (

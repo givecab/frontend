@@ -30,13 +30,7 @@ import { ImportDataDialog } from "./components/import-data-dialog"
 import { AnalysisHistoryDialog } from "./components/analysis-history-dialog"
 import type { Analysis } from "@/types"
 
-type AnalysisManagementProps = {}
-
-const PAGE_LIMIT = 20
-
 export function AnalysisManagement() {
-  console.log("[v0] ========== AnalysisManagement RENDER ==========")
-
   const { apiRequest } = useApi()
   const toastActions = useToast()
 
@@ -65,16 +59,6 @@ export function AnalysisManagement() {
 
   const fetchAnalyses = useCallback(
     async (search = "", reset = true, showSearching = false) => {
-      console.log("[v0] fetchAnalyses called:", {
-        search,
-        reset,
-        showSearching,
-        isLoadingInitial,
-        isLoadingMore,
-        isSearching,
-      })
-
-      // Prevent multiple simultaneous calls
       if (reset && !showSearching && isLoadingInitial) return
       if (!reset && isLoadingMore) return
       if (reset && showSearching && isSearching) return
@@ -103,15 +87,11 @@ export function AnalysisManagement() {
           url = analysesNextUrl!
         }
 
-        console.log("[v0] Fetching URL:", url)
-
         if (!url) return
 
         const response = await apiRequest(url)
         if (response.ok) {
           const data = await response.json()
-
-          console.log("[v0] Response data:", { count: data.count, resultsLength: data.results.length, next: data.next })
 
           if (reset) {
             setAnalyses(data.results)
@@ -121,15 +101,18 @@ export function AnalysisManagement() {
           }
 
           setAnalysesNextUrl(data.next)
-          console.log("[v0] Next URL set to:", data.next)
         } else {
-          setError("Error al cargar los análisis.")
-          toastActions.error("Error", { description: "No se pudieron cargar los análisis." })
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage =
+            errorData.detail || errorData.error || errorData.message || "Error al cargar los análisis."
+          setError(errorMessage)
+          toastActions.error("Error", { description: errorMessage })
         }
       } catch (err) {
         console.error("Error fetching analyses:", err)
-        setError("Ocurrió un error inesperado al cargar análisis.")
-        toastActions.error("Error", { description: "Error de conexión o servidor (análisis)." })
+        const errorMessage = err instanceof Error ? err.message : "Ocurrió un error inesperado al cargar análisis."
+        setError(errorMessage)
+        toastActions.error("Error", { description: errorMessage })
       } finally {
         setIsLoadingInitial(false)
         setIsLoadingMore(false)
@@ -142,24 +125,10 @@ export function AnalysisManagement() {
   const hasMore = !!analysesNextUrl
 
   const loadMore = useCallback(() => {
-    console.log("[v0] loadMore called:", { isLoadingMore, analysesNextUrl, isSearching })
-
     if (!isLoadingMore && analysesNextUrl && !isSearching) {
-      console.log("[v0] Calling fetchAnalyses from loadMore")
       fetchAnalyses("", false)
-    } else {
-      console.log("[v0] loadMore skipped - conditions not met")
     }
   }, [isLoadingMore, analysesNextUrl, isSearching, fetchAnalyses])
-
-  console.log("[v0] analysis-management - Hook states:", {
-    isLoadingInitial,
-    isLoadingMore,
-    hasMore,
-    analysesLength: analyses.length,
-    analysesNextUrl,
-    isSearching,
-  })
 
   const loadMoreSentinelRef = useInfiniteScroll({
     loading: isLoadingMore,
@@ -168,23 +137,12 @@ export function AnalysisManagement() {
   })
 
   useEffect(() => {
-    console.log("[v0] useInfiniteScroll state:", {
-      loading: isLoadingMore || isSearching,
-      hasMore: !!analysesNextUrl,
-      analysesNextUrl,
-      analysesCount: analyses.length,
-    })
-  }, [isLoadingMore, isSearching, analysesNextUrl, analyses.length])
-
-  useEffect(() => {
     fetchAnalyses()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (debouncedSearchTerm !== searchTerm) return
     fetchAnalyses(debouncedSearchTerm, true, true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchTerm])
 
   const toggleAnalysis = (analysisId: number) => {
@@ -224,71 +182,12 @@ export function AnalysisManagement() {
     toastActions.success("Éxito", { description: "Análisis desactivado correctamente." })
   }
 
-  const handleAnalysisHistorySuccess = () => {
-    setIsHistoryDialogOpen(false)
-    setSelectedAnalysisForHistory(null)
-  }
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A"
-    try {
-      return new Date(dateString).toLocaleDateString("es-ES", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    } catch {
-      return "Fecha inválida"
-    }
-  }
-
-  const getUserDisplayName = (user: { id: number; username: string; photo?: string } | null | undefined) => {
-    if (!user || !user.username || user.username.trim() === "") {
-      return "Sistema"
-    }
-    return user.username
-  }
-
-  const getCreationInfo = (analysisItem: Analysis) => {
-    if (analysisItem?.history && Array.isArray(analysisItem.history) && analysisItem.history.length > 0) {
-      const creationEntry = analysisItem.history.find((entry) => entry.version === 1)
-      if (creationEntry) {
-        return {
-          user: creationEntry.user,
-          date: creationEntry.created_at,
-        }
-      }
-    }
-    return {
-      user: analysisItem?.created_by || null,
-      date: analysisItem?.created_at || "",
-    }
-  }
-
-  const getLatestUpdate = (analysisItem: Analysis) => {
-    if (analysisItem?.history && Array.isArray(analysisItem.history) && analysisItem.history.length > 1) {
-      const sortedHistory = [...analysisItem.history].sort((a, b) => b.version - a.version)
-      const latestEntry = sortedHistory[0]
-
-      if (latestEntry && latestEntry.version > 1) {
-        return {
-          user: latestEntry.user,
-          date: latestEntry.created_at,
-          version: latestEntry.version,
-        }
-      }
-    }
-    return null
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <TestTube className="h-5 w-5" />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+          <h3 className="text-base md:text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <TestTube className="h-4 w-4 md:h-5 md:w-5" />
             Análisis ({totalAnalyses})
           </h3>
           <div className="relative w-full sm:w-64">
@@ -301,10 +200,10 @@ export function AnalysisManagement() {
             />
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
             variant="outline"
-            className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white bg-transparent w-full sm:w-auto"
+            className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white bg-transparent w-full sm:w-auto"
             onClick={() => setIsImportModalOpen(true)}
           >
             <Download className="mr-2 h-4 w-4" />
@@ -338,7 +237,7 @@ export function AnalysisManagement() {
 
       {!isLoadingInitial && !error && analyses.length === 0 && (
         <div className="text-center text-gray-400 py-8">
-          <PackageX className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <PackageX className="mx-auto h-10 w-10 md:h-12 md:w-12 text-gray-300 mb-4" />
           <p>No se encontraron análisis</p>
           {searchTerm && <p className="text-sm">que coincidan con la búsqueda.</p>}
         </div>
@@ -348,8 +247,6 @@ export function AnalysisManagement() {
         <div className="space-y-3">
           {analyses.map((analysis) => {
             const isExpanded = expandedAnalyses.has(analysis.id)
-            const creationInfo = getCreationInfo(analysis)
-            const latestUpdate = getLatestUpdate(analysis)
 
             return (
               <div
@@ -359,92 +256,97 @@ export function AnalysisManagement() {
                 }`}
               >
                 <div
-                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="p-3 md:p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => toggleAnalysis(analysis.id)}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                         {isExpanded ? (
                           <ChevronDown className="h-4 w-4 text-gray-500" />
                         ) : (
                           <ChevronRight className="h-4 w-4 text-gray-500" />
                         )}
-                        <TestTube className="h-5 w-5 text-blue-600" />
+                        <TestTube className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-medium text-gray-900 truncate">{analysis.name || "Sin nombre"}</h4>
+                          <h4 className="text-sm md:text-base font-medium text-gray-900 truncate">
+                            {analysis.name || "Sin nombre"}
+                          </h4>
                           {analysis.is_urgent && (
-                            <Badge variant="destructive" className="text-xs flex-shrink-0">
+                            <Badge variant="destructive" className="text-[10px] md:text-xs flex-shrink-0">
                               U
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-500 mt-1 flex-wrap">
+                        <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-500 mt-1 flex-wrap">
                           <span className="flex items-center gap-1 flex-shrink-0">
                             Código:
                             <Badge
                               variant="outline"
-                              className="text-xs font-mono bg-blue-100 text-blue-800 border-blue-300 font-semibold ml-1"
+                              className="text-[10px] md:text-xs font-mono bg-blue-100 text-blue-800 border-blue-300 font-semibold ml-1"
                             >
                               {analysis.code || "N/A"}
                             </Badge>
                           </span>
-                          <span className="truncate">UB: {analysis.bio_unit || "N/A"}</span>
+                          <span className="truncate hidden sm:inline">UB: {analysis.bio_unit || "N/A"}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <AuditAvatars creation={analysis.creation} lastChange={analysis.last_change} size="sm" />
-                      <div className="flex space-x-2">
+                    <div
+                      className="flex items-center gap-2 md:gap-3 flex-shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="hidden md:block">
+                        {(analysis.creation || analysis.last_change) && (
+                          <AuditAvatars creation={analysis.creation} lastChange={analysis.last_change} size="sm" />
+                        )}
+                      </div>
+                      <div className="flex space-x-1 md:space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
+                            e.preventDefault()
                             setSelectedAnalysis(analysis)
                             setIsEditAnalysisModalOpen(true)
                           }}
+                          className="h-7 w-7 md:h-8 md:w-8 p-0 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="border-red-200 hover:bg-red-50 bg-transparent"
+                          className="border-red-200 hover:bg-red-50 bg-transparent h-7 w-7 md:h-8 md:w-8 p-0"
                           onClick={(e) => {
                             e.stopPropagation()
+                            e.preventDefault()
                             setSelectedAnalysis(analysis)
                             setIsDeleteAnalysisModalOpen(true)
                           }}
                         >
-                          <Trash className="h-4 w-4 text-red-500" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedAnalysisForHistory(analysis)
-                            setIsHistoryDialogOpen(true)
-                          }}
-                        >
-                          <History className="h-4 w-4 text-gray-500" />
+                          <Trash className="h-3 w-3 md:h-4 md:w-4 text-red-500" />
                         </Button>
                       </div>
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="border-t bg-gray-50">
-                      <div className="p-4 bg-blue-50 border-b">
+                    <div
+                      className="border-t bg-gray-50 mt-3 -mx-3 md:-mx-4 -mb-3 md:-mb-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="p-3 md:p-4 bg-blue-50 border-b">
                         <Button
                           variant="outline"
-                          className="w-full bg-transparent"
+                          className="w-full bg-transparent text-xs md:text-sm"
                           onClick={(e) => {
                             e.stopPropagation()
+                            e.preventDefault()
                             setSelectedAnalysisForHistory(analysis)
                             setIsHistoryDialogOpen(true)
                           }}
@@ -473,7 +375,7 @@ export function AnalysisManagement() {
       )}
 
       {!hasMore && analyses.length > 0 && !isLoadingInitial && (
-        <p className="text-center text-sm text-gray-400 mt-4">No hay más análisis para mostrar.</p>
+        <p className="text-center text-xs md:text-sm text-gray-400 mt-4">No hay más análisis para mostrar.</p>
       )}
 
       <CreateAnalysisCatalogDialog

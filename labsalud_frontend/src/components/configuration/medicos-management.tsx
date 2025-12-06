@@ -1,11 +1,9 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Plus, Eye, Pencil, Trash, Settings } from "lucide-react"
+import { Search, Plus, Eye, Pencil, Trash } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll"
@@ -15,8 +13,7 @@ import { CreateMedicoDialog } from "./components/create-medico-dialog"
 import { EditMedicoDialog } from "./components/edit-medico-dialog"
 import { DeleteMedicoDialog } from "./components/delete-medico-dialog"
 import { MedicoDetailsDialog } from "./components/medico-details-dialog"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { AuditAvatars } from "@/components/common/audit-avatars"
 import type { Medico } from "@/types"
 
 interface ApiResponse {
@@ -26,37 +23,7 @@ interface ApiResponse {
   previous: string | null
 }
 
-interface MedicosManagementProps {
-  medico?: Medico
-}
-
-const UserAvatar: React.FC<{
-  user: { id: number; username: string; photo: string } | null | undefined
-  size?: "sm" | "md"
-}> = ({ user, size = "md" }) => {
-  const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8"
-
-  if (!user || !user.username || user.username.trim() === "") {
-    return (
-      <Avatar className={sizeClasses}>
-        <AvatarFallback className="text-xs bg-gray-200 text-gray-500">
-          <Settings className="h-4 w-4 text-gray-600" />
-        </AvatarFallback>
-      </Avatar>
-    )
-  }
-
-  return (
-    <Avatar className={sizeClasses}>
-      <AvatarImage src={user.photo || undefined} alt={user.username} />
-      <AvatarFallback className="text-xs bg-slate-200 text-slate-700">
-        {user.username.substring(0, 2).toUpperCase()}
-      </AvatarFallback>
-    </Avatar>
-  )
-}
-
-export function MedicosManagement({ medico }: MedicosManagementProps) {
+export function MedicosManagement() {
   const [medicos, setMedicos] = useState<Medico[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -95,7 +62,13 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
         const response = await apiRequest(url)
 
         if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`)
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage =
+            errorData.detail ||
+            errorData.error ||
+            errorData.message ||
+            `Error ${response.status}: ${response.statusText}`
+          throw new Error(errorMessage)
         }
 
         const data: ApiResponse = await response.json()
@@ -150,33 +123,15 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
     toast.success("Médico eliminado exitosamente")
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const getUserDisplayName = (user: { id: number; username: string; photo: string } | null | undefined) => {
-    if (!user || !user.username || user.username.trim() === "") {
-      return "Sistema"
-    }
-    return user.username
-  }
-
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Gestión de Médicos</h2>
-        <p className="text-gray-600">Administra los médicos del sistema</p>
+        <h2 className="text-xl md:text-2xl font-bold text-gray-900">Gestión de Médicos</h2>
+        <p className="text-sm md:text-base text-gray-600">Administra los médicos del sistema</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+        <div className="relative flex-1 sm:max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Buscar médicos..."
@@ -185,7 +140,7 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
             className="pl-10"
           />
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="bg-[#204983] hover:bg-[#1a3d6f]">
+        <Button onClick={() => setShowCreateDialog(true)} className="bg-[#204983] hover:bg-[#1a3d6f] w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Médico
         </Button>
@@ -202,87 +157,48 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Nombre y Apellido
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                   Matrícula
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Creado por
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  Auditoría
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Modificado por
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {medicos.map((medico) => (
+              {medicos.map((medicoItem, index) => (
                 <tr
-                  key={medico.id}
-                  ref={medicos.indexOf(medico) === medicos.length - 1 ? lastElementRef : null}
+                  key={medicoItem.id}
+                  ref={index === medicos.length - 1 ? lastElementRef : null}
                   className="hover:bg-gray-50"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {medico.first_name} {medico.last_name}
+                  <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {medicoItem.first_name} {medicoItem.last_name}
+                    </div>
+                    <div className="text-xs text-gray-500 sm:hidden">Mat: {medicoItem.license}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{medico.license}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-help">
-                            <UserAvatar user={medico.creation?.user} size="md" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-sm">
-                            <strong>Creado por:</strong> {getUserDisplayName(medico.creation?.user)}
-                            <br />
-                            <strong>Fecha:</strong> {formatDate(medico.creation?.date)}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                  <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden sm:table-cell">
+                    {medicoItem.license}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {medico.last_change ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="cursor-help">
-                              <UserAvatar user={medico.last_change.user} size="md" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-sm">
-                              <strong>Modificado por:</strong> {getUserDisplayName(medico.last_change.user)}
-                              <br />
-                              <strong>Fecha:</strong> {formatDate(medico.last_change.date)}
-                              {medico.last_change.changes && medico.last_change.changes.length > 0 && (
-                                <>
-                                  <br />
-                                  <strong>Cambios:</strong> {medico.last_change.changes.join(", ")}
-                                </>
-                              )}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : (
-                      <span className="text-xs text-gray-400">Sin modificaciones</span>
+                  <td className="px-4 md:px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                    {(medicoItem.creation || medicoItem.last_change) && (
+                      <AuditAvatars creation={medicoItem.creation} lastChange={medicoItem.last_change} size="sm" />
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-1 md:space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSelectedMedico(medico)
+                          setSelectedMedico(medicoItem)
                           setShowDetailsDialog(true)
                         }}
                       >
@@ -292,7 +208,7 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSelectedMedico(medico)
+                          setSelectedMedico(medicoItem)
                           setShowEditDialog(true)
                         }}
                       >
@@ -303,7 +219,7 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
                         size="sm"
                         className="border-red-200 hover:bg-red-50 bg-transparent"
                         onClick={() => {
-                          setSelectedMedico(medico)
+                          setSelectedMedico(medicoItem)
                           setShowDeleteDialog(true)
                         }}
                       >
@@ -334,7 +250,7 @@ export function MedicosManagement({ medico }: MedicosManagementProps) {
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         onSuccess={handleCreateSuccess}
-        onOpenChange={(isOpen) => setShowCreateDialog(isOpen)}
+        onOpenChange={(isOpen: boolean) => setShowCreateDialog(isOpen)}
       />
 
       {selectedMedico && (

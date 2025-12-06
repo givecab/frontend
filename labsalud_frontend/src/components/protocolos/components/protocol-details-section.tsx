@@ -19,7 +19,6 @@ interface ProtocolDetailsSectionProps {
   privateUbValue?: string
   isPrinted?: boolean
   onOpenHistoryDialog: () => void
-  // New payment fields
   insuranceTotalToPay?: string
   privateTotalToPay?: string
   patientToLabAmount?: string
@@ -34,19 +33,16 @@ export function ProtocolDetailsSection({
   sendMethodName,
   valuePaid,
   paymentStatus,
-  balance,
   insuranceUbValue,
   privateUbValue,
   isPrinted,
   onOpenHistoryDialog,
-  // New payment fields
   insuranceTotalToPay,
   privateTotalToPay,
   patientToLabAmount,
   labToPatientAmount,
 }: ProtocolDetailsSectionProps) {
   const paymentStatusInfo = getPaymentStatusInfo(paymentStatus)
-  const paymentStatusId = paymentStatus?.id ?? 0
 
   const patientDebt = Number.parseFloat(patientToLabAmount || "0")
   const labDebt = Number.parseFloat(labToPatientAmount || "0")
@@ -55,23 +51,24 @@ export function ProtocolDetailsSection({
 
   return (
     <div className="space-y-4 mt-4">
-      <div className="space-y-3">
+      {/* // Improved responsive grid layout */}
+      <div className="grid grid-cols-1 gap-3">
         <div className="flex items-center gap-3 text-sm">
           <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
           <span className="text-gray-600 w-28 flex-shrink-0">Paciente:</span>
-          <span className="font-medium">{patientName}</span>
+          <span className="font-medium truncate">{patientName}</span>
         </div>
 
         <div className="flex items-center gap-3 text-sm">
           <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
           <span className="text-gray-600 w-28 flex-shrink-0">Médico:</span>
-          <span className="font-medium">{doctorName}</span>
+          <span className="font-medium truncate">{doctorName}</span>
         </div>
 
         <div className="flex items-center gap-3 text-sm">
           <Building className="h-4 w-4 text-gray-400 flex-shrink-0" />
           <span className="text-gray-600 w-28 flex-shrink-0">Obra Social:</span>
-          <span className="font-medium">{insuranceName}</span>
+          <span className="font-medium truncate">{insuranceName}</span>
         </div>
 
         {affiliateNumber && (
@@ -108,7 +105,6 @@ export function ProtocolDetailsSection({
           <span className="font-medium text-green-600">${Number.parseFloat(valuePaid || "0").toFixed(2)}</span>
         </div>
 
-        {/* Show patient debt if exists */}
         {patientDebt > 0 && (
           <div className="flex items-center gap-3 text-sm">
             <DollarSign className="h-4 w-4 text-yellow-500 flex-shrink-0" />
@@ -117,7 +113,6 @@ export function ProtocolDetailsSection({
           </div>
         )}
 
-        {/* Show lab debt (refund) if exists */}
         {labDebt > 0 && (
           <div className="flex items-center gap-3 text-sm">
             <DollarSign className="h-4 w-4 text-red-500 flex-shrink-0" />
@@ -158,7 +153,7 @@ export function ProtocolDetailsSection({
       </div>
 
       <div className="pt-4 pb-4 border-t border-gray-100">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
             <History className="h-4 w-4 text-gray-400" />
             Historial de Cambios
@@ -170,7 +165,7 @@ export function ProtocolDetailsSection({
               e.stopPropagation()
               onOpenHistoryDialog()
             }}
-            className="text-xs"
+            className="text-xs w-full sm:w-auto"
             data-no-expand
           >
             <History className="h-3 w-3 mr-1" />

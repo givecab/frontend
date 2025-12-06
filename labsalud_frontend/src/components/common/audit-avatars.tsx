@@ -10,8 +10,8 @@ interface AuditInfo {
 }
 
 interface AuditAvatarsProps {
-  creation: AuditInfo
-  lastChange: AuditInfo
+  creation?: AuditInfo | null
+  lastChange?: AuditInfo | null
   size?: "sm" | "md" | "lg"
   className?: string
 }
@@ -47,21 +47,25 @@ export function AuditAvatars({ creation, lastChange, size = "md", className = ""
   const sizeClass = sizeClasses[size]
   const textSizeClass = textSizeClasses[size]
 
+  if (!creation?.user && !lastChange?.user) {
+    return null
+  }
+
   return (
     <TooltipProvider>
-      <div className={`flex items-center gap-2 ${className}`}>
+      <div className={`flex items-center gap-1 sm:gap-2 flex-wrap ${className}`}>
         {/* Avatar de Creación */}
         {creation?.user && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Avatar className={`${sizeClass} border-2 border-green-500 cursor-pointer`}>
+              <Avatar className={`${sizeClass} border-2 border-green-500 cursor-help`}>
                 <AvatarImage src={creation.user.photo || "/placeholder.svg"} alt={creation.user.username} />
                 <AvatarFallback className="bg-green-100 text-green-700">
                   {creation.user.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="max-w-[250px] sm:max-w-none">
               <div className="space-y-1">
                 <p className={textSizeClass}>
                   <strong>Creado por:</strong> {creation.user.username}
@@ -76,14 +80,14 @@ export function AuditAvatars({ creation, lastChange, size = "md", className = ""
         {lastChange?.user && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Avatar className={`${sizeClass} border-2 border-blue-500 cursor-pointer`}>
+              <Avatar className={`${sizeClass} border-2 border-blue-500 cursor-help`}>
                 <AvatarImage src={lastChange.user.photo || "/placeholder.svg"} alt={lastChange.user.username} />
                 <AvatarFallback className="bg-blue-100 text-blue-700">
                   {lastChange.user.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="max-w-[250px] sm:max-w-none">
               <div className="space-y-1">
                 <p className={textSizeClass}>
                   <strong>Modificado por:</strong> {lastChange.user.username}

@@ -93,7 +93,6 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
     setIsDeleting(false)
   }
 
-  // Validar datos
   const validUsers = Array.isArray(users) ? users.filter((user) => user && user.id) : []
   const validRoles = Array.isArray(roles) ? roles.filter((role) => role && role.id) : []
   const validPermissions = Array.isArray(permissions)
@@ -102,11 +101,11 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Gestión de Usuarios</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Gestión de Usuarios</h2>
 
         {canCreateUser && (
-          <Button className="bg-[#204983]" onClick={() => setIsCreating(true)}>
+          <Button className="bg-[#204983] w-full sm:w-auto" onClick={() => setIsCreating(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Usuario
           </Button>
@@ -127,8 +126,8 @@ export function UserManagement({ users, roles, permissions, setUsers, refreshDat
       ) : (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-md">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            <p>No tienes permiso para ver la lista de usuarios.</p>
+            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+            <p className="text-sm sm:text-base">No tienes permiso para ver la lista de usuarios.</p>
           </div>
         </div>
       )}

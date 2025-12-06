@@ -8,6 +8,7 @@ interface AnalysisDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   protocolId: number
+  protocolNumber: number
   details: ProtocolDetail[]
   isLoading: boolean
   updatingDetailId: number | null
@@ -19,7 +20,7 @@ interface AnalysisDialogProps {
 export function AnalysisDialog({
   open,
   onOpenChange,
-  protocolId,
+  protocolNumber,
   details,
   isLoading,
   updatingDetailId,
@@ -31,11 +32,13 @@ export function AnalysisDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-4xl max-h-[90vh] overflow-y-auto">
+      {/* // Mejor responsive sin scroll horizontal */}
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TestTube className="h-5 w-5 text-[#204983]" />
-            Análisis del Protocolo #{protocolId}
+            {/* // Usando protocolNumber en lugar de protocolId */}
+            Análisis del Protocolo #{protocolNumber}
           </DialogTitle>
           <DialogDescription>
             {isEditable && !isParticular
@@ -52,7 +55,45 @@ export function AnalysisDialog({
           </div>
         ) : details.length > 0 ? (
           <div className="space-y-4">
-            <div className="border rounded-lg overflow-hidden">
+            {/* // Vista responsive: cards en mobile, tabla en desktop */}
+            {/* Mobile view - cards */}
+            <div className="block sm:hidden space-y-3">
+              {details.map((detail) => (
+                <div
+                  key={detail.id}
+                  className={`border rounded-lg p-3 ${!detail.is_active ? "bg-gray-100 opacity-60" : ""}`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="font-mono text-sm text-gray-500">{detail.code}</span>
+                      <p className="font-medium text-sm">{detail.name}</p>
+                    </div>
+                    {detail.is_urgent && (
+                      <Badge variant="destructive" className="text-xs">
+                        Urgente
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">UB: {detail.ub}</span>
+                    {!isParticular && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 text-xs">Autorizado:</span>
+                        <Switch
+                          checked={detail.is_authorized}
+                          onCheckedChange={() => onToggleAuthorization(detail)}
+                          disabled={!isEditable || updatingDetailId === detail.id || !detail.is_active}
+                        />
+                        {updatingDetailId === detail.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop view - table */}
+            <div className="hidden sm:block border rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>

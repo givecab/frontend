@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
-import { Loader2, CheckCircle, AlertTriangle, History, Beaker, ChevronDown, ChevronUp, XCircle } from "lucide-react"
+import { Loader2, CheckCircle, AlertTriangle, History, Beaker, XCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { RESULTS_ENDPOINTS } from "@/config/api"
 import { toast } from "sonner"
@@ -20,6 +20,40 @@ import {
 } from "@/components/ui/dialog"
 import type { ProtocolWithLoadedResults, Result } from "@/types"
 import { Textarea } from "@/components/ui/textarea"
+
+const extractErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    try {
+      const parsed = JSON.parse(error.message)
+      if (parsed.detail) return parsed.detail
+      if (parsed.error) return parsed.error
+      if (parsed.message) return parsed.message
+      const firstKey = Object.keys(parsed)[0]
+      if (firstKey && Array.isArray(parsed[firstKey])) {
+        return `${firstKey}: ${parsed[firstKey][0]}`
+      }
+    } catch {
+      return error.message
+    }
+  }
+  return "Error desconocido"
+}
+
+const extractResponseError = async (response: Response): Promise<string> => {
+  try {
+    const data = await response.json()
+    if (data.detail) return data.detail
+    if (data.error) return data.error
+    if (data.message) return data.message
+    const firstKey = Object.keys(data)[0]
+    if (firstKey && Array.isArray(data[firstKey])) {
+      return `${firstKey}: ${data[firstKey][0]}`
+    }
+    return JSON.stringify(data)
+  } catch {
+    return `Error ${response.status}: ${response.statusText}`
+  }
+}
 
 interface GroupedAnalysis {
   analysisId: number
@@ -84,7 +118,8 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       const response = await apiRequest(RESULTS_ENDPOINTS.BY_PROTOCOL_WITH_VALUE(protocol.id))
 
       if (!response.ok) {
-        throw new Error("Error al cargar los resultados")
+        const errorMsg = await extractResponseError(response)
+        throw new Error(errorMsg)
       }
 
       const data = await response.json()
@@ -96,7 +131,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       setExpandedAnalysis(grouped.map((g) => g.analysisId.toString()))
     } catch (err) {
       console.error("Error loading protocol results:", err)
-      toast.error("Error al cargar los resultados del protocolo")
+      toast.error(extractErrorMessage(err))
     } finally {
       setIsLoading(false)
     }
@@ -123,13 +158,15 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
         const response = await apiRequest(RESULTS_ENDPOINTS.PREVIOUS_RESULTS(protocol.patient.id, determinationId))
 
         if (!response.ok) {
-          throw new Error("Error al cargar historial")
+          const errorMsg = await extractResponseError(response)
+          throw new Error(errorMsg)
         }
 
         const data: Result[] = await response.json()
         setPreviousResults((prev) => ({ ...prev, [resultId]: data }))
       } catch (error) {
         console.error("Error loading previous results:", error)
+        toast.error(extractErrorMessage(error))
       } finally {
         setLoadingPrevious((prev) => {
           const newSet = new Set(prev)
@@ -141,7 +178,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
     [apiRequest, protocol.patient.id, previousResults, loadingPrevious],
   )
 
-  const handleDeterminationHover = useCallback(
+  const handleButtonZoneEnter = useCallback(
     (resultId: number, determinationId: number) => {
       if (!previousResults[resultId] && !loadingPrevious.has(resultId)) {
         loadPreviousResults(resultId, determinationId)
@@ -151,7 +188,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
     [previousResults, loadingPrevious, loadPreviousResults],
   )
 
-  const handleDeterminationLeave = useCallback((e: React.MouseEvent, resultId: number) => {
+  const handleButtonZoneLeave = useCallback((e: React.MouseEvent, resultId: number) => {
     const relatedTarget = e.relatedTarget as Node | null
     const currentTarget = e.currentTarget as Node
     if (relatedTarget && currentTarget.contains(relatedTarget)) {
@@ -177,7 +214,8 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       })
 
       if (!response.ok) {
-        throw new Error("Error al validar el resultado")
+        const errorMsg = await extractResponseError(response)
+        throw new Error(errorMsg)
       }
 
       const updatedResult: Result = await response.json()
@@ -197,7 +235,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       }
     } catch (err) {
       console.error("Error validating result:", err)
-      toast.error("Error al validar el resultado")
+      toast.error(extractErrorMessage(err))
     } finally {
       setValidatingIds((prev) => {
         const newSet = new Set(prev)
@@ -217,7 +255,8 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       })
 
       if (!response.ok) {
-        throw new Error("Error al rechazar el resultado")
+        const errorMsg = await extractResponseError(response)
+        throw new Error(errorMsg)
       }
 
       const updatedResult: Result = await response.json()
@@ -233,7 +272,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       toast.success("Resultado marcado como incorrecto")
     } catch (err) {
       console.error("Error rejecting result:", err)
-      toast.error("Error al rechazar el resultado")
+      toast.error(extractErrorMessage(err))
     } finally {
       setRejectingIds((prev) => {
         const newSet = new Set(prev)
@@ -253,7 +292,8 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       })
 
       if (!response.ok) {
-        throw new Error("Error al cambiar el estado de validación")
+        const errorMsg = await extractResponseError(response)
+        throw new Error(errorMsg)
       }
 
       const updatedResult: Result = await response.json()
@@ -269,7 +309,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
       toast.success("Estado de validación actualizado")
     } catch (err) {
       console.error("Error toggling validation:", err)
-      toast.error("Error al cambiar el estado de validación")
+      toast.error(extractErrorMessage(err))
     } finally {
       setTogglingIds((prev) => {
         const newSet = new Set(prev)
@@ -310,16 +350,16 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
             value={group.analysisId.toString()}
             className="border rounded-lg bg-white relative"
           >
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-gray-50">
-              <div className="flex items-center gap-3">
-                <Beaker className="h-5 w-5 text-[#204983]" />
-                <span className="font-semibold text-gray-900">{group.analysisName}</span>
+            <AccordionTrigger className="px-3 sm:px-4 py-3 hover:no-underline hover:bg-gray-50">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <Beaker className="h-4 w-4 sm:h-5 sm:w-5 text-[#204983]" />
+                <span className="font-semibold text-gray-900 text-sm sm:text-base">{group.analysisName}</span>
                 <Badge variant="outline" className="text-xs">
-                  {group.results.length} determinaciones
+                  {group.results.length} det.
                 </Badge>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
+            <AccordionContent className="px-3 sm:px-4 pb-4">
               <div className="space-y-4">
                 {group.results.map((result) => {
                   const validationStatus = getValidationStatus(result)
@@ -333,79 +373,22 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
                   return (
                     <div
                       key={result.id}
-                      className={`relative p-4 border rounded-lg shadow-sm ${
+                      className={`relative border rounded-lg shadow-sm overflow-hidden ${
                         validationStatus === "wrong"
                           ? "border-red-300 bg-red-50"
                           : validationStatus === "valid"
                             ? "border-green-300 bg-green-50"
                             : "border-blue-300 bg-white"
                       }`}
-                      onMouseEnter={() => handleDeterminationHover(result.id, result.determination.id)}
-                      onMouseLeave={(e) => handleDeterminationLeave(e, result.id)}
                     >
-                      {validationStatus !== "pending" && (
-                        <div className="absolute top-4 right-4">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-gray-300 text-gray-700 hover:bg-gray-100 bg-transparent"
-                            onClick={() => handleToggleValidation(result.id, result.is_valid)}
-                            disabled={isToggling}
-                          >
-                            {isToggling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cambiar"}
-                          </Button>
-                        </div>
-                      )}
-
-                      {validationStatus === "pending" && (
-                        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => handleValidateResult(result.id)}
-                              disabled={isValidating || isRejecting || isToggling}
-                            >
-                              {isValidating ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Validar
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-red-300 text-red-700 hover:bg-red-50 bg-transparent"
-                              onClick={() => handleRejectResult(result.id)}
-                              disabled={isValidating || isRejecting || isToggling}
-                            >
-                              {isRejecting ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Rechazar
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                          <Textarea
-                            placeholder="Notas (opcional)"
-                            className="text-sm resize-none w-64"
-                            rows={2}
-                            value={validationNotes[result.id] || ""}
-                            onChange={(e) => setValidationNotes((prev) => ({ ...prev, [result.id]: e.target.value }))}
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1 pr-72">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold text-gray-900">{result.determination.name}</h4>
+                      <div className="flex flex-col sm:flex-row">
+                        {/* Contenido principal */}
+                        <div className="flex-1 p-3 sm:p-4">
+                          {/* Header con nombre y badges */}
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
+                              {result.determination.name}
+                            </h4>
                             {validationStatus === "valid" && (
                               <Badge variant="outline" className="bg-green-50 border-green-300 text-green-700 text-xs">
                                 <CheckCircle className="h-3 w-3 mr-1" />
@@ -415,7 +398,7 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
                             {validationStatus === "wrong" && (
                               <Badge variant="outline" className="bg-red-50 border-red-300 text-red-700 text-xs">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                Requiere revisión
+                                Revisión
                               </Badge>
                             )}
                             {validationStatus === "pending" && (
@@ -424,114 +407,147 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
                               </Badge>
                             )}
                           </div>
-                          <p className="text-lg text-[#204983] font-medium mt-1">
+
+                          {/* Valor */}
+                          <p className="text-base sm:text-lg text-[#204983] font-medium mb-2">
                             {result.value || "Sin valor"} {result.determination.measure_unit}
                           </p>
-                        </div>
 
-                        {validationStatus === "valid" && result.validated_by && (
-                          <div className="text-xs text-gray-500">
-                            Validado por: {result.validated_by.first_name} {result.validated_by.last_name}
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-gray-500 hover:text-[#204983] mb-3"
-                        onClick={() => {
-                          toggleHistory(result.id)
-                          if (!previousResults[result.id]) {
-                            loadPreviousResults(result.id, result.determination.id)
-                          }
-                        }}
-                      >
-                        <History className="h-3 w-3 mr-1" />
-                        Historial
-                        {isHistoryExpanded ? (
-                          <ChevronUp className="h-3 w-3 ml-1" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3 ml-1" />
-                        )}
-                      </Button>
-
-                      {/* Panel de historial */}
-                      {isHistoryExpanded && (
-                        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                            <History className="h-4 w-4" />
-                            Resultados Previos del Paciente
-                          </h4>
-                          {isLoadingHistory ? (
-                            <div className="flex items-center gap-2 text-gray-500">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-sm">Cargando historial...</span>
+                          {/* Validado por */}
+                          {validationStatus === "valid" && result.validated_by && (
+                            <div className="text-xs text-gray-500">
+                              Validado por: {result.validated_by.first_name} {result.validated_by.last_name}
                             </div>
-                          ) : prevResults.length === 0 ? (
-                            <p className="text-sm text-gray-500">No hay resultados previos para esta determinación.</p>
-                          ) : (
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                              {prevResults.map((prev, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center justify-between p-2 bg-white border border-gray-100 rounded"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-lg font-semibold text-[#204983]">{prev.value}</span>
-                                    <span className="text-xs text-gray-500">{prev.determination?.measure_unit}</span>
-                                    {(prev as any).date && (
-                                      <span className="text-xs text-gray-400">
-                                        {new Date((prev as any).date).toLocaleDateString("es-AR", {
-                                          day: "2-digit",
-                                          month: "2-digit",
-                                          year: "numeric",
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {prev.is_valid ? (
-                                      <Badge
-                                        variant="outline"
-                                        className="bg-green-50 border-green-300 text-green-700 text-xs"
-                                      >
-                                        Validado
-                                      </Badge>
-                                    ) : prev.is_wrong ? (
-                                      <Badge
-                                        variant="outline"
-                                        className="bg-red-50 border-red-300 text-red-700 text-xs"
-                                      >
-                                        No válido
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        variant="outline"
-                                        className="bg-amber-50 border-amber-300 text-amber-700 text-xs"
-                                      >
-                                        Pendiente
-                                      </Badge>
-                                    )}
-                                    {prev.validated_by && (
-                                      <span className="text-xs text-gray-400">
-                                        por {prev.validated_by.first_name} {prev.validated_by.last_name}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                          )}
+
+                          {/* Notas - solo para pendientes y en móvil */}
+                          {validationStatus === "pending" && (
+                            <div className="mt-2 sm:hidden">
+                              <Textarea
+                                placeholder="Notas (opcional)"
+                                className="text-sm resize-none w-full"
+                                rows={2}
+                                value={validationNotes[result.id] || ""}
+                                onChange={(e) =>
+                                  setValidationNotes((prev) => ({ ...prev, [result.id]: e.target.value }))
+                                }
+                              />
                             </div>
                           )}
                         </div>
-                      )}
 
-                      {/* Mostrar notas si ya existen */}
-                      {result.notes && validationStatus !== "pending" && (
-                        <p className="text-sm text-gray-600 mt-2 italic">Notas: {result.notes}</p>
-                      )}
+                        <div
+                          className="relative flex flex-col bg-gray-50 border-t sm:border-t-0 sm:border-l border-gray-200 p-3 sm:p-4 sm:w-64 md:w-72"
+                          onMouseEnter={() => handleButtonZoneEnter(result.id, result.determination.id)}
+                          onMouseLeave={(e) => handleButtonZoneLeave(e, result.id)}
+                        >
+                          {/* Botones de acción */}
+                          <div className="flex flex-row sm:flex-col gap-2">
+                            {validationStatus === "pending" ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                                  onClick={() => handleValidateResult(result.id)}
+                                  disabled={isValidating || isRejecting || isToggling}
+                                >
+                                  {isValidating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-4 w-4 mr-1" />
+                                      Validar
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-300 text-red-700 hover:bg-red-50 bg-white flex-1"
+                                  onClick={() => handleRejectResult(result.id)}
+                                  disabled={isValidating || isRejecting || isToggling}
+                                >
+                                  {isRejecting ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <XCircle className="h-4 w-4 mr-1" />
+                                      Rechazar
+                                    </>
+                                  )}
+                                </Button>
+                                {/* Notas - solo en desktop */}
+                                <Textarea
+                                  placeholder="Notas (opcional)"
+                                  className="text-sm resize-none w-full hidden sm:block"
+                                  rows={2}
+                                  value={validationNotes[result.id] || ""}
+                                  onChange={(e) =>
+                                    setValidationNotes((prev) => ({ ...prev, [result.id]: e.target.value }))
+                                  }
+                                />
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-300 text-gray-700 hover:bg-gray-100 bg-white w-full"
+                                onClick={() => handleToggleValidation(result.id, result.is_valid)}
+                                disabled={isToggling}
+                              >
+                                {isToggling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cambiar estado"}
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* Botón de historial manual para móvil */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-gray-500 hover:text-[#204983] sm:hidden mt-2"
+                            onClick={() => {
+                              toggleHistory(result.id)
+                              if (!previousResults[result.id]) {
+                                loadPreviousResults(result.id, result.determination.id)
+                              }
+                            }}
+                          >
+                            <History className="h-3 w-3 mr-1" />
+                            {isHistoryExpanded ? "Ocultar historial" : "Ver historial"}
+                          </Button>
+
+                          {/* Panel de historial */}
+                          {isHistoryExpanded && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                                <History className="h-3 w-3" />
+                                Resultados previos
+                              </div>
+                              {isLoadingHistory ? (
+                                <div className="flex justify-center py-2">
+                                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                </div>
+                              ) : prevResults.length > 0 ? (
+                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                  {prevResults.slice(0, 5).map((prev, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex justify-between text-xs p-1.5 bg-white rounded border"
+                                    >
+                                      <span className="font-medium text-[#204983]">
+                                        {prev.value} {prev.determination?.measure_unit}
+                                      </span>
+                                      <span className="text-gray-400">#{prev.id}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-400 italic">Sin resultados previos</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )
                 })}
@@ -543,18 +559,18 @@ export function ValidationProtocolCard({ protocol, onProtocolValidated, isExpand
 
       {/* Modal de confirmación */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle>Validación Completada</DialogTitle>
             <DialogDescription>
               Has validado todos los resultados de este protocolo. ¿Deseas realizar algún cambio adicional o finalizar?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleContinueEditing}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleContinueEditing} className="w-full sm:w-auto bg-transparent">
               Seguir editando
             </Button>
-            <Button className="bg-[#204983] hover:bg-[#204983]/90" onClick={handleConfirmComplete}>
+            <Button className="bg-[#204983] hover:bg-[#204983]/90 w-full sm:w-auto" onClick={handleConfirmComplete}>
               Finalizar
             </Button>
           </DialogFooter>

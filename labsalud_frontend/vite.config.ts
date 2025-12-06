@@ -13,6 +13,6 @@ export default defineConfig({
   server: {
     port: 80,
     host: "0.0.0.0", // escucha en todas las interfaces IPv4
-    allowedHosts: ['*']
+    allowedHosts: ['gestion.labsalud.com.ar', 'www.gestion.labsalud.com.ar', '*']
   }
 })

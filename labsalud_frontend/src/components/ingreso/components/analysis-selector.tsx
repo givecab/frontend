@@ -8,7 +8,7 @@ import { Checkbox } from "../../ui/checkbox"
 import { Search, TestTube, X } from "lucide-react"
 import { useApi } from "../../../hooks/use-api"
 import { toast } from "sonner"
-import type { AnalysisPanel, Analysis } from "../../../types"
+import type { Analysis } from "../../../types"
 import { CATALOG_ENDPOINTS } from "@/config/api"
 
 interface AnalysisSelectorProps {
@@ -25,33 +25,24 @@ interface PaginatedResponse<T> {
 
 export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: AnalysisSelectorProps) {
   const { apiRequest } = useApi()
-  const [panels, setPanels] = useState<AnalysisPanel[]>([])
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    loadPanelsAndAnalyses()
+    loadAnalyses()
   }, [])
 
-  const loadPanelsAndAnalyses = async () => {
+  const loadAnalyses = async () => {
     try {
       setIsLoading(true)
-      // Cargar paneles
-      const panelsResponse = await apiRequest(CATALOG_ENDPOINTS.ANALYSIS)
-      if (panelsResponse.ok) {
-        const panelsData: PaginatedResponse<AnalysisPanel> = await panelsResponse.json()
-        setPanels(panelsData.results)
-      }
-
-      // Cargar análisis
       const analysesResponse = await apiRequest(CATALOG_ENDPOINTS.ANALYSIS)
       if (analysesResponse.ok) {
         const analysesData: PaginatedResponse<Analysis> = await analysesResponse.json()
         setAnalyses(analysesData.results)
       }
     } catch (error) {
-      console.error("Error loading panels and analyses:", error)
+      console.error("Error loading analyses:", error)
       toast.error("Error al cargar los análisis")
     } finally {
       setIsLoading(false)
@@ -71,40 +62,8 @@ export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: Analysi
     }
   }
 
-  const handlePanelToggle = (panel: AnalysisPanel, checked: boolean) => {
-    const panelAnalyses = analyses.filter((analysis) => analysis.panel === panel.id)
-
-    if (checked) {
-      // Agregar todos los análisis del panel que no estén ya seleccionados
-      const newAnalyses = panelAnalyses.filter(
-        (analysis) => !selectedAnalyses.find((selected) => selected.id === analysis.id),
-      )
-      onAnalysisChange([...selectedAnalyses, ...newAnalyses])
-    } else {
-      // Remover todos los análisis del panel
-      const panelAnalysisIds = panelAnalyses.map((a) => a.id)
-      onAnalysisChange(selectedAnalyses.filter((analysis) => !panelAnalysisIds.includes(analysis.id)))
-    }
-  }
-
   const removeAnalysis = (analysisId: number) => {
     onAnalysisChange(selectedAnalyses.filter((a) => a.id !== analysisId))
-  }
-
-  const isPanelSelected = (panel: AnalysisPanel) => {
-    const panelAnalyses = analyses.filter((analysis) => analysis.panel === panel.id)
-    return (
-      panelAnalyses.length > 0 &&
-      panelAnalyses.every((analysis) => selectedAnalyses.find((selected) => selected.id === analysis.id))
-    )
-  }
-
-  const isPanelPartiallySelected = (panel: AnalysisPanel) => {
-    const panelAnalyses = analyses.filter((analysis) => analysis.panel === panel.id)
-    const selectedCount = panelAnalyses.filter((analysis) =>
-      selectedAnalyses.find((selected) => selected.id === analysis.id),
-    ).length
-    return selectedCount > 0 && selectedCount < panelAnalyses.length
   }
 
   if (isLoading) {
@@ -122,8 +81,8 @@ export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: Analysi
       {/* Análisis Seleccionados */}
       {selectedAnalyses.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <TestTube className="h-5 w-5" />
               Análisis Seleccionados ({selectedAnalyses.length})
             </CardTitle>
@@ -150,8 +109,8 @@ export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: Analysi
 
       {/* Selector de Análisis */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Search className="h-5 w-5" />
             Seleccionar Análisis
           </CardTitle>
@@ -166,44 +125,12 @@ export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: Analysi
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Paneles */}
+          {/* Análisis */}
           <div className="space-y-2">
-            <h4 className="font-medium text-sm text-gray-700">Paneles de Análisis</h4>
-            {panels.map((panel) => {
-              const panelAnalyses = analyses.filter((analysis) => analysis.panel === panel.id)
-              const isSelected = isPanelSelected(panel)
-              const isPartiallySelected = isPanelPartiallySelected(panel)
-
-              return (
-                <div key={panel.id} className="flex items-center space-x-2 p-2 border rounded">
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={(checked) => handlePanelToggle(panel, checked as boolean)}
-                    className={isPartiallySelected ? "data-[state=checked]:bg-orange-500" : ""}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">{panel.name}</div>
-                    <div className="text-sm text-gray-500">
-                      {panelAnalyses.length} análisis
-                      {panel.is_urgent && (
-                        <Badge variant="destructive" className="ml-2">
-                          Urgente
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Análisis Individuales */}
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm text-gray-700">Análisis Individuales</h4>
+            <h4 className="font-medium text-sm text-gray-700">Análisis Disponibles</h4>
             <div className="max-h-60 overflow-y-auto space-y-1">
               {filteredAnalyses.map((analysis) => {
                 const isSelected = selectedAnalyses.find((selected) => selected.id === analysis.id)
-                const panel = panels.find((p) => p.id === analysis.panel)
 
                 return (
                   <div key={analysis.id} className="flex items-center space-x-2 p-2 border rounded">
@@ -211,17 +138,24 @@ export function AnalysisSelector({ selectedAnalyses, onAnalysisChange }: Analysi
                       checked={!!isSelected}
                       onCheckedChange={(checked) => handleAnalysisToggle(analysis, checked as boolean)}
                     />
-                    <div className="flex-1">
-                      <div className="font-medium">{analysis.name}</div>
-                      <div className="text-sm text-gray-500">
-                        Código: {analysis.code}
-                        {panel && ` • Panel: ${panel.name}`}
-                        {analysis.measure_unit && ` • Unidad: ${analysis.measure_unit}`}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{analysis.name}</div>
+                      <div className="text-sm text-gray-500 flex flex-wrap gap-x-2">
+                        <span>Código: {analysis.code}</span>
+                        {analysis.bio_unit && <span>Unidad: {analysis.bio_unit}</span>}
+                        {analysis.is_urgent && (
+                          <Badge variant="destructive" className="text-xs">
+                            Urgente
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
                 )
               })}
+              {filteredAnalyses.length === 0 && (
+                <div className="text-center py-4 text-gray-500">No se encontraron análisis</div>
+              )}
             </div>
           </div>
         </CardContent>

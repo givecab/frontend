@@ -18,6 +18,21 @@ interface CreateMedicoFormProps {
   onCancel: () => void
 }
 
+const extractErrorMessage = (errorData: unknown): string => {
+  if (typeof errorData === "string") return errorData
+  if (errorData && typeof errorData === "object") {
+    const err = errorData as Record<string, unknown>
+    if (err.detail) return String(err.detail)
+    if (err.error) return String(err.error)
+    if (err.message) return String(err.message)
+    const firstKey = Object.keys(err)[0]
+    if (firstKey && Array.isArray(err[firstKey])) {
+      return `${firstKey}: ${err[firstKey][0]}`
+    }
+  }
+  return "Ha ocurrido un error inesperado"
+}
+
 export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoFormProps) {
   const { apiRequest } = useApi()
   const [formData, setFormData] = useState({
@@ -61,12 +76,12 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
         const errorData = await response.json()
         console.error("Medico creation error:", errorData)
         toast.error("Error al crear médico", {
-          description: errorData.detail || "Ha ocurrido un error al crear el médico.",
+          description: extractErrorMessage(errorData),
         })
       }
     } catch (error) {
       console.error("Error creating medico:", error)
-      toast.error("Error al crear el médico")
+      toast.error("Error al crear el médico", { description: "Error de conexión con el servidor" })
     } finally {
       setIsCreating(false)
     }
@@ -81,7 +96,7 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="first_name">Nombre *</Label>
             <Input
@@ -117,7 +132,8 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
             required
           />
         </div>
-        <div className="flex gap-2 pt-4">
+
+        <div className="flex flex-col sm:flex-row gap-2 pt-4">
           <Button onClick={handleCreateMedico} disabled={isCreating} className="flex-1 bg-[#204983] hover:bg-[#1a3d6f]">
             {isCreating ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
@@ -126,7 +142,7 @@ export function CreateMedicoForm({ onMedicoCreated, onCancel }: CreateMedicoForm
             )}
             {isCreating ? "Creando..." : "Crear Médico"}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" onClick={onCancel} className="sm:w-auto bg-transparent">
             <X className="h-4 w-4 mr-2" />
             Cancelar
           </Button>
