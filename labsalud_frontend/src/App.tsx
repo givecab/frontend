@@ -15,6 +15,7 @@ import ProtocolosPage from "./components/protocolos/protocolos-page"
 import ResultadosPage from "./components/results/results-page"
 import ValidacionPage from "./components/validacion/validacion-page"
 import { PERMISSIONS } from "./config/permissions"
+import NotFound from "./components/not-found"
 
 function App() {
   return (
@@ -113,6 +114,7 @@ function App() {
           >
             <Route index element={<ValidacionPage />} />
           </Route>
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
       <Toaster position="bottom-right" richColors />

@@ -5,7 +5,7 @@ import { useApi } from "@/hooks/use-api"
 import { useToast } from "@/hooks/use-toast"
 import { ANALYTICS_ENDPOINTS } from "@/config/api"
 import type { Permission } from "@/types"
-import { User, Shield, Clock, TestTube, Users, TrendingUp, CheckCircle, AlertCircle } from "lucide-react"
+import { User, Shield, Clock, TestTube, Users, TrendingUp, CheckCircle, AlertCircle, Printer } from "lucide-react"
 
 interface Stats {
   analysisToday: number
@@ -15,10 +15,11 @@ interface Stats {
   protocolsCompletedMonth: number
   protocolsCompletedGrowthPercent: string
   avgResultLoadTimeHuman: string
+  printedIncompletePayment: number
 }
 
 export default function Home() {
-  const { user, hasPermission, } = useAuth()
+  const { user, hasPermission } = useAuth()
   const { apiRequest } = useApi()
   const { error: showErrorToast } = useToast()
 
@@ -30,6 +31,7 @@ export default function Home() {
     protocolsCompletedMonth: 0,
     protocolsCompletedGrowthPercent: "0.0",
     avgResultLoadTimeHuman: "0 min",
+    printedIncompletePayment: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -56,6 +58,7 @@ export default function Home() {
         avgResultLoadTimeHuman: data.avg_result_load_time_human || "0 min",
         pendingResultsLoad: data.pending_results_load || 0,
         pendingResultsValidation: data.pending_results_validation || 0,
+        printedIncompletePayment: data.printed_with_incomplete_payment || 0,
       })
     } catch (error) {
       console.error("Error fetching stats:", error)
@@ -247,6 +250,23 @@ export default function Home() {
             <p className="text-orange-600 text-sm">Resultados por validar</p>
           </div>
         )}
+
+        <div className="bg-red-50/80 backdrop-blur-sm p-6 rounded-lg border border-red-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <Printer className="w-6 h-6 text-red-600" />
+            </div>
+            <span className="text-xs text-red-500 font-medium">PAGO PENDIENTE</span>
+          </div>
+          <h3 className="text-2xl font-bold text-red-800 mb-1">
+            {loading ? (
+              <div className="animate-pulse bg-red-200 h-8 w-16 rounded"></div>
+            ) : (
+              stats.printedIncompletePayment.toLocaleString()
+            )}
+          </h3>
+          <p className="text-red-600 text-sm">Protocolos impresos sin pago completo</p>
+        </div>
       </div>
     </div>
   )
