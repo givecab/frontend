@@ -100,6 +100,7 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
   const [reportType, setReportType] = useState<"full" | "summary">("full")
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
 
   // Helper function to extract error messages from backend responses
@@ -411,6 +412,30 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
     }
   }
 
+  const handleSendWhatsApp = async () => {
+    setIsSendingWhatsApp(true)
+    try {
+      const response = await apiRequest(REPORTING_ENDPOINTS.SEND_WHATSAPP(protocol.id, reportType), {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(data.detail || "WhatsApp enviado exitosamente", { duration: TOAST_DURATION })
+        setReportDialogOpen(false)
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(extractErrorMessage(errorData, "Error sending WhatsApp"))
+      }
+    } catch (error) {
+      console.error("Error sending WhatsApp:", error)
+      const message = error instanceof Error ? error.message : "Error al enviar el WhatsApp"
+      toast.error(message, { duration: TOAST_DURATION })
+    } finally {
+      setIsSendingWhatsApp(false)
+    }
+  }
+
   const handleToggleAuthorization = async (detail: ProtocolDetailType) => {
     setUpdatingDetailId(detail.id)
     try {
@@ -625,8 +650,10 @@ export function ProtocolCard({ protocol, onUpdate, sendMethods = [] }: ProtocolC
         onReportTypeChange={setReportType}
         onGenerateReport={handleGenerateReport}
         onSendEmail={handleSendEmail}
+        onSendWhatsApp={handleSendWhatsApp}
         isGenerating={isGeneratingReport}
         isSending={isSendingEmail}
+        isSendingWhatsApp={isSendingWhatsApp}
       />
 
       <ProtocolHistoryDialog

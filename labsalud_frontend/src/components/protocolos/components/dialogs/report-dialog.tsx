@@ -1,6 +1,6 @@
 "use client"
 
-import { Loader2, FileText, Printer, Mail } from "lucide-react"
+import { Loader2, FileText, Printer, Mail, MessageCircle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../../ui/dialog"
 import { Button } from "../../../ui/button"
 import { Label } from "../../../ui/label"
@@ -14,8 +14,10 @@ interface ReportDialogProps {
   onReportTypeChange: (type: "full" | "summary") => void
   onGenerateReport: () => void
   onSendEmail: () => void
+  onSendWhatsApp: () => void
   isGenerating: boolean
   isSending: boolean
+  isSendingWhatsApp: boolean
 }
 
 export function ReportDialog({
@@ -26,8 +28,10 @@ export function ReportDialog({
   onReportTypeChange,
   onGenerateReport,
   onSendEmail,
+  onSendWhatsApp,
   isGenerating,
   isSending,
+  isSendingWhatsApp,
 }: ReportDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -38,7 +42,7 @@ export function ReportDialog({
             <FileText className="h-5 w-5 text-purple-600" />
             Reportes - Protocolo #{protocolId}
           </DialogTitle>
-          <DialogDescription>Genere un reporte PDF o envíelo por email al paciente.</DialogDescription>
+          <DialogDescription>Genere un reporte PDF o envíelo por email/WhatsApp al paciente.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -60,44 +64,73 @@ export function ReportDialog({
           </div>
         </div>
         {/* // Responsive footer with stacked buttons on mobile */}
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto order-3 sm:order-1">
-            Cancelar
-          </Button>
+        <DialogFooter className="flex-col gap-3 sm:gap-2">
+          {/* Action buttons row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+            <Button
+              type="button"
+              onClick={onGenerateReport}
+              disabled={isGenerating}
+              variant="outline"
+              className="text-purple-600 border-purple-600 hover:bg-purple-600 hover:text-white bg-transparent w-full"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              onClick={onSendEmail}
+              disabled={isSending}
+              className="bg-purple-600 hover:bg-purple-700 w-full"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Email
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              onClick={onSendWhatsApp}
+              disabled={isSendingWhatsApp}
+              className="bg-green-600 hover:bg-green-700 w-full"
+            >
+              {isSendingWhatsApp ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  WhatsApp
+                </>
+              )}
+            </Button>
+          </div>
+          {/* Cancel button row */}
           <Button
-            onClick={onGenerateReport}
-            disabled={isGenerating}
+            type="button"
             variant="outline"
-            className="text-purple-600 border-purple-600 hover:bg-purple-600 hover:text-white bg-transparent w-full sm:w-auto order-1 sm:order-2"
+            onClick={() => onOpenChange(false)}
+            className="w-full sm:w-auto sm:self-start"
           >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generando...
-              </>
-            ) : (
-              <>
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir Reporte
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={onSendEmail}
-            disabled={isSending}
-            className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto order-2 sm:order-3"
-          >
-            {isSending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              <>
-                <Mail className="mr-2 h-4 w-4" />
-                Enviar por Email
-              </>
-            )}
+            Cancelar
           </Button>
         </DialogFooter>
       </DialogContent>

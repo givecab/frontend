@@ -112,6 +112,8 @@ export const REPORTING_ENDPOINTS = {
   PRINT: (id: number, type: "full" | "summary") => buildApiUrl(`/reports/protocols/${id}/print/?type=${type}`),
   SEND_EMAIL: (id: number, type: "full" | "summary") =>
     buildApiUrl(`/reports/protocols/${id}/send-email/?type=${type}`),
+  SEND_WHATSAPP: (id: number, type: "full" | "summary") =>
+    buildApiUrl(`/reports/protocols/${id}/send-whatsapp/?type=${type}`),
 } as const
 
 // Core endpoints
